@@ -102,6 +102,15 @@ func catalogShape(): Int64 {
         ck.that(GlyphCatalog.indexOfAsset("glyph/不存在.svg") == -1, "查无此 asset 返回 -1")
         a = a + 1
     }
+    /* 27 字各阶段行数加总 = 106 */
+    var sumRows: Int64 = 0
+    var ci: Int64 = 0
+    while (ci < GlyphCatalog.charIds().size) {
+        sumRows = sumRows + GlyphCatalog.ofChar(GlyphCatalog.charIds()[ci]).size
+        ci = ci + 1
+    }
+    ck.that(sumRows == 106, "27 字行数加总 106（got ${sumRows}）")
+    ck.that(sumRows == GlyphCatalog.count(), "加总 = count()")
     ck.done("catalog")
     return ck.failures.size
 }
@@ -116,10 +125,22 @@ func benAndMo(): Int64 {
         ck.that(rows.size == 3, "${charId} 3 行")
         ck.that(rows[0].stage == "bronze", "${charId} 首行是金文")
         ck.that(rows[0].stageLabel == "金文 · 商周", "${charId} 首行 金文 · 商周")
+        /* 本/末没有甲骨文：表里不出现 oracle，演变条也不出甲骨文格。 */
+        var r: Int64 = 0
+        while (r < rows.size) {
+            ck.that(rows[r].stage != "oracle", "${charId} 表里无甲骨文（got ${rows[r].stage}）")
+            r = r + 1
+        }
+        ck.that(GlyphCatalog.ofChar(charId).size == 3, "${charId} ofChar 仍是 3")
         let strip = buildEvoStrip(charId, None)
         ck.that(strip.cells.size == 4, "${charId} 演变条 4 格（3 古字形 + 繁简同形）")
         ck.that(strip.cellAt(0).name == "金文", "${charId} 第 1 格阶段名 金文")
         ck.that(strip.cellAt(0).era == "商周", "${charId} 第 1 格时代 商周")
+        var sn: Int64 = 0
+        while (sn < strip.cells.size) {
+            ck.that(strip.cellAt(sn).name != "甲骨文", "${charId} 演变条无甲骨文格")
+            sn = sn + 1
+        }
         ck.that(strip.cellAt(3).name == "繁简同形", "${charId} 最后 繁简同形")
         ck.that(strip.cellAt(3).era == "", "${charId} 最后一格不写时代")
         ck.that(strip.isTier(EvoTier.M), "${charId} 标准档 M")
@@ -203,6 +224,45 @@ func congStrip(): Int64 {
     return ck.failures.size
 }
 
+func sizeBuckets(): Int64 {
+    println("== 档位分桶：默认条 ≤5 格 M(304)、≥6 格 S(301)；卡面强制 C(296) ==")
+    let ck = Check()
+    var mCount: Int64 = 0
+    var sCount: Int64 = 0
+    var c: Int64 = 0
+    while (c < GlyphCatalog.charIds().size) {
+        let charId = GlyphCatalog.charIds()[c]
+        let strip = buildEvoStrip(charId, None)
+        if (strip.cells.size >= 6) {
+            sCount = sCount + 1
+            ck.that(strip.isTier(EvoTier.S), "${charId} ≥6 格 → S")
+            ck.that(strip.cellSize == 46 && strip.gap == 5, "${charId} S 格 46/5")
+            ck.that(strip.trackWidth == 301, "${charId} S 轨道 301")
+            ck.that(strip.trackWidth <= 301, "${charId} S 轨道 ≤301")
+        } else {
+            mCount = mCount + 1
+            ck.that(strip.isTier(EvoTier.M), "${charId} ≤5 格 → M")
+            ck.that(strip.cellSize == 56 && strip.gap == 6, "${charId} M 格 56/6")
+            ck.that(strip.trackWidth == 304, "${charId} M 轨道 304")
+        }
+        ck.that(strip.usedWidth() <= strip.trackWidth, "${charId} used ≤ track")
+        let card = buildCardStrip(charId)
+        ck.that(card.isTier(EvoTier.C), "${charId} 卡面强制 C")
+        ck.that(card.cellSize == 48 && card.gap == 14, "${charId} C 格 48/14")
+        ck.that(card.trackWidth == 296, "${charId} C 轨道 296")
+        c = c + 1
+    }
+    ck.that(mCount + sCount == 27, "分桶覆盖 27 字（M ${mCount} + S ${sCount}）")
+    ck.that(mCount >= 1 && sCount >= 1, "M/S 两档都有字（M ${mCount} / S ${sCount}）")
+    /* 从 是已知 S 档样例；休 / 本 / 末 是 M 档样例 */
+    ck.that(buildEvoStrip("cong", None).isTier(EvoTier.S), "从 → S")
+    ck.that(buildEvoStrip("xiu", None).isTier(EvoTier.M), "休 → M")
+    ck.that(buildEvoStrip("ben", None).isTier(EvoTier.M), "本 → M")
+    ck.that(buildEvoStrip("mo", None).isTier(EvoTier.M), "末 → M")
+    ck.done("size-buckets")
+    return ck.failures.size
+}
+
 func cardTier(): Int64 {
     println("== 卡面档 C：格 48 间距 14，轨道 296 ==")
     let ck = Check()
@@ -275,13 +335,18 @@ func ziluShape(): Int64 {
     println("== 字录：27 格、计数 8/7/1/0、四种状态 ==")
     let ck = Check()
     let (all, xiang, huiyi, zhishi) = ziluCounts()
+    ck.that(ZILU_TOTAL == 27, "ZILU_TOTAL 27")
+    ck.that(ZILU_MADE_IDS.size == 8, "已造列表 8")
     ck.that(all == 8, "全部 8（got ${all}）")
     ck.that(xiang == 7, "象形 7（got ${xiang}）")
     ck.that(huiyi == 1, "会意 1（got ${huiyi}）")
     ck.that(zhishi == 0, "指事 0（got ${zhishi}）")
+    ck.that(all == xiang + huiyi + zhishi, "计数 8 = 象形+会意+指事")
     let grid = ziluGrid()
+    ck.that(grid.size == ZILU_TOTAL, "格数 = ZILU_TOTAL（got ${grid.size}）")
     ck.that(grid.size == 27, "27 格（got ${grid.size}）")
     ck.that(ziluUnknownCount() == 17, "未知 17（got ${ziluUnknownCount()}）")
+    ck.that(ziluUnknownCount() == ZILU_TOTAL - ZILU_MADE_IDS.size - 2, "未知 = 总数−已造−事签−残片")
     var made: Int64 = 0
     var sign: Int64 = 0
     var frag: Int64 = 0
@@ -363,6 +428,10 @@ func tokenShape(): Int64 {
     ck.that(Theme.evoCellS == 46 && Theme.evoGapS == 5, "S 档 46/5")
     ck.that(Theme.evoTrackC == 296 && Theme.evoTrackM == 304 && Theme.evoTrackS == 301, "轨道宽")
     ck.that(Theme.popW == 188 && Theme.popGlyphBox == 144, "放大卡 188/144")
+    /* v1.1.1：放大卡白话 Serif 12（fsPopBaihua）；字体族占位 "serif"。 */
+    ck.that(Theme.fsPopBaihua == 12, "放大卡白话字号 12（got ${Theme.fsPopBaihua}）")
+    ck.that(Theme.serif == "serif", "serif 族占位")
+    ck.that(Theme.serifTC == "serif", "serifTC 族占位")
     ck.that(Theme.gridCell == 60 && Theme.gridGap == 9 && Theme.gridPerRow == 5, "字录格子 60/9/5")
     let (c, g, t) = evoGeometry(EvoTier.M)
     ck.that(c == 56 && g == 6 && t == 304, "evoGeometry(M)")
@@ -379,7 +448,7 @@ main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
-        cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape()
+        sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")

@@ -438,14 +438,14 @@ public class ZiluScreen {
                                         .height(Theme.gridCell)
                                         .borderRadius(Theme.gridRadius)
                                         .backgroundColor(if (c.state == ZiluCellState.Made) {
-                                            if (c.isSelected) { Theme.bone100 } else { Theme.paper50 }
+                                            if (c.charId == this.selectedId) { Theme.bone100 } else { Theme.paper50 }
                                         } else {
                                             if (c.state == ZiluCellState.HasFragment) { Theme.jade100 }
                                             else { if (c.state == ZiluCellState.Unknown) { Theme.paper200 } else { Theme.paper50 } }
                                         })
                                         .border(
-                                            width: if (c.isSelected) { 2 } else { 1 },
-                                            color: if (c.isSelected) { Theme.zhu600 }
+                                            width: if (c.charId == this.selectedId) { 2 } else { 1 },
+                                            color: if (c.charId == this.selectedId) { Theme.zhu600 }
                                                 else {
                                                     if (c.state == ZiluCellState.HasFragment) { Theme.jade600 }
                                                     else { Theme.ink600 }
