@@ -28,7 +28,7 @@ public class ZiluPopCard {
     }
 
     func popCell(): EvoCell {
-        return this.popStrip().cells.at(this.popIndexSafe())
+        return this.popStrip().cells[this.popIndexSafe()]
     }
 
     func build() {

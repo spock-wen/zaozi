@@ -48,10 +48,10 @@ public class ZiluScreen {
         let out = ArrayList<ZiluGridCell>()
         var i: Int64 = 0
         while (i < all.size) {
-            let c = all.at(i)
+            let c = all[i]
             if (c.isMade()) {
                 let rows = GlyphCatalog.ofChar(c.charId)
-                if (rows.at(0).method == this.tabName()) {
+                if (rows[0].method == this.tabName()) {
                     out.add(c)
                 }
             }
@@ -69,7 +69,7 @@ public class ZiluScreen {
             let row = ArrayList<ZiluGridCell>()
             var j: Int64 = 0
             while (j < Theme.gridPerRow && i + j < cells.size) {
-                row.add(cells.at(i + j))
+                row.add(cells[i + j])
                 j = j + 1
             }
             out.add(UiGridRow(row))
@@ -87,7 +87,7 @@ public class ZiluScreen {
     /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
        这些函数都是纯函数，反复调用结果一致。 */
     func ziluFirst(): GlyphRow {
-        return GlyphCatalog.ofChar(this.selectedId).at(0)
+        return GlyphCatalog.ofChar(this.selectedId)[0]
     }
 
     func ziluCopy(): ZiluCopy {
