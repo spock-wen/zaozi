@@ -188,7 +188,7 @@ public class EvoStripScreen {
 
 /* 「休 · 5 格 · M 档」这类说明文字。 */
 public func stripCaption(charId: String): String {
-    let strip = buildEvoStrip(charId, None)
+    let strip = buildEvoStrip(charId, Option<EvoTier>.None)
     let tierName = if (strip.isTier(EvoTier.C)) { "C" } else { if (strip.isTier(EvoTier.S)) { "S" } else { "M" } }
     return "${strip.glyph} · ${strip.cells.size} 格 · ${tierName} 档"
 }

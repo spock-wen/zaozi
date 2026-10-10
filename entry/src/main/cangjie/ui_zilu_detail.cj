@@ -144,8 +144,11 @@ public class ZiluDetailCard {
         return ziluCopyOf(this.selectedId)
     }
 
+    /* copy_text 里 effects 是 ArrayList，ForEach 要 Array：在界面这层转一次。
+       cjc 1.1.3 的 ArrayList 没有 at()，所以用下标取值。 */
     func ziluEffects(): Array<EffectRow> {
-        return this.ziluCopy().effects
+        let src = this.ziluCopy().effects
+        return Array<EffectRow>(src.size, {i: Int64 => src[i]})
     }
 
     /* 放大卡下标：越界时退回第 0 格。 */
