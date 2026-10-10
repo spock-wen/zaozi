@@ -276,7 +276,10 @@ def emit_res(rows, out_path):
     lines.append("   只做语法检查：bash tools/box_check/parse_check.sh */")
     lines.append("")
     lines.append("import ohos.resource.AppResource")
-    lines.append("import ohos.state_macro_manage.rawfile")
+    # @rawfile 在 SDK 里挂在 ohos.arkui.state_macro_manage 下；
+    # ohos.state_macro_manage 这个包不存在（DevEco 报
+    # can not find the following dependencies），所以用 arkui 这条。
+    lines.append("import ohos.arkui.state_macro_manage.*")
     lines.append("")
     lines.append("/* rawfile 里的字形资源（resources/rawfile/glyph/<id>_<stage>.<ext>）。")
     lines.append("   cell.asset 就是 GlyphRow.asset，见 glyph_data.cj。 */")

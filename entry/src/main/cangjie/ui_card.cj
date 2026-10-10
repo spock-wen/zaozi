@@ -79,12 +79,22 @@ public class CardScreen {
         return this.stage
     }
 
-    func build() {
-        let strip = buildCardStrip(this.charId)
-        let idx = this.currentIndex()
-        let lastIdx = strip.cells.size - 1
-        let parts = formulaParts(this.charId)
+    /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
+       buildCardStrip / formulaParts 都是纯函数，反复调用结果一致。 */
+    func cardStrip(): EvoStrip {
+        return buildCardStrip(this.charId)
+    }
 
+    /* 最后一格的下标。 */
+    func cardLastIndex(): Int64 {
+        return this.cardStrip().cells.size - 1
+    }
+
+    func cardParts(): Array<String> {
+        return formulaParts(this.charId)
+    }
+
+    func build() {
         Stack {
             /* —— 卡面本体：点一下跳过 —— */
             Column {
@@ -154,14 +164,14 @@ public class CardScreen {
                     Column {
                         /* 字形区 176 × 176 */
                         Column {
-                            if (idx == lastIdx) {
-                                Text(strip.cells[idx].glyph)
+                            if (this.currentIndex() == this.cardLastIndex()) {
+                                Text(this.cardStrip().cells[this.currentIndex()].glyph)
                                     .fontSize(Theme.fsGlyphHero)
                                     .fontFamily(Theme.serif)
                                     .fontWeight(FontWeight.Bold)
                                     .fontColor(Theme.ink900)
                             } else {
-                                Image(glyphResource(strip.cells[idx].asset))
+                                Image(glyphResource(this.cardStrip().cells[this.currentIndex()].asset))
                                     .width(Theme.boneGlyphBox)
                                     .height(Theme.boneGlyphBox)
                                     .objectFit(ImageFit.Contain)
@@ -176,8 +186,8 @@ public class CardScreen {
 
                         /* 公式行 */
                         Row {
-                            if (parts.size > 0) {
-                                ForEach(parts, itemGeneratorFunc: {p: String, i: Int64 =>
+                            if (this.cardParts().size > 0) {
+                                ForEach(this.cardParts(), itemGeneratorFunc: {p: String, i: Int64 =>
                                     Row {
                                         if (i > 0) {
                                             Text("＋")
@@ -211,8 +221,8 @@ public class CardScreen {
                                 tierOpt: Some(EvoTier.C),
                                 charId: this.charId,
                                 dark: false,
-                                selectedIndex: idx,
-                                playedUpTo: idx,
+                                selectedIndex: this.currentIndex(),
+                                playedUpTo: this.currentIndex(),
                                 showBaihua: false,
                                 tappable: false,
                                 onSelect: {_ => }
@@ -237,12 +247,12 @@ public class CardScreen {
                     .fontColor(Theme.onNight2)
                     .margin(top: 18)
                 Row {
-                    ForEach(strip.cells, itemGeneratorFunc: {cell: EvoCell, i: Int64 =>
+                    ForEach(this.cardStrip().cells, itemGeneratorFunc: {cell: EvoCell, i: Int64 =>
                         Row()
-                            .width(if (i == idx) { 18 } else { 6 })
+                            .width(if (i == this.currentIndex()) { 18 } else { 6 })
                             .height(6)
                             .borderRadius(3)
-                            .backgroundColor(if (i == idx) { Theme.gold400 } else { Theme.nightLine })
+                            .backgroundColor(if (i == this.currentIndex()) { Theme.gold400 } else { Theme.nightLine })
                             .margin(left: 3, right: 3)
                     })
                 }

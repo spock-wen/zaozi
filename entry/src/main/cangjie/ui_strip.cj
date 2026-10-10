@@ -22,29 +22,34 @@ public class EvoStripView {
     @Prop var tappable: Bool
     @Prop var onSelect: (Int64) -> Unit
 
+    /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
+       这几个函数都是纯函数，反复调用结果一致。 */
+    func evoStrip(): EvoStrip {
+        return buildEvoStrip(this.charId, this.tierOpt)
+    }
+
     func build() {
-        let strip = buildEvoStrip(this.charId, this.tierOpt)
         Row {
-            ForEach(strip.cells, itemGeneratorFunc: {cell: EvoCell, index: Int64 =>
+            ForEach(this.evoStrip().cells, itemGeneratorFunc: {cell: EvoCell, index: Int64 =>
                 Column {
                     /* —— 格子：圆角 10，描边 1，底 bone-100；深底 night-700 —— */
                     Column {
                         if (cell.isOld()) {
                             Image(glyphResource(cell.asset))
-                                .width(strip.cellSize)
-                                .height(strip.cellSize)
+                                .width(this.evoStrip().cellSize)
+                                .height(this.evoStrip().cellSize)
                                 .objectFit(ImageFit.Contain)
                                 .fillColor(if (this.dark) { Theme.glyphNight } else { Theme.carve })
                         } else {
                             Text(cell.glyph)
-                                .fontSize(strip.cellSize * 4 / 5)
+                                .fontSize(this.evoStrip().cellSize * 4 / 5)
                                 .fontFamily(if (cell.kind == EvoCellKind.Trad) { Theme.serifTC } else { Theme.serif })
                                 .fontWeight(FontWeight.Bold)
                                 .fontColor(if (this.dark) { Theme.onNight } else { Theme.ink900 })
                         }
                     }
-                    .width(strip.cellSize)
-                    .height(strip.cellSize)
+                    .width(this.evoStrip().cellSize)
+                    .height(this.evoStrip().cellSize)
                     .borderRadius(Theme.evoRadius)
                     .backgroundColor(if (this.dark) { Theme.night700 } else { Theme.bone100 })
                     .border(
@@ -63,7 +68,7 @@ public class EvoStripView {
 
                     /* —— 阶段名（卡面档 10，其余 11）—— */
                     Text(cell.name)
-                        .fontSize(if (strip.tier == EvoTier.C) { Theme.fsStageNameCard } else { Theme.fsStageName })
+                        .fontSize(if (this.evoStrip().tier == EvoTier.C) { Theme.fsStageNameCard } else { Theme.fsStageName })
                         .fontFamily(Theme.sans)
                         .fontWeight(FontWeight.Bold)
                         .fontColor(if (this.dark) { Theme.onNight } else { Theme.ink900 })
@@ -86,7 +91,7 @@ public class EvoStripView {
                             .fontFamily(Theme.serif)
                             .fontColor(if (this.dark) { Theme.onNight2 } else { Theme.ink600 })
                             .maxLines(1)
-                            .width(strip.cellSize + strip.gap - 2)
+                            .width(this.evoStrip().cellSize + this.evoStrip().gap - 2)
                             .textAlign(TextAlign.Center)
                         if (cell.baihua.size > 1) {
                             Text(cell.baihua[1])
@@ -94,13 +99,13 @@ public class EvoStripView {
                                 .fontFamily(Theme.serif)
                                 .fontColor(if (this.dark) { Theme.onNight2 } else { Theme.ink600 })
                                 .maxLines(1)
-                                .width(strip.cellSize + strip.gap - 2)
+                                .width(this.evoStrip().cellSize + this.evoStrip().gap - 2)
                                 .textAlign(TextAlign.Center)
                         }
                     }
                 }
-                .width(strip.cellSize)
-                .margin(right: strip.gap)
+                .width(this.evoStrip().cellSize)
+                .margin(right: this.evoStrip().gap)
                 .alignItems(HorizontalAlign.Center)
             })
         }

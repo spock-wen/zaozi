@@ -14,22 +14,35 @@ public class ZiluPopCard {
     @Prop var onPrev: () -> Unit
     @Prop var onNext: () -> Unit
 
-    func build() {
-        let strip = buildDetailStrip(this.charId)
-        let pi = if (this.popIndex < strip.cells.size) { this.popIndex } else { 0 }
-        let cell = strip.cells.at(pi)
+    /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
+       popIndex 越界时退回第 0 格。 */
+    func popStrip(): EvoStrip {
+        return buildDetailStrip(this.charId)
+    }
 
+    func popIndexSafe(): Int64 {
+        if (this.popIndex < this.popStrip().cells.size) {
+            return this.popIndex
+        }
+        return 0
+    }
+
+    func popCell(): EvoCell {
+        return this.popStrip().cells.at(this.popIndexSafe())
+    }
+
+    func build() {
         Column {
             /* 字形区 144 × 144 */
             Column {
-                if (cell.isOld()) {
-                    Image(glyphResource(cell.asset))
+                if (this.popCell().isOld()) {
+                    Image(glyphResource(this.popCell().asset))
                         .width(Theme.popGlyphBox)
                         .height(Theme.popGlyphBox)
                         .objectFit(ImageFit.Contain)
                         .fillColor(Theme.carve)
                 } else {
-                    Text(cell.glyph)
+                    Text(this.popCell().glyph)
                         .fontSize(Theme.popGlyphBox * 4 / 5)
                         .fontFamily(Theme.serif)
                         .fontWeight(FontWeight.Bold)
@@ -45,7 +58,7 @@ public class ZiluPopCard {
             .alignItems(HorizontalAlign.Center)
 
             /* 标题「阶段名 · 时代」 */
-            Text(if (cell.era.size > 0) { "${cell.name} · ${cell.era}" } else { cell.name })
+            Text(if (this.popCell().era.size > 0) { "${this.popCell().name} · ${this.popCell().era}" } else { this.popCell().name })
                 .fontSize(Theme.fsPopTitle)
                 .fontFamily(Theme.serif)
                 .fontWeight(FontWeight.Bold)
@@ -54,16 +67,16 @@ public class ZiluPopCard {
                 .margin(top: 12)
 
             /* 白话 Serif 12 */
-            if (cell.baihua.size > 0) {
-                Text(cell.baihua[0])
+            if (this.popCell().baihua.size > 0) {
+                Text(this.popCell().baihua[0])
                     .fontSize(Theme.fsPopBaihua)
                     .fontFamily(Theme.serif)
                     .fontColor(Theme.ink900)
                     .width(100.percent)
                     .margin(top: 6)
             }
-            if (cell.baihua.size > 1) {
-                Text(cell.baihua[1])
+            if (this.popCell().baihua.size > 1) {
+                Text(this.popCell().baihua[1])
                     .fontSize(Theme.fsPopBaihua)
                     .fontFamily(Theme.serif)
                     .fontColor(Theme.ink900)
@@ -71,16 +84,16 @@ public class ZiluPopCard {
             }
 
             /* 出处 10 ink-400 */
-            if (cell.sourceLabel.size > 0) {
-                Text("出处：${cell.sourceLabel}")
+            if (this.popCell().sourceLabel.size > 0) {
+                Text("出处：${this.popCell().sourceLabel}")
                     .fontSize(Theme.fsPopSource)
                     .fontFamily(Theme.sans)
                     .fontColor(Theme.ink400)
                     .width(100.percent)
                     .margin(top: 8)
             }
-            if (cell.license.size > 0) {
-                Text(cell.license)
+            if (this.popCell().license.size > 0) {
+                Text(this.popCell().license)
                     .fontSize(Theme.fsPopSource)
                     .fontFamily(Theme.sans)
                     .fontColor(Theme.ink400)
@@ -100,12 +113,12 @@ public class ZiluPopCard {
                     .textAlign(TextAlign.Center)
                     .onClick({event => this.onPrev()})
                 Row {
-                    ForEach(strip.cells, itemGeneratorFunc: {c: EvoCell, i: Int64 =>
+                    ForEach(this.popStrip().cells, itemGeneratorFunc: {c: EvoCell, i: Int64 =>
                         Row()
-                            .width(if (i == pi) { 16 } else { 6 })
+                            .width(if (i == this.popIndexSafe()) { 16 } else { 6 })
                             .height(6)
                             .borderRadius(3)
-                            .backgroundColor(if (i == pi) { Theme.zhu600 } else { Theme.paperLine })
+                            .backgroundColor(if (i == this.popIndexSafe()) { Theme.zhu600 } else { Theme.paperLine })
                             .margin(left: 2, right: 2)
                     })
                 }

@@ -84,19 +84,50 @@ public class ZiluScreen {
         }
     }
 
-    func build() {
-        let rows = GlyphCatalog.ofChar(this.selectedId)
-        let first = rows.at(0)
-        let cp = ziluCopyOf(this.selectedId)
-        let strip = buildDetailStrip(this.selectedId)
-        let counts = ziluCounts()
-        let nAll = counts[0]
-        let nXiang = counts[1]
-        let nHuiyi = counts[2]
-        let nZhishi = counts[3]
-        let pi = if (this.popIndex < strip.cells.size) { this.popIndex } else { 0 }
-        let parts = formulaParts(this.selectedId)
+    /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
+       这些函数都是纯函数，反复调用结果一致。 */
+    func ziluFirst(): GlyphRow {
+        return GlyphCatalog.ofChar(this.selectedId).at(0)
+    }
 
+    func ziluCopy(): ZiluCopy {
+        return ziluCopyOf(this.selectedId)
+    }
+
+    func ziluDetail(): EvoStrip {
+        return buildDetailStrip(this.selectedId)
+    }
+
+    /* 放大卡下标：越界时退回第 0 格。 */
+    func popIndexSafe(): Int64 {
+        if (this.popIndex < this.ziluDetail().cells.size) {
+            return this.popIndex
+        }
+        return 0
+    }
+
+    /* 分页条计数：全部 / 象形 / 会意 / 指事。 */
+    func ziluNAll(): Int64 {
+        return ziluCounts()[0]
+    }
+
+    func ziluNXiang(): Int64 {
+        return ziluCounts()[1]
+    }
+
+    func ziluNHuiyi(): Int64 {
+        return ziluCounts()[2]
+    }
+
+    func ziluNZhishi(): Int64 {
+        return ziluCounts()[3]
+    }
+
+    func ziluParts(): Array<String> {
+        return formulaParts(this.selectedId)
+    }
+
+    func build() {
         Column {
             /* —— 导航：返回 / 字录 / 计数胶囊 —— */
             Row {
@@ -133,7 +164,7 @@ public class ZiluScreen {
 
             /* —— 分页条 —— */
             Row {
-                Text("${ZILU_TAB_ALL} ${nAll}")
+                Text("${ZILU_TAB_ALL} ${this.ziluNAll()}")
                     .fontSize(14)
                     .fontFamily(Theme.sans)
                     .fontWeight(if (this.tab == 0) { FontWeight.Bold } else { FontWeight.Normal })
@@ -141,7 +172,7 @@ public class ZiluScreen {
                     .layoutWeight(1)
                     .textAlign(TextAlign.Center)
                     .onClick({event => this.tab = 0})
-                Text("${ZILU_TAB_XIANG} ${nXiang}")
+                Text("${ZILU_TAB_XIANG} ${this.ziluNXiang()}")
                     .fontSize(14)
                     .fontFamily(Theme.sans)
                     .fontWeight(if (this.tab == 1) { FontWeight.Bold } else { FontWeight.Normal })
@@ -149,7 +180,7 @@ public class ZiluScreen {
                     .layoutWeight(1)
                     .textAlign(TextAlign.Center)
                     .onClick({event => this.tab = 1})
-                Text("${ZILU_TAB_HUIYI} ${nHuiyi}")
+                Text("${ZILU_TAB_HUIYI} ${this.ziluNHuiyi()}")
                     .fontSize(14)
                     .fontFamily(Theme.sans)
                     .fontWeight(if (this.tab == 2) { FontWeight.Bold } else { FontWeight.Normal })
@@ -157,7 +188,7 @@ public class ZiluScreen {
                     .layoutWeight(1)
                     .textAlign(TextAlign.Center)
                     .onClick({event => this.tab = 2})
-                Text("${ZILU_TAB_ZHISHI} ${nZhishi}")
+                Text("${ZILU_TAB_ZHISHI} ${this.ziluNZhishi()}")
                     .fontSize(14)
                     .fontFamily(Theme.sans)
                     .fontWeight(if (this.tab == 3) { FontWeight.Bold } else { FontWeight.Normal })
@@ -180,7 +211,7 @@ public class ZiluScreen {
                         Row {
                             /* 大字方块 112 × 112 */
                             Column {
-                                Text(first.glyph)
+                                Text(this.ziluFirst().glyph)
                                     .fontSize(Theme.fsZiluBig)
                                     .fontFamily(Theme.serif)
                                     .fontWeight(FontWeight.Bold)
@@ -195,10 +226,10 @@ public class ZiluScreen {
                             .alignItems(HorizontalAlign.Center)
 
                             Column(space: 8) {
-                                MethodBadge(method: first.method)
+                                MethodBadge(method: this.ziluFirst().method)
                                 Row {
-                                    if (parts.size > 0) {
-                                        ForEach(parts, itemGeneratorFunc: {p: String, i: Int64 =>
+                                    if (this.ziluParts().size > 0) {
+                                        ForEach(this.ziluParts(), itemGeneratorFunc: {p: String, i: Int64 =>
                                             Row {
                                                 if (i > 0) {
                                                     Text("＋")
@@ -245,10 +276,10 @@ public class ZiluScreen {
                         .width(100.percent)
 
                         /* 白话字义 */
-                        if (cp.hasMeaning()) {
+                        if (this.ziluCopy().hasMeaning()) {
                             Column {
                                 SectionHead(title: ZILU_SEC_MEANING, hint: "")
-                                Text(cp.meaning)
+                                Text(this.ziluCopy().meaning)
                                     .fontSize(Theme.fsBody)
                                     .fontFamily(Theme.serif)
                                     .fontColor(Theme.ink900)
@@ -260,7 +291,7 @@ public class ZiluScreen {
                         }
 
                         /* 典籍：查不到就整块不显示 */
-                        if (cp.hasClassic()) {
+                        if (this.ziluCopy().hasClassic()) {
                             Column {
                                 SectionHead(title: ZILU_SEC_CLASSIC, hint: "")
                                 Row {
@@ -268,7 +299,7 @@ public class ZiluScreen {
                                         .width(3)
                                         .height(40)
                                         .backgroundColor(Theme.bone300)
-                                    Text(cp.classic)
+                                    Text(this.ziluCopy().classic)
                                         .fontSize(Theme.fsBody)
                                         .fontFamily(Theme.serif)
                                         .fontColor(Theme.ink900)
@@ -277,7 +308,7 @@ public class ZiluScreen {
                                 }
                                 .width(100.percent)
                                 .margin(top: 8)
-                                Text(cp.classicSource)
+                                Text(this.ziluCopy().classicSource)
                                     .fontSize(12)
                                     .fontFamily(Theme.sans)
                                     .fontColor(Theme.ink400)
@@ -295,7 +326,7 @@ public class ZiluScreen {
                                     tierOpt: Some(EvoTier.M),
                                     charId: this.selectedId,
                                     dark: false,
-                                    selectedIndex: pi,
+                                    selectedIndex: this.popIndexSafe(),
                                     playedUpTo: 99,
                                     showBaihua: false,
                                     tappable: true,
@@ -311,9 +342,9 @@ public class ZiluScreen {
                             if (this.showPop) {
                                 ZiluPopCard(
                                     charId: this.selectedId,
-                                    popIndex: pi,
-                                    onPrev: { => this.popIndex = pi - 1 },
-                                    onNext: { => this.popIndex = pi + 1 }
+                                    popIndex: this.popIndexSafe(),
+                                    onPrev: { => this.popIndex = this.popIndexSafe() - 1 },
+                                    onNext: { => this.popIndex = this.popIndexSafe() + 1 }
                                 )
                             }
                         }
@@ -321,10 +352,10 @@ public class ZiluScreen {
                         .margin(top: 16)
 
                         /* 小故事 */
-                        if (cp.hasStory()) {
+                        if (this.ziluCopy().hasStory()) {
                             Column {
                                 SectionHead(title: ZILU_SEC_STORY, hint: "")
-                                Text(cp.story)
+                                Text(this.ziluCopy().story)
                                     .fontSize(Theme.fsBody)
                                     .fontFamily(Theme.serif)
                                     .fontColor(Theme.ink900)
@@ -336,10 +367,10 @@ public class ZiluScreen {
                         }
 
                         /* 效果 */
-                        if (cp.hasEffects()) {
+                        if (this.ziluCopy().hasEffects()) {
                             Column {
                                 SectionHead(title: ZILU_SEC_EFFECT, hint: "")
-                                ForEach(cp.effects, itemGeneratorFunc: {row: EffectRow, _: Int64 =>
+                                ForEach(this.ziluCopy().effects, itemGeneratorFunc: {row: EffectRow, _: Int64 =>
                                     Row {
                                         Text(row.label)
                                             .fontSize(Theme.fsBadge)

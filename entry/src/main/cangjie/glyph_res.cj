@@ -12,7 +12,7 @@ package ohos_app_cangjie_entry
    只做语法检查：bash tools/box_check/parse_check.sh */
 
 import ohos.resource.AppResource
-import ohos.state_macro_manage.rawfile
+import ohos.arkui.state_macro_manage.*
 
 /* rawfile 里的字形资源（resources/rawfile/glyph/<id>_<stage>.<ext>）。
    cell.asset 就是 GlyphRow.asset，见 glyph_data.cj。 */
