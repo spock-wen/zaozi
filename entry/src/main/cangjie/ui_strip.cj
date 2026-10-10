@@ -109,7 +109,7 @@ public class EvoStripView {
                 .alignItems(HorizontalAlign.Center)
             })
         }
-        .alignItems(HorizontalAlign.Top)
+        .alignItems(VerticalAlign.Top)
         .justifyContent(FlexAlign.Start)
     }
 }
@@ -141,7 +141,7 @@ public class EvoStripScreen {
                                     playedUpTo: 99,
                                     showBaihua: true,
                                     tappable: false,
-                                    onSelect: {_ => }
+                                    onSelect: {_: Int64 => }
                                 )
                             }
                             .width(100.percent)
@@ -160,7 +160,7 @@ public class EvoStripScreen {
                                     playedUpTo: 99,
                                     showBaihua: true,
                                     tappable: false,
-                                    onSelect: {_ => }
+                                    onSelect: {_: Int64 => }
                                 )
                             }
                             .width(100.percent)

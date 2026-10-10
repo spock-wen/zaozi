@@ -137,7 +137,7 @@ public class ZiluPopCard {
             }
             .width(100.percent)
             .margin(top: 10)
-            .alignItems(HorizontalAlign.Center)
+            .alignItems(VerticalAlign.Center)
         }
         .width(Theme.popW)
         .padding(14)

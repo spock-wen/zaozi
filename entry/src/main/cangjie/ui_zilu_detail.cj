@@ -58,7 +58,7 @@ public class ZiluGlyphHead {
                                 }
                                 PartChip(glyph: p)
                             }
-                            .alignItems(HorizontalAlign.Center)
+                            .alignItems(VerticalAlign.Center)
                         })
                     } else {
                         Text(formulaText(this.selectedId))
@@ -68,7 +68,7 @@ public class ZiluGlyphHead {
                             .fontColor(Theme.ink600)
                     }
                 }
-                .alignItems(HorizontalAlign.Center)
+                .alignItems(VerticalAlign.Center)
                 Text("造于 ${CARD_GEN_LINE}")
                     .fontSize(12)
                     .fontFamily(Theme.sans)
@@ -122,7 +122,7 @@ public class ZiluEffectRow {
         }
         .width(100.percent)
         .margin(top: 8)
-        .alignItems(HorizontalAlign.Center)
+        .alignItems(VerticalAlign.Center)
     }
 }
 

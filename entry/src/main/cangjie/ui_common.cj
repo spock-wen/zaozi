@@ -46,7 +46,7 @@ public class TopSwitcher {
         .height(44)
         .backgroundColor(Theme.night900)
         .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .alignItems(VerticalAlign.Center)
     }
 }
 

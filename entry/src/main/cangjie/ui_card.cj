@@ -42,7 +42,9 @@ public class CardScreen {
     func schedule(): Unit {
         let g = this.gen
         this.getUIContext().animateTo(
-            AnimateParam(duration: Theme.playStepMs, onFinish: Some({ =>
+            /* duration 要 Int32 字面量：Theme.playStepMs 是 Int64(600)，直接传会 mismatched types。
+               与 yilu 一致用裸字面量 600（= Theme.playStepMs）。 */
+            AnimateParam(duration: 600, onFinish: Some({ =>
                 if (g == this.gen) {
                     this.tick()
                 }
@@ -199,7 +201,7 @@ public class CardScreen {
                                         }
                                         PartChip(glyph: p)
                                     }
-                                    .alignItems(HorizontalAlign.Center)
+                                    .alignItems(VerticalAlign.Center)
                                 })
                             } else {
                                 Text(formulaText(this.charId))
@@ -213,7 +215,7 @@ public class CardScreen {
                         .height(32)
                         .margin(top: 12)
                         .justifyContent(FlexAlign.Center)
-                        .alignItems(HorizontalAlign.Center)
+                        .alignItems(VerticalAlign.Center)
 
                         /* 卡面档演变条：只显示阶段名 */
                         Column {
@@ -225,7 +227,7 @@ public class CardScreen {
                                 playedUpTo: this.currentIndex(),
                                 showBaihua: false,
                                 tappable: false,
-                                onSelect: {_ => }
+                                onSelect: {_: Int64 => }
                             )
                         }
                         .margin(top: 20)
@@ -314,7 +316,7 @@ public class CardScreen {
                         }
                         .width(100.percent)
                         .margin(top: 10)
-                        .alignItems(HorizontalAlign.Center)
+                        .alignItems(VerticalAlign.Center)
 
                         /* 记忆数值条 */
                         Row {
@@ -346,7 +348,7 @@ public class CardScreen {
                         .border(width: 1, color: Theme.paper200)
                         .padding(left: 16, right: 16)
                         .margin(top: 16)
-                        .alignItems(HorizontalAlign.Center)
+                        .alignItems(VerticalAlign.Center)
 
                         Text(CARD_SHEET_META)
                             .fontSize(12)

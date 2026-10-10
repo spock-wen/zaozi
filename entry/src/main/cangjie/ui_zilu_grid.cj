@@ -2,6 +2,7 @@ package ohos_app_cangjie_entry
 
 import kit.ArkUI.*
 import ohos.arkui.state_macro_manage.*
+import std.collection.ArrayList
 
 /* 27 格总览（从 ZiluScreen.build() 拆出）：分页过滤 + 按 5 格一行切行 + 单格。
    拆分理由同 ui_zilu_nav.cj：ZiluScreen 原来单个 build() 嵌套太深，
