@@ -72,6 +72,13 @@ public class CardScreen {
         this.showSheet = true
     }
 
+    /* 点一下卡面 → 跳过播放：代次 +1 让还挂着的 onFinish 直接失效，然后落定 + 弹层。
+       已经落定的话再点也是同一结果（弹层已经开着）。 */
+    func skip(): Unit {
+        this.gen = this.gen + 1
+        this.settle()
+    }
+
     /* 当前这一格（落定后停在最后一格）。 */
     func currentIndex(): Int64 {
         let last = buildCardStrip(this.charId).cells.size - 1

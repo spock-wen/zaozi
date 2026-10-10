@@ -43,7 +43,7 @@ public class EvoStripView {
                         } else {
                             Text(cell.glyph)
                                 .fontSize(this.evoStrip().cellSize * 4 / 5)
-                                .fontFamily(if (cell.kind == EvoCellKind.Trad) { Theme.serifTC } else { Theme.serif })
+                                .fontFamily(if (cell.kindIs(EvoCellKind.Trad)) { Theme.serifTC } else { Theme.serif })
                                 .fontWeight(FontWeight.Bold)
                                 .fontColor(if (this.dark) { Theme.onNight } else { Theme.ink900 })
                         }
@@ -68,7 +68,7 @@ public class EvoStripView {
 
                     /* —— 阶段名（卡面档 10，其余 11）—— */
                     Text(cell.name)
-                        .fontSize(if (this.evoStrip().tier == EvoTier.C) { Theme.fsStageNameCard } else { Theme.fsStageName })
+                        .fontSize(if (this.evoStrip().isTier(EvoTier.C)) { Theme.fsStageNameCard } else { Theme.fsStageName })
                         .fontFamily(Theme.sans)
                         .fontWeight(FontWeight.Bold)
                         .fontColor(if (this.dark) { Theme.onNight } else { Theme.ink900 })
@@ -121,7 +121,7 @@ public class EvoStripScreen {
         Scroll {
             Column(space: 16) {
                 ForEach(
-                    Array<String>(["xiu", "ben", "cong"]),
+                    ["xiu", "ben", "cong"],
                     itemGeneratorFunc: {charId: String, _: Int64 =>
                         Column(space: 12) {
                             Text(stripCaption(charId))
@@ -134,7 +134,7 @@ public class EvoStripScreen {
                             /* 浅底 */
                             Column(space: 8) {
                                 EvoStripView(
-                                    tierOpt: None,
+                                    tierOpt: Option<EvoTier>.None,
                                     charId: charId,
                                     dark: false,
                                     selectedIndex: -1,
@@ -153,7 +153,7 @@ public class EvoStripScreen {
                             /* 深底 */
                             Column(space: 8) {
                                 EvoStripView(
-                                    tierOpt: None,
+                                    tierOpt: Option<EvoTier>.None,
                                     charId: charId,
                                     dark: true,
                                     selectedIndex: -1,
@@ -189,6 +189,6 @@ public class EvoStripScreen {
 /* 「休 · 5 格 · M 档」这类说明文字。 */
 public func stripCaption(charId: String): String {
     let strip = buildEvoStrip(charId, None)
-    let tierName = if (strip.tier == EvoTier.C) { "C" } else { if (strip.tier == EvoTier.S) { "S" } else { "M" } }
+    let tierName = if (strip.isTier(EvoTier.C)) { "C" } else { if (strip.isTier(EvoTier.S)) { "S" } else { "M" } }
     return "${strip.glyph} · ${strip.cells.size} 格 · ${tierName} 档"
 }
