@@ -74,6 +74,46 @@ public let HOME_BTN_ZILU: String = "字录"
 public let HOME_BTN_EVO: String = "演变条"
 public let HOME_BTN_CARD: String = "造字卡"
 
+/* —— 主界滑卡（M2 slice 2：四维条 / 骨片行 / 事件卡 / 按住看分量）——
+   N / Y 由界面替换（见 HomeBonesRow / HomeHudDim 的成员函数）。 */
+/* 骨片行：pip 前面的小标签。 */
+public let HOME_BONES_LABEL: String = "骨片"
+/* 「余年 N 年」，数字单独上 gold-400 Bold（SPEC §2.2）。 */
+public let HOME_YEARS_LEFT: String = "余年 N 年"
+/* 事件卡立绘区占位（SPEC §4 待确认 5：立绘风格另定）。 */
+public let HOME_ART_PLACEHOLDER: String = "人物立绘区"
+/* 事件卡操作提示（设计稿字匣条右下角那两行小字）：拖卡 / 长按各一行。 */
+public let HOME_CARD_TIP_DRAG: String = "左右拖卡做决定"
+public let HOME_CARD_TIP_HOLD: String = "按住卡片看分量"
+/* 按住看分量：两排圆点左边的「左 / 右」（states_v1 ① .sd）。 */
+public let HOME_HOLD_LEFT: String = "左"
+public let HOME_HOLD_RIGHT: String = "右"
+/* 落字第三选项：本 slice 字匣还没接上，一律灰态（slice 3 打开）。 */
+public let HOME_LUOZI_OFF: String = "落字（字匣未接）"
+/* 结局占位：slice 4 才做结局卡，现在只落一行字。 */
+public let HOME_ENDING_PREFIX: String = "结局："
+public let HOME_ENDING_SUFFIX: String = "（结算待接）"
+
+/* 四维名（粮 信 记 外，与 RunState.dims 顺序一致）。认不出的下标给空串。 */
+public func homeDimName(i: Int64): String {
+    if (i == 0) { return "粮" }
+    if (i == 1) { return "信" }
+    if (i == 2) { return "记" }
+    if (i == 3) { return "外" }
+    return ""
+}
+
+/* 「余年 N 年」把 N 替成实数。 */
+public func homeYearsText(yearsLeft: Int64): String {
+    return HOME_YEARS_LEFT.replace("N", "${yearsLeft}")
+}
+
+/* 结局占位行：结局标题由 endingOfState 给，没有结局时给空串（界面整行不显示）。 */
+public func homeEndingText(title: String): String {
+    if (title.size == 0) { return "" }
+    return HOME_ENDING_PREFIX + title + HOME_ENDING_SUFFIX
+}
+
 public func baihuaLines(charId: String, cellIndex: Int64): Array<String> {
     /* 与设计稿 common.py 的 BAIHUA 一致：每阶段一行，竖线是手动断行，
        每行 ≤5 字；下标含最后那格繁简。 */

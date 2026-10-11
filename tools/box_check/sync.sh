@@ -11,7 +11,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO:-$(cd "$HERE/../.." && pwd)}"
 SRC="$REPO/entry/src/main/cangjie"
 
-FILES="glyph_data.cj theme.cj evo_model.cj copy_text.cj zilu_model.cj run_state.cj"
+FILES="glyph_data.cj theme.cj evo_model.cj copy_text.cj zilu_model.cj run_state.cj event_cards.cj game_rules.cj"
 
 rm -rf "$HERE/src"
 mkdir -p "$HERE/src"

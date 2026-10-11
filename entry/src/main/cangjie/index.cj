@@ -38,8 +38,25 @@ class EntryView {
         RunStore.save(next)
     }
 
+    /* 主界选定一个选项（0 左 / 1 右 / 2 落字）：四维增减、牌堆前进一步、
+       三年一过、结局判定全在 game_rules.applyChoice，这里只负责换引用 + 存档。
+       落到 phase 2（结局）时主界面换成占位的一行字（结局卡是 slice 4）。 */
+    func pick(side: Int64): Unit {
+        let next = applyChoice(this.run, side)
+        this.run = next
+        RunStore.save(next)
+    }
+
     func openSub(i: Int64): Unit {
         this.sub = i
+    }
+
+    /* 这一局的结局标题（没有结局 → 空串，占位行整行不显示）。 */
+    func endingTitle(): String {
+        match (endingOfState(this.run)) {
+            case Some(info) => return info.title
+            case None => return ""
+        }
     }
 
     func goZilu(): Unit {
@@ -85,11 +102,20 @@ class EntryView {
                     generation: this.run.generation,
                     onConfirm: {picked => this.confirmPick(picked)}
                 )
+            } else if (this.run.phase == RUN_PHASE_ENDING) {
+                /* 结局卡是 slice 4；现在只落一行占位字，界面不空、也不崩。 */
+                HomeEndingHolder(title: this.endingTitle())
             } else {
                 HomeScreen(
                     generation: this.run.generation,
                     year: this.run.year,
+                    yearsLeft: this.run.yearsLeft,
+                    dims: this.run.dims,
+                    boneEmpty: this.run.boneEmpty,
+                    boneShiqian: this.run.boneShiqian,
                     boxChars: this.run.boxChars,
+                    cardIndex: this.run.cardIndex,
+                    onPick: {side => this.pick(side)},
                     onOpenZilu: { => this.openSub(1) },
                     onOpenEvo: { => this.openSub(2) },
                     onOpenCard: { => this.openSub(3) }

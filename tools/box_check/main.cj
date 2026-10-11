@@ -815,12 +815,327 @@ func runStateShape(): Int64 {
     return ck.failures.size
 }
 
+/* ————— M2 事件卡 / 选卡 / 结局（game_rules.cj）————— */
+
+/* Option<EventOption> 是不是空（落字那一选项没有时用）。 */
+func optIsNone(o: Option<EventOption>): Bool {
+    match (o) {
+        case Some(_) => return false
+        case None => return true
+    }
+}
+
+/* 结局标题（没有结局 → 空串）。 */
+func endingTitleOf(s: RunState): String {
+    match (endingOfState(s)) {
+        case Some(info) => return info.title
+        case None => return ""
+    }
+}
+
+/* 一个状态的结局是不是善终。 */
+func endingIsGood(s: RunState): Bool {
+    match (endingOfState(s)) {
+        case Some(info) => return info.good
+        case None => return false
+    }
+}
+
+/* 找一张对第 d 维增减 ≤0 的 side（测「见底」用：见底那一维不能再往上加）。 */
+func sideForBottom(d: Int64): Int64 {
+    let pool = eventCardPool()
+    var i: Int64 = 0
+    while (i < pool.size) {
+        let c = pool[i]
+        if (c.left.deltaAt(d) <= 0) { return RUN_SIDE_LEFT }
+        if (c.right.deltaAt(d) <= 0) { return RUN_SIDE_RIGHT }
+        i = i + 1
+    }
+    return RUN_SIDE_LEFT
+}
+
+/* 找一张对第 d 维增减 ≥0 的 side（测「溢出」用：满的那一维不能再往下减）。 */
+func sideForTop(d: Int64): Int64 {
+    let pool = eventCardPool()
+    var i: Int64 = 0
+    while (i < pool.size) {
+        let c = pool[i]
+        if (c.left.deltaAt(d) >= 0) { return RUN_SIDE_LEFT }
+        if (c.right.deltaAt(d) >= 0) { return RUN_SIDE_RIGHT }
+        i = i + 1
+    }
+    return RUN_SIDE_LEFT
+}
+
+/* 一张开局后（挑过字）的状态，四维给的值。 */
+func runWithDims(v0: Int64, v1: Int64, v2: Int64, v3: Int64): RunState {
+    let s = runAfterPick(newRunState(), ["shui", "ri", "ren"])
+    s.dims = [v0, v1, v2, v3]
+    return s
+}
+
+func gameRulesShape(): Int64 {
+    println("== M2 事件卡 / applyChoice / 结局：牌堆 / 分量 / 年数 / 八败一善 ==")
+    let ck = Check()
+
+    /* —— 牌堆 —— */
+    let pool = eventCardPool()
+    ck.that(pool.size >= 10, "牌堆 ≥10 张（got ${pool.size}）")
+    ck.that(eventCardCount() == pool.size, "eventCardCount = 牌堆大小（got ${eventCardCount()}）")
+    ck.that(eventCardAt(0).id == pool[0].id, "eventCardAt(0) = 第一张")
+    ck.that(eventCardAt(-1).id == pool[0].id, "eventCardAt 负下标归到第一张")
+    ck.that(eventCardAt(pool.size).id == pool[pool.size - 1].id, "eventCardAt 越界归到最后一张")
+    ck.that(eventCardNext(pool.size - 1) == 0, "最后一张的下一张回到第 0 张（牌堆循环）")
+    ck.that(eventCardNext(0) == 1, "第 0 张的下一张是第 1 张")
+    ck.that(eventCardNext(-1) == 0, "eventCardNext 负下标归零")
+    /* id 不重复 */
+    var dup: Int64 = 0
+    var i: Int64 = 0
+    while (i < pool.size) {
+        var j: Int64 = i + 1
+        while (j < pool.size) {
+            if (pool[i].id == pool[j].id) { dup = dup + 1 }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    ck.that(dup == 0, "卡 id 不重复")
+    /* 每张卡的形状：who / season / body 非空，body ≤40 字，左右各 4 个增减 */
+    var luoziCards: Int64 = 0
+    i = 0
+    while (i < pool.size) {
+        let c = pool[i]
+        ck.that(c.who.size > 0, "${c.id} 有人物胶囊")
+        ck.that(c.season.size > 0, "${c.id} 有季节")
+        ck.that(utf8Len(c.body) <= 40, "${c.id} 卡文 ≤40 字（got ${utf8Len(c.body)}）")
+        ck.that(c.left.label.size > 0, "${c.id} 左选项有文案")
+        ck.that(c.right.label.size > 0, "${c.id} 右选项有文案")
+        ck.that(c.left.deltas.size == 4, "${c.id} 左选项 4 个增减（got ${c.left.deltas.size}）")
+        ck.that(c.right.deltas.size == 4, "${c.id} 右选项 4 个增减（got ${c.right.deltas.size}）")
+        ck.that(!optIsNone(c.optionOf(RUN_SIDE_LEFT)), "${c.id} 左选项取得到")
+        ck.that(!optIsNone(c.optionOf(RUN_SIDE_RIGHT)), "${c.id} 右选项取得到")
+        ck.that(c.left.deltaAt(-1) == 0 && c.left.deltaAt(9) == 0, "${c.id} deltaAt 越界当 0")
+        if (c.allowsLuozi) {
+            luoziCards = luoziCards + 1
+            ck.that(c.luozi.label.size > 0, "${c.id} 落字选项有文案")
+            ck.that(c.luozi.deltas.size == 4, "${c.id} 落字 4 个增减（got ${c.luozi.deltas.size}）")
+            ck.that(!optIsNone(c.optionOf(RUN_SIDE_LUOZI)), "${c.id} 落字是第三选项")
+        } else {
+            ck.that(optIsNone(c.optionOf(RUN_SIDE_LUOZI)), "${c.id} 不允许落字 → 没有第三选项")
+        }
+        /* 一张两边都不动的卡是死卡 */
+        var moved: Int64 = 0
+        var d: Int64 = 0
+        while (d < RUN_DIM_COUNT) {
+            if (c.left.deltaAt(d) != 0 || c.right.deltaAt(d) != 0) { moved = moved + 1 }
+            d = d + 1
+        }
+        ck.that(moved > 0, "${c.id} 至少有一维在动")
+        i = i + 1
+    }
+    ck.that(luoziCards >= 1, "至少有卡能落字（got ${luoziCards}）")
+    ck.that(pool[0].seasonLabel(0, 10) == "春 · 1 / 10", "卡面右上「季节 · 序号」（got ${pool[0].seasonLabel(0, 10)}）")
+    ck.that(pool[3].seasonLabel(9, 10) == "夏 · 10 / 10", "最后一张的序号（got ${pool[3].seasonLabel(9, 10)}）")
+
+    /* —— 按住看分量：三档 5 / 8 / 12，没有增减不画点 —— */
+    ck.that(weightTier(0) == RUN_WEIGHT_NONE, "0 → 不画点（got ${weightTier(0)}）")
+    ck.that(weightTier(1) == RUN_WEIGHT_SMALL, "±1 → 小点 5")
+    ck.that(weightTier(5) == RUN_WEIGHT_SMALL, "±5 → 小点 5（got ${weightTier(5)}）")
+    ck.that(weightTier(-5) == RUN_WEIGHT_SMALL, "−5 → 小点 5（不分涨跌）")
+    ck.that(weightTier(6) == RUN_WEIGHT_MID, "±6 → 中点 8（got ${weightTier(6)}）")
+    ck.that(weightTier(10) == RUN_WEIGHT_MID, "±10 → 中点 8")
+    ck.that(weightTier(-10) == RUN_WEIGHT_MID, "−10 → 中点 8")
+    ck.that(weightTier(11) == RUN_WEIGHT_LARGE, "±11 → 大点 12（got ${weightTier(11)}）")
+    ck.that(weightTier(-99) == RUN_WEIGHT_LARGE, "−99 → 大点 12")
+    ck.that(weightTier(100) == RUN_WEIGHT_LARGE, "±100 → 大点 12")
+    let tiers = weightTiersOf([0, 3, 9, 40])
+    ck.that(tiers.size == 4, "一排 4 个圆点（got ${tiers.size}）")
+    ck.that(runSameInts(tiers, [0, 5, 8, 12]), "圆点档位 0/5/8/12（got ${tiers[0]},${tiers[1]},${tiers[2]},${tiers[3]}）")
+    ck.that(weightTierOf(pool[0].left, 0) == RUN_WEIGHT_MID, "第一张左选项粮维中点 10 → 8（got ${weightTierOf(pool[0].left, 0)}）")
+    ck.that(weightTierOf(pool[8].left, 0) == RUN_WEIGHT_LARGE, "第九张左选项粮维 +12 → 大点")
+    ck.that(weightTierOf(pool[0].left, 2) == RUN_WEIGHT_NONE, "第一张左选项记维不画点")
+
+    /* —— 危险区 / 触底溢出 —— */
+    ck.that(dimInDanger(0), "0 在危险区")
+    ck.that(dimInDanger(RUN_DANGER_LOW), "15 在危险区（含）")
+    ck.that(dimInDanger(RUN_DANGER_HIGH), "85 在危险区（含）")
+    ck.that(dimInDanger(100), "100 在危险区")
+    ck.that(!dimInDanger(16), "16 不在危险区")
+    ck.that(!dimInDanger(84), "84 不在危险区")
+    ck.that(!dimInDanger(50), "50 不在危险区")
+    ck.that(dimEnds(0) == RUN_END_BOTTOM, "0 → 见底")
+    ck.that(dimEnds(-5) == RUN_END_BOTTOM, "负数 → 见底")
+    ck.that(dimEnds(RUN_DIM_MAX) == RUN_END_TOP, "100 → 溢出")
+    ck.that(dimEnds(101) == RUN_END_TOP, "101 → 溢出")
+    ck.that(dimEnds(1) == RUN_END_NONE, "1 → 没事")
+    ck.that(dimEnds(99) == RUN_END_NONE, "99 → 没事")
+    ck.that(runClampDim(-7) == 0, "runClampDim 下限")
+    ck.that(runClampDim(120) == RUN_DIM_MAX, "runClampDim 上限（got ${runClampDim(120)}）")
+    ck.that(runClampDim(37) == 37, "runClampDim 界内不动")
+
+    /* —— 骨片行 5 位怎么排 —— */
+    ck.that(bonePipKinds(2, 0).size == RUN_BONE_CAP, "骨片 5 位（got ${bonePipKinds(2, 0).size}）")
+    ck.that(bonePipKinds(2, 0)[0] == BONE_PIP_EMPTY, "空骨片排前面")
+    ck.that(bonePipKinds(2, 0)[4] == BONE_PIP_CAP, "剩下的都是上限空位")
+    ck.that(bonePipKinds(0, 3)[0] == BONE_PIP_SHIQIAN, "没有空骨片时事签排前面")
+    ck.that(bonePipKinds(0, 3)[3] == BONE_PIP_CAP, "事签后面补空位")
+    ck.that(bonePipKinds(2, 1)[2] == BONE_PIP_SHIQIAN, "2 空骨片 + 1 事签 + 2 空位")
+    ck.that(bonePipKinds(9, 9).size == RUN_BONE_CAP, "超上限也只出 5 位")
+    ck.that(bonePipKinds(-1, -1)[0] == BONE_PIP_CAP, "负数当 0（全空位）")
+
+    /* —— 选一张卡：增减 / 计数 / 牌堆前进一步 —— */
+    let base = runAfterPick(newRunState(), ["shui", "ri", "ren"])
+    let afterL = applyChoice(base, RUN_SIDE_LEFT)
+    ck.that(afterL.dims[0] == 60, "左选项 粮 +10 → 60（got ${afterL.dims[0]}）")
+    ck.that(afterL.dims[1] == 46, "左选项 信 −4 → 46（got ${afterL.dims[1]}）")
+    ck.that(afterL.dims[2] == 50 && afterL.dims[3] == 50, "没动的维不动")
+    ck.that(afterL.cardsSeen == 1, "cardsSeen +1（got ${afterL.cardsSeen}）")
+    ck.that(afterL.cardIndex == 1, "牌堆前进一步（got ${afterL.cardIndex}）")
+    ck.that(afterL.year == 1 && afterL.yearsLeft == 12, "3 张卡才过一年")
+    ck.that(afterL.phase == RUN_PHASE_HOME, "没触底还是主界")
+    ck.that(base.dims[0] == 50 && base.cardsSeen == 0, "applyChoice 不改原状态")
+    let afterR = applyChoice(base, RUN_SIDE_RIGHT)
+    ck.that(afterR.dims[0] == 46 && afterR.dims[1] == 58, "右选项 −4/+8（got ${afterR.dims[0]},${afterR.dims[1]}）")
+
+    /* 落字第三选项：允许的卡照算，不允许的卡这一下不算选过 */
+    let lz = runAfterPick(newRunState(), ["shui"])
+    let lz2 = applyChoice(lz, RUN_SIDE_LUOZI)
+    ck.that(lz2.cardsSeen == 1 && lz2.cardIndex == 1, "落字也算选过一次")
+    ck.that(lz2.dims[0] == 56 && lz2.dims[1] == 56, "落字增减照算（got ${lz2.dims[0]},${lz2.dims[1]}）")
+    /* 牌堆第 2 张（lie_hu）不允许落字 → 这一下不算选过，原样返回 */
+    let noLz = runAfterPick(newRunState(), ["shui"])
+    noLz.cardIndex = 1
+    let noLz2 = applyChoice(noLz, RUN_SIDE_LUOZI)
+    ck.that(noLz2.sameAs(noLz) && noLz2.cardsSeen == 0, "这一张不允许落字 → 原样返回")
+    let noSide = applyChoice(lz, 9)
+    ck.that(noSide.sameAs(lz), "不认识的 side → 原样返回")
+
+    /* 钳制：上限 100、下限 0 */
+    let hi = runWithDims(95, 60, 60, 60)
+    let hi2 = applyChoice(hi, RUN_SIDE_LEFT)
+    ck.that(hi2.dims[0] == RUN_DIM_MAX, "上限钳到 100（got ${hi2.dims[0]}）")
+    let lo = runWithDims(3, 60, 60, 60)
+    let lo2 = applyChoice(lo, RUN_SIDE_RIGHT)
+    ck.that(lo2.dims[0] == 0, "下限钳到 0（got ${lo2.dims[0]}）")
+    let over = runWithDims(60, 60, 60, 60)
+    over.dims = [60, 60, 60, 200]
+    let over2 = applyChoice(over, RUN_SIDE_LEFT)
+    ck.that(over2.dims[3] == RUN_DIM_MAX, "离谱的入参也钳回 100（got ${over2.dims[3]}）")
+
+    /* 3 张卡 = 1 年 */
+    var yr = runAfterPick(newRunState(), ["shui"])
+    yr.yearsLeft = 12
+    var n: Int64 = 0
+    while (n < 3) {
+        yr.dims = [50, 50, 50, 50]
+        yr = applyChoice(yr, RUN_SIDE_RIGHT)
+        n = n + 1
+    }
+    ck.that(yr.cardsSeen == 3, "看了 3 张（got ${yr.cardsSeen}）")
+    ck.that(yr.year == 2, "进到第 2 年（got ${yr.year}）")
+    ck.that(yr.yearsLeft == 11, "余年 −1（got ${yr.yearsLeft}）")
+    ck.that(yr.phase == RUN_PHASE_HOME, "这才 3 张，不结局")
+
+    /* 牌堆循环：走完一整轮回到第 0 张 */
+    var cyc = runAfterPick(newRunState(), ["shui"])
+    cyc.yearsLeft = 99
+    var k: Int64 = 0
+    while (k < pool.size) {
+        cyc.dims = [50, 50, 50, 50]
+        cyc = applyChoice(cyc, RUN_SIDE_LEFT)
+        k = k + 1
+    }
+    ck.that(cyc.cardIndex == 0, "走完一整轮牌堆回到第 0 张（got ${cyc.cardIndex}）")
+    ck.that(cyc.cardsSeen == pool.size, "cardsSeen 累计（got ${cyc.cardsSeen}）")
+    ck.that(cyc.year == 1 + pool.size / RUN_CARDS_PER_YEAR, "年数按 3 张一年走（got ${cyc.year}）")
+
+    /* 结局表：每一维的见底 / 溢出 */
+    let bottomIds = ["jinian", "shisi", "jiushui", "binghuo"]
+    let bottomTitles = ["饥年", "失祀", "旧水重来", "兵祸"]
+    let topIds = ["cangman", "fenggu", "suyuan", "bingzu"]
+    let topTitles = ["仓满招寇", "封骨", "宿怨", "并族"]
+    var d: Int64 = 0
+    while (d < RUN_DIM_COUNT) {
+        /* 见底 */
+        let b = runWithDims(50, 50, 50, 50)
+        b.dims[d] = 0
+        let be = applyChoice(b, sideForBottom(d))
+        ck.that(be.phase == RUN_PHASE_ENDING, "第 ${d} 维见底 → 进结局")
+        ck.that(be.endingDim == d, "第 ${d} 维见底 endingDim（got ${be.endingDim}）")
+        ck.that(be.endingKind == RUN_KIND_BOTTOM, "第 ${d} 维见底 kind（got ${be.endingKind}）")
+        ck.that(be.endingId == bottomIds[d], "第 ${d} 维见底 id ${bottomIds[d]}（got ${be.endingId}）")
+        ck.that(endingTitleOf(be) == bottomTitles[d], "第 ${d} 维见底标题 ${bottomTitles[d]}（got ${endingTitleOf(be)}）")
+        ck.that(!endingIsGood(be), "第 ${d} 维见底不是善终")
+        /* 溢出 */
+        let t = runWithDims(50, 50, 50, 50)
+        t.dims[d] = RUN_DIM_MAX
+        let te = applyChoice(t, sideForTop(d))
+        ck.that(te.phase == RUN_PHASE_ENDING, "第 ${d} 维溢出 → 进结局")
+        ck.that(te.endingDim == d, "第 ${d} 维溢出 endingDim（got ${te.endingDim}）")
+        ck.that(te.endingKind == RUN_KIND_TOP, "第 ${d} 维溢出 kind（got ${te.endingKind}）")
+        ck.that(te.endingId == topIds[d], "第 ${d} 维溢出 id ${topIds[d]}（got ${te.endingId}）")
+        ck.that(endingTitleOf(te) == topTitles[d], "第 ${d} 维溢出标题 ${topTitles[d]}（got ${endingTitleOf(te)}）")
+        /* 见底优先于溢出之外没有任何歧义：结局信息与 endingOf 一致 */
+        let info = endingOf(d, RUN_END_BOTTOM)
+        ck.that(info.id == bottomIds[d] && info.title == bottomTitles[d], "endingOf(${d}, 见底) 表一致")
+        let infoT = endingOf(d, RUN_END_TOP)
+        ck.that(infoT.id == topIds[d] && infoT.title == topTitles[d], "endingOf(${d}, 溢出) 表一致")
+        d = d + 1
+    }
+    /* 活着的状态没有结局 */
+    ck.that(endingTitleOf(base) == "", "活着 → 没有结局标题")
+    ck.that(!endingIsGood(base), "活着 → 不是善终")
+
+    /* 余年走完 → 善终 寿终传笔 */
+    let good = endingGood()
+    ck.that(good.id == "shouzhong" && good.title == "寿终传笔", "善终 id / 标题（got ${good.id}/${good.title}）")
+    ck.that(good.good && good.kind == RUN_KIND_GOOD, "善终标记 / kind（got ${good.good}/${good.kind}）")
+    ck.that(good.dim == -1, "善终没有原因维")
+    let g = runAfterPick(newRunState(), ["shui"])
+    g.yearsLeft = 1
+    g.cardsSeen = 2
+    let g2 = applyChoice(g, RUN_SIDE_LEFT)
+    ck.that(g2.yearsLeft == 0, "余年归零（got ${g2.yearsLeft}）")
+    ck.that(g2.phase == RUN_PHASE_ENDING, "余年归零 → 进结局")
+    ck.that(g2.endingId == "shouzhong", "余年归零 → 寿终传笔（got ${g2.endingId}）")
+    ck.that(g2.endingKind == RUN_KIND_GOOD && g2.endingDim == -1, "善终 kind / dim")
+    ck.that(endingIsGood(g2), "这一局算善终")
+    /* 四维触底比余年归零更硬：同一张卡两个都中时按见底记 */
+    let both = runAfterPick(newRunState(), ["shui"])
+    both.yearsLeft = 1
+    both.cardsSeen = 2
+    both.dims = [50, 0, 50, 50]
+    let both2 = applyChoice(both, sideForBottom(1))
+    ck.that(both2.endingId == "shisi", "两个都中时按四维记（got ${both2.endingId}）")
+
+    /* 结局状态照样能存档往返（字段没加，格式还是 17 段） */
+    ck.that(RUN_FIELD_COUNT == 17, "存档字段数没变（got ${RUN_FIELD_COUNT}）")
+    ck.that(RUN_SAVE_VERSION == 1, "存档版本没变（got ${RUN_SAVE_VERSION}）")
+    let raw = serializeRunState(lo2)
+    ck.that(raw.split("|").size == RUN_FIELD_COUNT, "结局存档还是 17 段（got ${raw.split("|").size}）")
+    match (parseRunState(raw)) {
+        case Some(back) =>
+            ck.that(back.sameAs(lo2), "选过卡、进了结局的状态照样往返")
+            ck.that(back.endingId == lo2.endingId && back.endingKind == lo2.endingKind, "往返 结局字段")
+            ck.that(back.dims[0] == lo2.dims[0] && back.dims[3] == lo2.dims[3], "往返 四维")
+            ck.that(back.cardIndex == lo2.cardIndex && back.cardsSeen == lo2.cardsSeen, "往返 牌堆")
+        case None => ck.that(false, "结局存档往返 parse 失败")
+    }
+    /* 主界中段的存档也照样往返 */
+    match (parseRunState(serializeRunState(afterL))) {
+        case Some(back2) => ck.that(back2.sameAs(afterL), "主界中段的存档往返")
+        case None => ck.that(false, "主界存档往返 parse 失败")
+    }
+    ck.done("game-rules")
+    return ck.failures.size
+}
+
 main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
-        tabFilterShape() + ziluSeedShape() + runStateShape()
+        tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")
