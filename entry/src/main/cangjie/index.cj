@@ -23,6 +23,12 @@ class EntryView {
     /* 本次会话是否已看过「休」的成字动画。看过 → 再进造字卡直接落定，
        不自动播、不弹层（否则「继续」会变成重播，无限循环）。 */
     @State var cardDone: Bool = false
+    /* 字匣选中态（界面状态，不进存档）：-1 = 没有选中（game_rules.BOX_SLOT_NONE）。
+       放在这一层是因为详情弹层的开关也要被 onBackPress 看见。 */
+    @State var selectedSlot: Int64 = BOX_SLOT_NONE
+    /* 字匣详情弹层开着没有 / 开的是哪一格。 */
+    @State var boxSheetOpen: Bool = false
+    @State var boxSheetSlot: Int64 = BOX_SLOT_NONE
 
     /* 冷启读档。新装 / 存档坏 → 新开局（phase 0 挑字页）。 */
     public func aboutToAppear(): Unit {
@@ -38,13 +44,54 @@ class EntryView {
         RunStore.save(next)
     }
 
+    /* 点字匣某一格（SPEC §2.4：点字可落 · 每字每代一次）：
+       可落的格 → 选中它并打开详情弹层（再点一下同一格就是取消选中、关层）；
+       本代已落的格 → 只打开弹层看，不改选中；空格 / 事签格点了不动。 */
+    func selectBoxSlot(i: Int64): Unit {
+        let st = boxSlotStateOf(this.run.boxChars, this.run.boxLanded, this.selectedSlot, i)
+        if (st == BOX_SLOT_EMPTY || st == BOX_SLOT_SHIQIAN) { return }
+        if (st == BOX_SLOT_OK) {
+            if (this.selectedSlot == i) {
+                /* 再点一下已选中的格：取消选中，关层。 */
+                this.selectedSlot = BOX_SLOT_NONE
+                this.closeBoxSheet()
+                return
+            }
+            this.selectedSlot = i
+        }
+        this.boxSheetSlot = i
+        this.boxSheetOpen = true
+    }
+
+    func closeBoxSheet(): Unit {
+        this.boxSheetOpen = false
+        this.boxSheetSlot = BOX_SLOT_NONE
+    }
+
+    /* 详情弹层的「在卡上落字」：关层、留着选中，卡底那条已经是「落「X」字」。 */
+    func landFromSheet(): Unit {
+        this.closeBoxSheet()
+    }
+
     /* 主界选定一个选项（0 左 / 1 右 / 2 落字）：四维增减、牌堆前进一步、
-       三年一过、结局判定全在 game_rules.applyChoice，这里只负责换引用 + 存档。
+       三年一过、结局判定全在 game_rules.applyChoice；落字走 applyLuozi
+       （多一步：这一格标记「本代已落」）。这里只负责换引用 + 存档。
        落到 phase 2（结局）时主界面换成占位的一行字（结局卡是 slice 4）。 */
     func pick(side: Int64): Unit {
+        if (side == RUN_SIDE_LUOZI) {
+            let next = applyLuozi(this.run, this.selectedSlot)
+            /* 没落下（卡不允许 / 没选中可落的格）：状态、选中都别动。 */
+            if (next.cardsSeen == this.run.cardsSeen) { return }
+            this.run = next
+            RunStore.save(next)
+            this.selectedSlot = BOX_SLOT_NONE
+            return
+        }
         let next = applyChoice(this.run, side)
         this.run = next
         RunStore.save(next)
+        /* 选完这一张，字匣的选中跟着清掉（下一张重新挑）。 */
+        this.selectedSlot = BOX_SLOT_NONE
     }
 
     func openSub(i: Int64): Unit {
@@ -71,8 +118,13 @@ class EntryView {
         this.sub = 3
     }
 
-    /* 系统 Back：先关二级界面回首屏；首屏上返回 false 让系统默认处理。 */
+    /* 系统 Back：先关字匣详情弹层，再关二级界面，最后才让系统默认处理
+       （弹层开着的时候绝不能直接退回桌面）。 */
     protected override func onBackPress(): Bool {
+        if (this.boxSheetOpen) {
+            this.closeBoxSheet()
+            return true
+        }
         if (this.sub != 0) {
             this.sub = 0
             return true
@@ -80,8 +132,25 @@ class EntryView {
         return false
     }
 
+    /* 字匣详情弹层上的那一格（选中态 / 已落态都照实际状态画徽标）。 */
+    func boxSheetState(): Int64 {
+        return boxSlotStateOf(this.run.boxChars, this.run.boxLanded, this.selectedSlot, this.boxSheetSlot)
+    }
+
+    /* 弹层上的字id（查造法 / 白话字义用）与字形（大字用）。boxChars 存的是 id。 */
+    func boxSheetCharId(): String {
+        if (this.boxSheetSlot < 0 || this.boxSheetSlot >= this.run.boxChars.size) { return "" }
+        return this.run.boxChars[this.boxSheetSlot]
+    }
+
+    func boxSheetGlyph(): String {
+        if (boxSlotIsShiqianId(this.boxSheetCharId())) { return BOX_SLOT_SHIQIAN_TEXT }
+        return ziluGlyphOf(this.boxSheetCharId())
+    }
+
     func build() {
-        Column {
+        Stack {
+            Column {
             if (this.sub == 1) {
                 ZiluScreen(
                     selectedId: this.ziluSelected,
@@ -114,11 +183,27 @@ class EntryView {
                     boneEmpty: this.run.boneEmpty,
                     boneShiqian: this.run.boneShiqian,
                     boxChars: this.run.boxChars,
+                    boxLanded: this.run.boxLanded,
+                    selectedSlot: this.selectedSlot,
                     cardIndex: this.run.cardIndex,
                     onPick: {side => this.pick(side)},
+                    onSelectSlot: {i => this.selectBoxSlot(i)},
                     onOpenZilu: { => this.openSub(1) },
                     onOpenEvo: { => this.openSub(2) },
                     onOpenCard: { => this.openSub(3) }
+                )
+            }
+            }
+
+            /* 字匣详情弹层：盖在首屏之上（遮罩 45% 黑 + 底部弹层）。
+               只有主界开着才有；二级界面 / 挑字页 / 结局占位都不出。 */
+            if (this.boxSheetOpen && this.sub == 0 && this.run.phase == RUN_PHASE_HOME) {
+                BoxSheet(
+                    charId: this.boxSheetCharId(),
+                    glyph: this.boxSheetGlyph(),
+                    state: this.boxSheetState(),
+                    onClose: { => this.closeBoxSheet() },
+                    onLand: { => this.landFromSheet() }
                 )
             }
         }

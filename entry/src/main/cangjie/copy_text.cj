@@ -88,8 +88,32 @@ public let HOME_CARD_TIP_HOLD: String = "按住卡片看分量"
 /* 按住看分量：两排圆点左边的「左 / 右」（states_v1 ① .sd）。 */
 public let HOME_HOLD_LEFT: String = "左"
 public let HOME_HOLD_RIGHT: String = "右"
-/* 落字第三选项：本 slice 字匣还没接上，一律灰态（slice 3 打开）。 */
-public let HOME_LUOZI_OFF: String = "落字（字匣未接）"
+/* —— 字匣（M2 slice 3：五种格子状态 + 字匣详情弹层；SPEC §2.4）——
+   设计稿 home_slide_v1 字匣条 / ziku_pick_v1 E 弹层。 */
+/* 字匣条标题右边那行小字（点字可落 · 每字每代一次）。 */
+public let HOME_BOX_HINT: String = "点字可落 · 每字每代一次"
+/* 本代已落那一格下沿的小签。 */
+public let HOME_BOX_TAG_LANDED: String = "已落"
+/* 空格子里的「＋」（与挑字页大格同一个符号）。 */
+public let BOX_SLOT_EMPTY_MARK: String = PICK_SLOT_EMPTY
+/* 事签格：骨片形里写这两个字（本 slice 是 stub，见 game_rules 的 BOX_SHIQIAN_ID）。 */
+public let BOX_SLOT_SHIQIAN_TEXT: String = "事签"
+/* 详情弹层（ziku_pick_v1 E）：小标 / 主标 / 状态徽标三种。 */
+public let BOX_SHEET_KEY: String = "字匣"
+public let BOX_SHEET_TITLE: String = "这一代带着的三格"
+public let BOX_STATE_OK: String = "可落"
+public let BOX_STATE_LANDED: String = "本代已落"
+public let BOX_STATE_SHIQIAN: String = "待刻"
+/* 弹层里三种状态各一行小字（设计稿 E 的 .list .tx p）。 */
+public let BOX_HINT_OK: String = "可落一次 · 落下后这一代冬夜不能当部件"
+public let BOX_HINT_LANDED: String = "这一代已经落过 · 冬夜部件里置灰"
+public let BOX_HINT_SHIQIAN: String = "占一格，不能落；冬夜可拿来刻字"
+/* 弹层按钮：左「‹」关层，右「在卡上落字」（只有可落那一格有）。 */
+public let BOX_SHEET_BACK: String = "‹"
+public let BOX_SHEET_LAND: String = "在卡上落字"
+/* 卡底落字条（SPEC §2.3 第三选项：朱底白字 Serif 15 Bold，再点一次确认）。 */
+public let HOME_LUOZI_NEED: String = "先在字匣选一个字"
+public let HOME_LUOZI_ARMED: String = "再点一次确认落字"
 /* 结局占位：slice 4 才做结局卡，现在只落一行字。 */
 public let HOME_ENDING_PREFIX: String = "结局："
 public let HOME_ENDING_SUFFIX: String = "（结算待接）"
@@ -112,6 +136,31 @@ public func homeYearsText(yearsLeft: Int64): String {
 public func homeEndingText(title: String): String {
     if (title.size == 0) { return "" }
     return HOME_ENDING_PREFIX + title + HOME_ENDING_SUFFIX
+}
+
+/* 卡底落字条：选中的那个字叫什么（设计稿 C「落「水」· 以河为界」，
+   这里只写「落「X」字」，具体选项的说明在卡面数据里）。 */
+public func homeLuoziLabel(glyph: String): String {
+    if (glyph.size == 0) { return HOME_LUOZI_NEED }
+    return "落「${glyph}」字"
+}
+
+/* 字匣详情弹层的状态徽标文案（状态码见 game_rules 的 BOX_SLOT_*）。
+   空格没有详情，给空串。 */
+public func boxStateText(state: Int64): String {
+    if (state == BOX_SLOT_SELECTED) { return BOX_STATE_OK }
+    if (state == BOX_SLOT_LANDED) { return BOX_STATE_LANDED }
+    if (state == BOX_SLOT_SHIQIAN) { return BOX_STATE_SHIQIAN }
+    if (state == BOX_SLOT_EMPTY) { return "" }
+    return BOX_STATE_OK
+}
+
+/* 字匣详情弹层里那一行状态说明（设计稿 E 的三行小字）。空格给空串。 */
+public func boxStateHint(state: Int64): String {
+    if (state == BOX_SLOT_LANDED) { return BOX_HINT_LANDED }
+    if (state == BOX_SLOT_SHIQIAN) { return BOX_HINT_SHIQIAN }
+    if (state == BOX_SLOT_EMPTY) { return "" }
+    return BOX_HINT_OK
 }
 
 public func baihuaLines(charId: String, cellIndex: Int64): Array<String> {

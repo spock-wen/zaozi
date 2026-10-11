@@ -80,8 +80,33 @@ public class Theme {
     public static let seasonFs: Int64 = 11
     /* 卡顶选项条 64 高（过拖拽阈值时出现）。 */
     public static let optBarH: Int64 = 64
-    /* 落字第三选项条 48 高、圆角 12（本 slice 灰态）。 */
+    /* 落字第三选项条 48 高、圆角 12（朱底白字 Serif 15 Bold；再点一次确认）。 */
     public static let luoziBarH: Int64 = 48
+
+    /* —— v2 SPEC §2.4 字匣（M2 slice 3）——
+       主界底部字匣条 104 高；3 格 48×48、圆角 12、间距 12；格内字 Serif 26 Bold。
+       选中 = 朱 2 描边 + 3 外发光；本代已落 = night-700 底、字 38%、下沿「已落」
+       小签 16 高；空格 1.5 虚线（只在本代带的字不足 3 个时出现）。 */
+    public static let boxBarH: Int64 = 104
+    public static let boxSlotCell: Int64 = 48
+    public static let boxSlotRadius: Int64 = 12
+    public static let boxSlotGap: Int64 = 12
+    public static let boxSlotFs: Int64 = 26
+    /* 字匣条底色 night-900 60%（设计稿 .ziku）、上边一线 night-line。 */
+    public static let boxBarBg: Int64 = 0X9915171F
+    /* 选中格外发光：zhu-600 25%（设计稿 box-shadow 0 0 0 3px rgba(181,67,46,.25)）。
+       本仓库的 shadow 没验过，用一圈同色圆角块垫在格子背后顶（见 ui_box.cj）。 */
+    public static let boxSelGlow: Int64 = 0X40B5432E
+    /* 本代已落：字 38% 透明。 */
+    public static let boxLandedOpacity: Float64 = 0.38
+    /* 下沿「已落」小签：16 高、圆角 5、10 Bold。 */
+    public static let boxTagH: Int64 = 16
+    public static let boxTagRadius: Int64 = 5
+    public static let boxTagFs: Int64 = 10
+    /* 空格虚线边（SPEC 写 1.5；本仓库 border 的 Length 只验过整数，取 1）。 */
+    public static let boxEmptyBorder: Int64 = 1
+    /* 事签格：骨片形（不等圆角）、carve 字 11 Bold。 */
+    public static let boxShiqianFs: Int64 = 11
 
     /* —— §2 字体 ——
        TODO(字体)：SPEC 用 Noto Serif CJK SC/TC 与 HarmonyOS Sans SC，包体原因

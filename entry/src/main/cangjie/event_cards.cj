@@ -45,8 +45,8 @@ public class EventOption {
     }
 }
 
-/* 一张事件卡。allowsLuozi = 字匣能落下第三个选项（slice 3 才真的接上，
-   这一片先把数据与灰态摆出来）。 */
+/* 一张事件卡。allowsLuozi = 字匣里选中一个可落的字，卡底就升起第三个选项
+   （SPEC §2.3 / §2.4；规则在 game_rules.cj 的 canLuozi / applyLuozi）。 */
 public class EventCard {
     public let id: String
     public let who: String

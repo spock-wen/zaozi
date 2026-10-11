@@ -2,13 +2,13 @@ package ohos_app_cangjie_entry
 
 import kit.ArkUI.*
 import ohos.arkui.state_macro_manage.*
-import std.collection.ArrayList
 
 /* 主界（home_slide_v1）。M2 slice 1 铺了版式（代次/年 + 字匣三格 + 二级界面入口），
    slice 2 把 SPEC §2.1 四维条、§2.2 骨片行、§2.3 事件卡（拖动 / 按住看分量 /
-   点选退路 / 落字灰态）填了进来；字匣的「可落 / 已落 / 事签」、结局卡、代末结算
-   还是后面的 slice。四维条在 ui_hud.cj、骨片行在 ui_bones.cj、事件卡在
-   ui_event_card.cj，本文件只管这一层的版式。
+   点选退路 / 落字灰态）填了进来；slice 3 接上字匣（§2.4 五种格子状态 + 详情弹层）
+   与落字第三选项。结局卡、代末结算是 slice 4。四维条在 ui_hud.cj、骨片行在
+   ui_bones.cj、事件卡在 ui_event_card.cj、字匣在 ui_box.cj / ui_box_sheet.cj，
+   本文件只管这一层的版式。
    同样拆成小 @Component（@Component 宏展开撑不住大 build()）。 */
 
 /* 顶行：左「第 N 代 · 第 Y 年」，右「第 N 代记事人」（设计稿 .stat）。
@@ -42,85 +42,6 @@ public class HomeStatLine {
         .height(44)
         .border(width: 1, color: Theme.nightLine)
         .padding(left: Theme.insetNight, right: Theme.insetNight)
-    }
-}
-
-/* 字匣一格（48×48、圆角 12、Serif 26 Bold）。空格只在开局挑字前出现。 */
-@Component
-public class HomeBoxSlot {
-    @Prop var glyph: String
-
-    func filled(): Bool {
-        return this.glyph.size > 0
-    }
-
-    func build() {
-        Text(if (this.filled()) { this.glyph } else { PICK_SLOT_EMPTY })
-            .fontSize(if (this.filled()) { 26 } else { 20 })
-            .fontFamily(if (this.filled()) { Theme.serif } else { Theme.sans })
-            .fontWeight(FontWeight.Bold)
-            .fontColor(if (this.filled()) { Theme.ink900 } else { Theme.onNight2 })
-            .width(48)
-            .height(48)
-            .borderRadius(12)
-            .backgroundColor(if (this.filled()) { Theme.paper50 } else { Theme.night700 })
-            .border(
-                width: 1,
-                color: if (this.filled()) { Theme.ink600 } else { Theme.nightLine },
-                style: if (this.filled()) { BorderStyle.Solid } else { BorderStyle.Dashed }
-            )
-            .textAlign(TextAlign.Center)
-    }
-}
-
-/* 字匣条：标题 + 三格（SPEC §2.4 主界字匣条）。 */
-@Component
-public class HomeBoxBar {
-    @Prop var boxChars: Array<String>
-
-    func slotAt(i: Int64): String {
-        if (i >= 0 && i < this.boxChars.size) { return this.boxChars[i] }
-        return ""
-    }
-
-    /* 三格的下标（0/1/2）。ArrayList 是为了跟仓库里其它 ForEach 调用一致。 */
-    func slotIndexes(): ArrayList<Int64> {
-        let out = ArrayList<Int64>()
-        out.add(0)
-        out.add(1)
-        out.add(2)
-        return out
-    }
-
-    func build() {
-        Column {
-            Text(HOME_BOX_TITLE)
-                .fontSize(Theme.fsStatus)
-                .fontFamily(Theme.sans)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Theme.onNight2)
-                .width(100.percent)
-            Row(space: 12) {
-                ForEach(this.slotIndexes(), itemGeneratorFunc: {i: Int64, at: Int64 =>
-                    HomeBoxSlot(glyph: this.slotAt(i))
-                })
-            }
-            .width(100.percent)
-            .margin(top: 10)
-            if (this.boxChars.size == 0) {
-                Text(HOME_BOX_EMPTY)
-                    .fontSize(Theme.fsNote)
-                    .fontFamily(Theme.sans)
-                    .fontColor(Theme.onNight2)
-                    .width(100.percent)
-                    .margin(top: 10)
-            }
-        }
-        .width(100.percent)
-        .padding(Theme.insetPaper)
-        .borderRadius(16)
-        .backgroundColor(Theme.night800)
-        .margin(top: 20)
     }
 }
 
@@ -260,13 +181,16 @@ public class HomeCardTip {
 
 /* 事件卡那一块：把牌面字段从牌堆里取出来递给 EventCardView。
    单独拆一层是为了让 HomeScreen 的 build() 保持小块（@Component 宏展开
-   撑不住大 build()）。落字条这一片恒灰（luoziEnabled: false）——字匣的
-   「可落 / 已落」是 slice 3 的事。 */
+   撑不住大 build()）。落字条的文案 / 能不能点由字匣那边递进来
+   （luoziLabel / luoziEnabled）。 */
 @Component
 public class HomeCardStage {
     @Prop var cardIndex: Int64
+    @Prop var luoziLabel: String
+    @Prop var luoziEnabled: Bool
     @Prop var onHoldChange: (Bool) -> Unit
     @Prop var onPick: (Int64) -> Unit
+    @Prop var onLuozi: () -> Unit
 
     func card(): EventCard {
         return eventCardAt(this.cardIndex)
@@ -287,7 +211,9 @@ public class HomeCardStage {
                 leftDeltas: this.card().left.deltas,
                 rightDeltas: this.card().right.deltas,
                 allowsLuozi: this.card().allowsLuozi,
-                luoziEnabled: false,
+                luoziEnabled: this.luoziEnabled,
+                luoziLabel: this.luoziLabel,
+                onLuozi: { => this.onLuozi() },
                 onHoldChange: {v => this.onHoldChange(v)},
                 onPick: {side => this.onPick(side)}
             )
@@ -301,10 +227,13 @@ public class HomeCardStage {
      按住   四维条上方两排圆点（states_v1 ①，长按卡片才出现）
      四维   粮 信 记 外四条资源条
      骨片   5 位 pip + 余年
-     事件卡 296×384，下一张垫在后面；左右拖动 / 长按看分量 / 两条点选按钮
-     字匣   3 格（slice 3 接「可落 / 已落 / 事签」五种状态）
+     事件卡 296×384，下一张垫在后面；左右拖动 / 长按看分量 / 两条点选按钮 /
+             落字第三选项（字匣选中一个可落的字才有）
+     字匣   104 高一条，3 格五种状态（可落 / 选中 / 本代已落 / 事签 / 空）
      入口   字录 / 演变条 / 造字卡
-   props 全是简单类型：牌面字段在成员函数里从牌堆现算，界面层只传原始值。 */
+   props 全是简单类型：牌面字段在成员函数里从牌堆现算，界面层只传原始值。
+   字匣的选中态是界面状态（selectedSlot，-1 = 没有选中），存在 EntryView 里
+   ——详情弹层的开关也要被 onBackPress 看见。 */
 @Component
 public class HomeScreen {
     @Prop var generation: Int64
@@ -314,15 +243,24 @@ public class HomeScreen {
     @Prop var boneEmpty: Int64
     @Prop var boneShiqian: Int64
     @Prop var boxChars: Array<String>
+    @Prop var boxLanded: Array<Bool>
+    /* 字匣选中态（-1 = 没有选中）。 */
+    @Prop var selectedSlot: Int64
     @Prop var cardIndex: Int64
-    /* 选定一个选项（0 左 / 1 右 / 2 落字）：EntryView 负责 applyChoice + 存档。 */
+    /* 选定一个选项（0 左 / 1 右 / 2 落字）：EntryView 负责 applyChoice / applyLuozi + 存档。 */
     @Prop var onPick: (Int64) -> Unit
+    /* 点字匣某一格：EntryView 决定选中谁、开不开详情弹层。 */
+    @Prop var onSelectSlot: (Int64) -> Unit
     @Prop var onOpenZilu: () -> Unit
     @Prop var onOpenEvo: () -> Unit
     @Prop var onOpenCard: () -> Unit
 
     /* 按住看分量中：卡片长按置 true，两排圆点才排在四维条上方。 */
     @State var held: Bool = false
+    /* 「准备落字」记在哪个格子、哪张卡上：换了选中或换了卡就自动不算准备过
+       （不用监听 prop 变化，比较两个数就够）。 */
+    @State var armedSlot: Int64 = BOX_SLOT_NONE
+    @State var armedCard: Int64 = -1
 
     /* —— 当前这一张卡（牌堆循环，读档回到同一张）—— */
     func card(): EventCard {
@@ -351,6 +289,44 @@ public class HomeScreen {
 
     func allowsLuozi(): Bool {
         return this.card().allowsLuozi
+    }
+
+    /* 字匣第 i 格现在能不能落（纯逻辑在 game_rules.cj）。 */
+    func slotState(i: Int64): Int64 {
+        return boxSlotStateOf(this.boxChars, this.boxLanded, this.selectedSlot, i)
+    }
+
+    /* 选中格里的字（没选中 / 越界 → 空串）。 */
+    func selectedGlyph(): String {
+        if (this.selectedSlot < 0 || this.selectedSlot >= this.boxChars.size) { return "" }
+        return this.boxChars[this.selectedSlot]
+    }
+
+    /* 落字条能不能点：卡允许落字、并且字匣里选中了一个可落的字。 */
+    func luoziReady(): Bool {
+        return canLuoziOf(this.boxChars, this.boxLanded, this.allowsLuozi(), this.selectedSlot)
+    }
+
+    /* 第一次点只是准备，再点一次才真的落。 */
+    func luoziArmed(): Bool {
+        return this.armedSlot == this.selectedSlot && this.armedCard == this.cardIndex
+    }
+
+    func luoziLabel(): String {
+        if (!this.luoziReady()) { return HOME_LUOZI_NEED }
+        if (this.luoziArmed()) { return HOME_LUOZI_ARMED }
+        return homeLuoziLabel(this.selectedGlyph())
+    }
+
+    func luoziTap(): Unit {
+        if (!this.luoziReady()) { return }
+        if (!this.luoziArmed()) {
+            this.armedSlot = this.selectedSlot
+            this.armedCard = this.cardIndex
+            return
+        }
+        this.armedSlot = BOX_SLOT_NONE
+        this.pick(RUN_SIDE_LUOZI)
     }
 
     func pick(side: Int64): Unit {
@@ -391,8 +367,11 @@ public class HomeScreen {
             /* 事件卡：中间剩下的地方都归它（牌面在 HomeCardStage 里拼）。 */
             HomeCardStage(
                 cardIndex: this.cardIndex,
+                luoziLabel: this.luoziLabel(),
+                luoziEnabled: this.luoziReady(),
                 onHoldChange: {v => this.holdChange(v)},
-                onPick: {side => this.pick(side)}
+                onPick: {side => this.pick(side)},
+                onLuozi: { => this.luoziTap() }
             )
             .layoutWeight(1)
 
@@ -405,8 +384,13 @@ public class HomeScreen {
 
             HomeCardTip()
 
-            /* 字匣：slice 3 之前只摆三格 + 提示。 */
-            HomeBoxBar(boxChars: this.boxChars)
+            /* 字匣：104 高一条，3 格五种状态。 */
+            HomeBoxBar(
+                boxChars: this.boxChars,
+                boxLanded: this.boxLanded,
+                selectedSlot: this.selectedSlot,
+                onSelect: {i => this.onSelectSlot(i)}
+            )
 
             HomeEntryBtns(
                 onOpenZilu: { => this.onOpenZilu() },

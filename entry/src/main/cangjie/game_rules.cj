@@ -2,15 +2,15 @@ package ohos_app_cangjie_entry
 
 import std.collection.ArrayList
 
-/* M2「一代闭环」主界选卡的纯规则（SPEC §2.1 四维条 / §2.7 结局卡；
-   设计稿 home_slide_v1）。本文件不 import 任何 kit/ohos 模块，能在普通
-   Linux 上编译（tools/box_check）。
+/* M2「一代闭环」主界选卡的纯规则（SPEC §2.1 四维条 / §2.3 事件卡与落字第三选项 /
+   §2.4 字匣 / §2.7 结局卡；设计稿 home_slide_v1）。
+   本文件不 import 任何 kit/ohos 模块，能在普通 Linux 上编译（tools/box_check）。
    牌堆数据与「按住看分量」的圆点档位在 event_cards.cj，存档状态在
    run_state.cj，平台胶水在 run_store.cj，界面在 ui_hud.cj / ui_bones.cj /
-   ui_event_card.cj / ui_home.cj。
+   ui_event_card.cj / ui_box.cj / ui_home.cj。
 
    这一片只加「玩法规则」，不改 RunState 的字段与存档格式（SAVE_VERSION 还是 1，
-   RUN_FIELD_COUNT 还是 17）：applyChoice 只写 run_state.cj 里已有的字段。
+   RUN_FIELD_COUNT 还是 17）：applyChoice / applyLuozi 只写 run_state.cj 里已有的字段。
 
    约定：
      side 0 = 左选项，1 = 右选项，2 = 落字（第三选项，卡片 allowsLuozi 才有）
@@ -193,4 +193,86 @@ public func applyChoice(prev: RunState, side: Int64): RunState {
             return s
         case None => return prev
     }
+}
+
+/* ————— 字匣（SPEC §2.4：五种格子状态 / §2.3 落字第三选项）—————
+
+   字匣一共 3 格。格子里可能有字（开局挑的，可能不足 3 个 → 空格）、
+   上一代传下的事签（占一格，不能落）、或者本代已经落过的字。
+   选中（选中态）不进存档：它是界面状态（selectedSlot，-1 = 没有选中），
+   读档回来一律回到「没有选中」，玩家重新点。 */
+
+/* 字匣一格的状态码（界面照着摆，ui_box.cj）。 */
+public let BOX_SLOT_OK: Int64 = 0       /* 可落 */
+public let BOX_SLOT_SELECTED: Int64 = 1 /* 选中 */
+public let BOX_SLOT_LANDED: Int64 = 2   /* 本代已落 */
+public let BOX_SLOT_SHIQIAN: Int64 = 3  /* 传下的事签 */
+public let BOX_SLOT_EMPTY: Int64 = 4    /* 空（只在本代带的字不足 3 个时出现） */
+
+/* 「没有选中格」：界面层（EntryView / HomeScreen）的 selectedSlot 初值。 */
+public let BOX_SLOT_NONE: Int64 = -1
+
+/* 事签在字匣里占格时写的 id。这一片只把规则定死：现在还没有任何代码往
+   字匣里写这个 id（startGeneration 清空字匣，事签骨片记在 boneShiqian 里，
+   「传下的事签占一格」是代末结算 slice 的事），界面照这个 id 画骨片格。 */
+public let BOX_SHIQIAN_ID: String = "shiqian"
+
+/* 这一格是不是事签占位。 */
+public func boxSlotIsShiqianId(charId: String): Bool {
+    return charId == BOX_SHIQIAN_ID
+}
+
+/* 字匣第 i 格的状态（0..4，见 BOX_SLOT_*）。
+   chars / landed 是原始数组（函数调用当 @Prop 传进来不参与重绘跟踪，界面层
+   直接把 RunState 的这两个字段递给子组件）；selectedSlot 是界面选中态。 */
+public func boxSlotStateOf(chars: Array<String>, landed: Array<Bool>, selectedSlot: Int64, i: Int64): Int64 {
+    if (i < 0 || i >= RUN_PICK_CAP) { return BOX_SLOT_EMPTY }
+    if (i >= chars.size) { return BOX_SLOT_EMPTY }
+    if (boxSlotIsShiqianId(chars[i])) { return BOX_SLOT_SHIQIAN }
+    if (i < landed.size && landed[i]) { return BOX_SLOT_LANDED }
+    if (i == selectedSlot) { return BOX_SLOT_SELECTED }
+    return BOX_SLOT_OK
+}
+
+/* 同一个状态，从 RunState 上读（纯逻辑 / box_check 用；界面层走上面那个，
+   免得把 class 实例当 @Prop 传）。 */
+public func boxSlotState(s: RunState, selectedSlot: Int64, i: Int64): Int64 {
+    return boxSlotStateOf(s.boxChars, s.boxLanded, selectedSlot, i)
+}
+
+/* 这一格现在能不能落字：卡允许落字、格子在界内、格子里有字、本代没落过。
+   空格 / 事签格 / 已落格都不能落。
+   注意这里按「没有选中」算这一格的状态：选中只是界面态，落不落看得还是
+   格子里有没有字、落过没有。 */
+public func canLuoziOf(chars: Array<String>, landed: Array<Bool>, allowsLuozi: Bool, selectedSlot: Int64): Bool {
+    if (!allowsLuozi) { return false }
+    if (selectedSlot < 0 || selectedSlot >= RUN_PICK_CAP) { return false }
+    return boxSlotStateOf(chars, landed, BOX_SLOT_NONE, selectedSlot) == BOX_SLOT_OK
+}
+
+/* 同上，从 RunState + 当前这张卡上读。 */
+public func canLuozi(s: RunState, card: EventCard, selectedSlot: Int64): Bool {
+    return canLuoziOf(s.boxChars, s.boxLanded, card.allowsLuozi, selectedSlot)
+}
+
+/* 落字：这一格标记「本代已落」，卡上第三个选项的增减照算，牌堆前进一步。
+   返回新状态（原状态不改）；这一下落不下去（卡不允许 / 没选中可落的格）时
+   原样返回，cardsSeen 不动 —— 界面层靠这个判断「没落下」。 */
+public func applyLuozi(prev: RunState, slot: Int64): RunState {
+    let card = eventCardAt(prev.cardIndex)
+    if (!canLuozi(prev, card, slot)) { return prev }
+    let s = applyChoice(prev, RUN_SIDE_LUOZI)
+    /* applyChoice 只浅拷贝，boxLanded 还是原状态那个数组：复制一份再改，
+      不然会把上一帧的 @State 数组一起改掉（界面不重绘）。 */
+    let landed = ArrayList<Bool>()
+    var i: Int64 = 0
+    while (i < s.boxLanded.size) {
+        landed.add(s.boxLanded[i])
+        i = i + 1
+    }
+    if (slot >= 0 && slot < landed.size) {
+        landed[slot] = true
+    }
+    s.boxLanded = landed.toArray()
+    return s
 }

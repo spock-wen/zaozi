@@ -128,7 +128,8 @@ public class PickBigSlots {
             ForEach(this.slotIndexes(), itemGeneratorFunc: {i: Int64, at: Int64 =>
                 Column {
                     PickBigSlot(
-                        glyph: this.slotAt(i),
+                        /* picked 存的是字id（"shui"），大格里要显示字形（"水"）。 */
+                        glyph: ziluGlyphOf(this.slotAt(i)),
                         order: if (this.slotAt(i).size > 0) { i + 1 } else { 0 },
                         onTap: { => this.onRemove(this.slotAt(i)) }
                     )

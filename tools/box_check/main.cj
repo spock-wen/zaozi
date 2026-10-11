@@ -1130,12 +1130,189 @@ func gameRulesShape(): Int64 {
     return ck.failures.size
 }
 
+/* ————— M2 字匣（game_rules.cj：五种格子状态 / 落字第三选项）————— */
+
+/* 一张开局后（挑过 3 个字）的状态。 */
+func boxRun(): RunState {
+    return runAfterPick(newRunState(), ["shui", "ri", "ren"])
+}
+
+/* 字匣规则：格子状态 / canLuozi / applyLuozi / 落完不能落第二次。 */
+func boxRulesShape(): Int64 {
+    println("== M2 字匣：五种格子状态 / 可落判定 / 落字 / 存档往返 ==")
+    let ck = Check()
+    let pool = eventCardPool()
+
+    /* —— 格子状态：可落 / 选中 / 本代已落 / 事签 / 空 —— */
+    let s = boxRun()
+    ck.that(s.boxChars.size == 3, "开局挑了 3 个字（got ${s.boxChars.size}）")
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, 0) == BOX_SLOT_OK, "没选中 → 可落")
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, 1) == BOX_SLOT_OK, "第 2 格也可落")
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, 2) == BOX_SLOT_OK, "第 3 格也可落")
+    /* 选中是界面状态：只按 selectedSlot 变，不进存档 */
+    ck.that(boxSlotState(s, 1, 0) == BOX_SLOT_OK, "选中别格时这一格还是可落")
+    ck.that(boxSlotState(s, 1, 1) == BOX_SLOT_SELECTED, "选中的那一格 → 选中")
+    ck.that(boxSlotState(s, 2, 2) == BOX_SLOT_SELECTED, "选第 3 格 → 选中")
+    /* 已落压过选中：落过的格再怎么点也是已落 */
+    s.boxLanded = [false, true, false]
+    ck.that(boxSlotState(s, 1, 1) == BOX_SLOT_LANDED, "落过的格 → 本代已落（压过选中）")
+    ck.that(boxSlotState(s, 1, 0) == BOX_SLOT_OK, "旁边没落的格照旧可落")
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, 2) == BOX_SLOT_OK, "没选中时第 3 格可落")
+    /* 事签占一格（stub：现在还没有代码往字匣里写这个 id） */
+    let sq = boxRun()
+    sq.boxChars = ["shiqian", "ri", "ren"]
+    ck.that(boxSlotState(sq, BOX_SLOT_NONE, 0) == BOX_SLOT_SHIQIAN, "事签格 → 事签")
+    ck.that(boxSlotState(sq, 0, 0) == BOX_SLOT_SHIQIAN, "事签格点了也不变选中")
+    ck.that(boxSlotIsShiqianId(BOX_SHIQIAN_ID), "事签占位 id 认得出")
+    ck.that(!boxSlotIsShiqianId("shui"), "普通的字不是事签占位")
+    ck.that(boxSlotState(sq, BOX_SLOT_NONE, 1) == BOX_SLOT_OK, "事签旁边那格照旧可落")
+    /* 空格：本代带的字不足 3 个才出现（SPEC §3） */
+    let two = runAfterPick(newRunState(), ["shui", "ri"])
+    ck.that(boxSlotState(two, BOX_SLOT_NONE, 1) == BOX_SLOT_OK, "带了 2 个字，前两格有字")
+    ck.that(boxSlotState(two, BOX_SLOT_NONE, 2) == BOX_SLOT_EMPTY, "第 3 格空着 → 空")
+    ck.that(boxSlotState(two, 2, 2) == BOX_SLOT_EMPTY, "空格点不出选中态")
+    ck.that(boxSlotState(newRunState(), BOX_SLOT_NONE, 0) == BOX_SLOT_EMPTY, "一个字没带 → 空格")
+    /* 越界一律当空格（界面不判空） */
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, -1) == BOX_SLOT_EMPTY, "负下标 → 空")
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, 3) == BOX_SLOT_EMPTY, "第 4 格（越界）→ 空")
+    ck.that(boxSlotState(s, BOX_SLOT_NONE, 99) == BOX_SLOT_EMPTY, "大下标 → 空")
+    /* 界面那条路（传数组）与读 RunState 那条路结果一致 */
+    var i: Int64 = 0
+    while (i < RUN_PICK_CAP + 2) {
+        ck.that(boxSlotStateOf(s.boxChars, s.boxLanded, 1, i) == boxSlotState(s, 1, i),
+            "数组版与 RunState 版一致（第 ${i} 格）")
+        i = i + 1
+    }
+    /* 五种状态码互不重复 */
+    ck.that(BOX_SLOT_OK == 0 && BOX_SLOT_SELECTED == 1 && BOX_SLOT_LANDED == 2 &&
+        BOX_SLOT_SHIQIAN == 3 && BOX_SLOT_EMPTY == 4, "状态码 0..4")
+    ck.that(BOX_SLOT_NONE == -1, "没有选中格 = -1")
+
+    /* —— canLuozi —— */
+    let ok = pool[0]   /* he_di：允许落字 */
+    let no = pool[1]   /* lie_hu：不允许落字 */
+    let base = boxRun()
+    ck.that(canLuozi(base, ok, 0), "卡允许落字 + 选中可落的格 → 能落")
+    ck.that(canLuozi(base, ok, 2), "选第 3 格也能落")
+    ck.that(!canLuozi(base, ok, BOX_SLOT_NONE), "没选中 → 不能落")
+    ck.that(!canLuozi(base, no, 0), "这一张不允许落字 → 不能落")
+    ck.that(!canLuozi(base, no, BOX_SLOT_NONE), "不允许 + 没选中 → 不能落")
+    ck.that(!canLuozi(base, ok, 3), "选中越界 → 不能落")
+    ck.that(!canLuozi(base, ok, 99), "选中大下标 → 不能落")
+    /* 空格不能落（本代只带了 2 个字） */
+    ck.that(!canLuozi(two, ok, 2), "空格不能落")
+    /* 事签格不能落 */
+    ck.that(!canLuozi(sq, ok, 0), "事签格不能落")
+    /* 已落的格不能落 */
+    let landed = boxRun()
+    landed.boxLanded = [false, true, false]
+    ck.that(!canLuozi(landed, ok, 1), "本代已落的格不能再落")
+    ck.that(canLuozi(landed, ok, 0), "同一次里没落的格照样能落")
+    /* 数组版与 RunState 版一致（界面层走数组版） */
+    ck.that(canLuoziOf(base.boxChars, base.boxLanded, ok.allowsLuozi, 0), "数组版 能落")
+    ck.that(!canLuoziOf(base.boxChars, base.boxLanded, no.allowsLuozi, 0), "数组版 卡不允许 → 不能落")
+    ck.that(!canLuoziOf(base.boxChars, base.boxLanded, ok.allowsLuozi, BOX_SLOT_NONE),
+        "数组版 没选中 → 不能落")
+    ck.that(!canLuoziOf(two.boxChars, two.boxLanded, ok.allowsLuozi, 2), "数组版 空格不能落")
+    ck.that(canLuoziOf(landed.boxChars, landed.boxLanded, ok.allowsLuozi, 0), "数组版 已落旁格能落")
+    ck.that(!canLuoziOf(landed.boxChars, landed.boxLanded, ok.allowsLuozi, 1), "数组版 已落格不能落")
+
+    /* —— applyLuozi：标记已落 + 增减照算 + 牌堆前进 —— */
+    let lz = applyLuozi(base, 1)
+    ck.that(!lz.sameAs(base), "applyLuozi 返回新状态")
+    ck.that(lz.boxLanded.size == 3, "landed 还是 3 个（got ${lz.boxLanded.size}）")
+    ck.that(!lz.boxLanded[0] && lz.boxLanded[1] && !lz.boxLanded[2], "只有落的那一格标记已落")
+    ck.that(!base.boxLanded[1], "原状态的 landed 不被改写（数组不能共享引用）")
+    ck.that(lz.dims[0] == 56 && lz.dims[1] == 56, "落字增减照算（got ${lz.dims[0]},${lz.dims[1]}）")
+    ck.that(lz.dims[2] == 50 && lz.dims[3] == 50, "没动的维不动")
+    ck.that(lz.cardsSeen == 1 && lz.cardIndex == 1, "落字也算选过一次、牌堆前进")
+    ck.that(lz.boxChars[1] == "ri", "落过的字还留在字匣里（这一代冬夜置灰）")
+    /* 落不下去：原样返回，什么都不动 */
+    let badCard = boxRun()
+    badCard.cardIndex = 1   /* lie_hu 不允许落字 */
+    let bad2 = applyLuozi(badCard, 0)
+    ck.that(bad2.sameAs(badCard) && bad2.cardsSeen == 0, "这一张不允许落字 → 原样返回")
+    ck.that(!bad2.boxLanded[0], "没落下就不标记已落")
+    let noSel = applyLuozi(base, BOX_SLOT_NONE)
+    ck.that(noSel.sameAs(base), "没选中 → 原样返回")
+    let emptySlot = applyLuozi(two, 2)
+    ck.that(emptySlot.sameAs(two), "空格 → 原样返回")
+    let again = applyLuozi(lz, 1)
+    ck.that(again.sameAs(lz), "落过的格再落一次 → 原样返回")
+    ck.that(again.cardsSeen == lz.cardsSeen, "再落一次不算选过（cardsSeen 不动）")
+
+    /* 一次会话里连落两格：两格都标记，其它格子照旧。
+       第二下落在一张同样允许落字的卡上（第 3 张 wu_gu）。 */
+    let nextCard = cloneRunState(lz)
+    nextCard.cardIndex = 2
+    let twice = applyLuozi(nextCard, 2)
+    ck.that(twice.boxLanded[1] && twice.boxLanded[2] && !twice.boxLanded[0], "两格落过（got ${twice.boxLanded[0]},${twice.boxLanded[1]},${twice.boxLanded[2]}）")
+    ck.that(twice.cardsSeen == 2 && twice.cardIndex == 3, "落两次 → 看了 2 张、牌堆前进（got ${twice.cardsSeen},${twice.cardIndex}）")
+    ck.that(!nextCard.boxLanded[2], "原状态第 3 格还是没落")
+
+    /* 落字也走同一套结局判定（这一张落「水」信 +6，95 → 溢出） */
+    let over = boxRun()
+    over.dims = [50, 95, 50, 50]
+    let over2 = applyLuozi(over, 0)
+    ck.that(over2.dims[1] == RUN_DIM_MAX, "信 95 + 6 钳到 100（got ${over2.dims[1]}）")
+    ck.that(over2.phase == RUN_PHASE_ENDING, "落字也能把这一代送进结局")
+    ck.that(over2.endingId == "fenggu", "信 溢出 → 封骨（got ${over2.endingId}）")
+    ck.that(over2.boxLanded[0], "进了结局那一格照样标记已落")
+
+    /* —— 存档往返：落过的字读档回来还是落过的 —— */
+    ck.that(RUN_FIELD_COUNT == 17, "存档字段数没变（got ${RUN_FIELD_COUNT}）")
+    let raw = serializeRunState(twice)
+    ck.that(raw.split("|").size == RUN_FIELD_COUNT, "落过字的存档还是 17 段")
+    match (parseRunState(raw)) {
+        case Some(back) =>
+            ck.that(back.sameAs(twice), "落过两格的状态照样往返")
+            ck.that(back.boxLanded.size == 3 && back.boxLanded[1] && back.boxLanded[2],
+                "往返 landed 标记不丢")
+            ck.that(!back.boxLanded[0], "往返 没落过的那格还是没落")
+            ck.that(back.boxChars[1] == "ri" && back.boxChars[2] == "ren", "往返 字匣还是那三个字")
+        case None => ck.that(false, "落过字的存档往返 parse 失败")
+    }
+    /* 事签占位 id 也能往返（stub，先把格式走通） */
+    let rawSq = serializeRunState(sq)
+    match (parseRunState(rawSq)) {
+        case Some(backSq) =>
+            ck.that(boxSlotState(backSq, BOX_SLOT_NONE, 0) == BOX_SLOT_SHIQIAN, "事签格往返回来还是事签")
+        case None => ck.that(false, "事签占位存档往返 parse 失败")
+    }
+
+    /* —— 文案：落字条 / 状态徽标 / 状态说明 —— */
+    ck.that(homeLuoziLabel("水") == "落「水」字", "落字条文案 落「水」字（got ${homeLuoziLabel("水")}）")
+    ck.that(homeLuoziLabel("") == HOME_LUOZI_NEED, "没有字 → 先在字匣选一个字")
+    ck.that(HOME_LUOZI_NEED == "先在字匣选一个字", "文案 先在字匣选一个字")
+    ck.that(HOME_LUOZI_ARMED == "再点一次确认落字", "文案 再点一次确认落字")
+    ck.that(boxStateText(BOX_SLOT_OK) == BOX_STATE_OK && boxStateText(BOX_SLOT_SELECTED) == BOX_STATE_OK,
+        "可落 / 选中 徽标都写 可落")
+    ck.that(boxStateText(BOX_SLOT_LANDED) == BOX_STATE_LANDED, "已落徽标 本代已落")
+    ck.that(boxStateText(BOX_SLOT_SHIQIAN) == BOX_STATE_SHIQIAN, "事签徽标 待刻")
+    ck.that(boxStateText(BOX_SLOT_EMPTY).size == 0, "空格没有徽标")
+    ck.that(boxStateHint(BOX_SLOT_OK).size > 0 && boxStateHint(BOX_SLOT_LANDED).size > 0,
+        "可落 / 已落 各有一行说明")
+    ck.that(boxStateHint(BOX_SLOT_EMPTY).size == 0, "空格没有说明")
+    ck.that(HOME_BOX_TAG_LANDED == "已落", "已落小签 已落")
+    ck.that(BOX_SHEET_LAND == "在卡上落字", "弹层按钮 在卡上落字")
+    ck.that(BOX_SHEET_BACK == "‹", "弹层返回 ‹")
+    ck.that(Theme.boxBarH == 104 && Theme.boxSlotCell == 48 && Theme.boxSlotGap == 12,
+        "字匣条 104 / 格 48 / 间距 12")
+    ck.that(Theme.boxSlotRadius == 12 && Theme.boxSlotFs == 26, "格 圆角 12 / 字 26")
+    ck.that(Theme.boxTagH == 16 && Theme.boxTagFs == 10, "已落小签 16 高 / 10 号")
+    ck.that(Theme.boxLandedOpacity == 0.38, "已落字 38% 透明")
+    ck.that(Theme.sheetRadius == 20, "弹层上圆角 20")
+    ck.that(Theme.scrimBlack45 == 0X73000000, "遮罩 45% 黑")
+    ck.done("box-rules")
+    return ck.failures.size
+}
+
 main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
-        tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape()
+        tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape() + boxRulesShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")

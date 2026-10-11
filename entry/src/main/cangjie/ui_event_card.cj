@@ -9,7 +9,7 @@ import std.collection.ArrayList
      CardArt        立绘区 184：人物胶囊（左上）+ 季节 · 序号（右上）+ 立绘占位
      CardBody       卡文 Serif 16 / 行高 26，内边距 18
      CardOptBar     卡顶 64 高选项条（拖过阈值时露出来）
-     CardLuoziBar   卡底 48 高落字条（本 slice 一律灰态，slice 3 接字匣）
+     CardLuoziBar   卡底 48 高落字条（字匣选中可落的字 → 朱底，再点一次确认）
      WeightDotRow   按住看分量的一排圆点（上排 = 左选项，下排 = 右选项）
      HomeWeightDots 两排圆点，由主界面排在四维条上方
      EventCardView  这一张卡本身：下一张垫在后面 + 拖动 / 按住 / 点选退路
@@ -114,12 +114,14 @@ public class CardOptBar {
     }
 }
 
-/* 卡底落字条 48 高、圆角 12。本 slice 字匣还没接上：一律灰态
-   （paper-200 底、ink-400 字），点了不动；slice 3 接上字匣后才有朱底那一版。 */
+/* 卡底落字条 48 高、圆角 12（SPEC §2.3 第三选项：朱底白字 Serif 15 Bold，
+   再点一次确认落字）。字匣里选中一个可落的字才有朱底那一版（enabled）；
+   卡允许落字但没选字 → 灰态「先在字匣选一个字」，点了不动。 */
 @Component
 public class CardLuoziBar {
     @Prop var label: String
     @Prop var enabled: Bool
+    @Prop var onTap: () -> Unit
 
     func build() {
         Text(this.label)
@@ -132,6 +134,12 @@ public class CardLuoziBar {
             .fontWeight(FontWeight.Bold)
             .fontColor(if (this.enabled) { Theme.white } else { Theme.ink400 })
             .textAlign(TextAlign.Center)
+            .enabled(this.enabled)
+            .onClick({event =>
+                if (this.enabled) {
+                    this.onTap()
+                }
+            })
     }
 }
 
@@ -223,6 +231,10 @@ public class EventCardView {
     @Prop var rightDeltas: Array<Int64>
     @Prop var allowsLuozi: Bool
     @Prop var luoziEnabled: Bool
+    /* 落字条上的文案（选中了哪个字 / 还没选），由主界面按字匣状态现算。 */
+    @Prop var luoziLabel: String
+    /* 点落字条：第一次按下只是「准备落」，再点一次才真的落（主界面记 armed）。 */
+    @Prop var onLuozi: () -> Unit
     /* 按住状态回传：圆点排在主界面四维条上方，那一层才是它的父组件。 */
     @Prop var onHoldChange: (Bool) -> Unit
     @Prop var onPick: (Int64) -> Unit
@@ -320,8 +332,12 @@ public class EventCardView {
                     CardBody(text: this.body)
                     Blank()
                     if (this.allowsLuozi) {
-                        CardLuoziBar(label: HOME_LUOZI_OFF, enabled: this.luoziEnabled)
-                            .margin(left: 12, right: 12, bottom: 12)
+                        CardLuoziBar(
+                            label: this.luoziLabel,
+                            enabled: this.luoziEnabled,
+                            onTap: { => this.onLuozi() }
+                        )
+                        .margin(left: 12, right: 12, bottom: 12)
                     }
                 }
                 .width(100.percent)
