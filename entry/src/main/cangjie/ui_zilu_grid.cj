@@ -138,31 +138,17 @@ public class ZiluGridOverview {
     @Prop var selectedId: String
     @Prop var onSelect: (String) -> Unit
 
-    func tabName(): String {
-        if (this.tab == 1) {
-            return "象形"
-        }
-        if (this.tab == 2) {
-            return "会意"
-        }
-        return "指事"
-    }
-
-    /* 分页后要显示的格子（只对已造的字按造法过滤）。 */
+    /* 分页后要显示的格子（只对已造的字按造法过滤）。
+       该分页有哪些字走 ziluTabIds（与切 tab 时改选中用同一个函数，两处不会不一致）。 */
     func visibleCells(): ArrayList<ZiluGridCell> {
         let all = ziluGrid()
-        if (this.tab == 0) {
-            return all
-        }
+        let ids = ziluTabIds(this.tab)
         let out = ArrayList<ZiluGridCell>()
         var i: Int64 = 0
         while (i < all.size) {
             let c = all[i]
-            if (c.isMade()) {
-                let rows = GlyphCatalog.ofChar(c.charId)
-                if (rows[0].method == this.tabName()) {
-                    out.add(c)
-                }
+            if (this.tab == 0 || (c.isMade() && ziluHasId(ids, c.charId))) {
+                out.add(c)
             }
             i = i + 1
         }
@@ -202,9 +188,11 @@ public class ZiluGridOverview {
                 .width(100.percent)
                 .margin(top: 20)
             Column(space: Theme.gridGap) {
-                ForEach(this.gridRows(), itemGeneratorFunc: {row: UiGridRow, _: Int64 =>
+                /* key 都带上会变的东西（分页 / 选中字 / 下标）：不传 keyGenerator 时
+                   ForEach 按下标复用，数据变了不重建 → 切分页网格不筛、选中不跟字。 */
+                ForEach(this.gridRows(), itemGeneratorFunc: {row: UiGridRow, i: Int64 =>
                     Row {
-                        ForEach(row.cells, itemGeneratorFunc: {c: ZiluGridCell, _: Int64 =>
+                        ForEach(row.cells, itemGeneratorFunc: {c: ZiluGridCell, j: Int64 =>
                             ZiluGridCellView(
                                 glyph: c.glyph,
                                 hint: c.hint,
@@ -213,8 +201,12 @@ public class ZiluGridOverview {
                                 selected: (c.charId == this.selectedId),
                                 onTap: { => this.pick(c) }
                             )
+                        }, keyGeneratorFunc: {c: ZiluGridCell, j: Int64 =>
+                            "${this.tab}_${c.charId}_${c.charId == this.selectedId}_${j}"
                         })
                     }
+                }, keyGeneratorFunc: {row: UiGridRow, i: Int64 =>
+                    "${this.tab}_${this.selectedId}_${i}"
                 })
             }
             .width(100.percent)

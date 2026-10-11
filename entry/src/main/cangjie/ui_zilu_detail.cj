@@ -47,6 +47,7 @@ public class ZiluGlyphHead {
                 MethodBadge(method: this.ziluFirst().method)
                 Row {
                     if (this.ziluParts().size > 0) {
+                        /* key 带上字与下标：换字时公式行要重建。 */
                         ForEach(this.ziluParts(), itemGeneratorFunc: {p: String, i: Int64 =>
                             Row {
                                 if (i > 0) {
@@ -59,6 +60,8 @@ public class ZiluGlyphHead {
                                 PartChip(glyph: p)
                             }
                             .alignItems(VerticalAlign.Center)
+                        }, keyGeneratorFunc: {p: String, i: Int64 =>
+                            "${this.selectedId}_${i}"
                         })
                     } else {
                         Text(formulaText(this.selectedId))
@@ -69,14 +72,17 @@ public class ZiluGlyphHead {
                     }
                 }
                 .alignItems(VerticalAlign.Center)
-                Text("造于 ${CARD_GEN_LINE}")
-                    .fontSize(12)
-                    .fontFamily(Theme.sans)
-                    .fontColor(Theme.ink600)
-                Text("记事人 阿禾")
-                    .fontSize(12)
-                    .fontFamily(Theme.sans)
-                    .fontColor(Theme.ink600)
+                /* 造于 / 记事人：设计稿只在「休」给了这条记录，别的字没有 → 不显示，不编造。 */
+                if (hasMadeMeta(this.selectedId)) {
+                    Text("造于 ${CARD_GEN_LINE}")
+                        .fontSize(12)
+                        .fontFamily(Theme.sans)
+                        .fontColor(Theme.ink600)
+                    Text("记事人 阿禾")
+                        .fontSize(12)
+                        .fontFamily(Theme.sans)
+                        .fontColor(Theme.ink600)
+                }
                 Text(ZILU_REPLAY)
                     .fontSize(12)
                     .fontFamily(Theme.sans)
@@ -132,6 +138,8 @@ public class ZiluEffectRow {
 public class ZiluDetailCard {
     @Prop var selectedId: String
     @Prop var showPop: Bool
+    /* 放大卡下标：直接透传父组件的字段（不在这层做钳制，也不写成函数调用），
+       越界钳制放在最底层 ZiluPopCard.popIndexSafe 里。 */
     @Prop var popIndex: Int64
     @Prop var onGoCard: () -> Unit
     @Prop var onEvoSelect: (Int64) -> Unit
@@ -149,14 +157,6 @@ public class ZiluDetailCard {
     func ziluEffects(): Array<EffectRow> {
         let src = this.ziluCopy().effects
         return Array<EffectRow>(src.size, {i: Int64 => src[i]})
-    }
-
-    /* 放大卡下标：越界时退回第 0 格。 */
-    func popIndexSafe(): Int64 {
-        if (this.popIndex < buildDetailStrip(this.selectedId).cells.size) {
-            return this.popIndex
-        }
-        return 0
     }
 
     func build() {
@@ -213,11 +213,13 @@ public class ZiluDetailCard {
             Column {
                 SectionHead(title: ZILU_SEC_EVO, hint: ZILU_SEC_EVO_HINT)
                 Column {
+                    /* selectedIndex 直接传字段：写成 this.popIndexSafe() 时状态宏识别不到
+                       对 @State popIndex 的依赖，父组件改了子组件不更新（› 就这样失效的）。 */
                     EvoStripView(
                         tierOpt: Some(EvoTier.M),
                         charId: this.selectedId,
                         dark: false,
-                        selectedIndex: this.popIndexSafe(),
+                        selectedIndex: this.popIndex,
                         playedUpTo: 99,
                         showBaihua: false,
                         tappable: true,
@@ -230,7 +232,7 @@ public class ZiluDetailCard {
                 if (this.showPop) {
                     ZiluPopCard(
                         charId: this.selectedId,
-                        popIndex: this.popIndexSafe(),
+                        popIndex: this.popIndex,
                         onPrev: { => this.onPrev() },
                         onNext: { => this.onNext() }
                     )
@@ -258,8 +260,11 @@ public class ZiluDetailCard {
             if (this.ziluCopy().hasEffects()) {
                 Column {
                     SectionHead(title: ZILU_SEC_EFFECT, hint: "")
-                    ForEach(this.ziluEffects(), itemGeneratorFunc: {row: EffectRow, _: Int64 =>
+                    /* key 带上选中字与下标：不传 keyGenerator 时按下标复用，换字不重建。 */
+                    ForEach(this.ziluEffects(), itemGeneratorFunc: {row: EffectRow, i: Int64 =>
                         ZiluEffectRow(label: row.label, text: row.text)
+                    }, keyGeneratorFunc: {row: EffectRow, i: Int64 =>
+                        "${this.selectedId}_${i}"
                     })
                 }
                 .width(100.percent)

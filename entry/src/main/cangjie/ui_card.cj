@@ -13,6 +13,10 @@ import ohos.arkui.state_macro_manage.*
 @Component
 public class CardScreen {
     @Prop var onGoZilu: () -> Unit
+    /* 本次已经看过成字（EntryView 记住）：再进造字 tab 直接落定，不自动播、不弹层。 */
+    @Prop var cardDone: Bool
+    /* 落定时告诉父组件「本次已看过」。 */
+    @Prop var onDone: () -> Unit
 
     @State var stage: Int64 = 0
     @State var settled: Bool = false
@@ -23,7 +27,16 @@ public class CardScreen {
     let charId: String = "xiu"
 
     public func aboutToAppear(): Unit {
-        this.startPlay()
+        /* 只认 cardDone：本组件每次进造字 tab 都会重建，跨次数的「重播计数」在这里
+           必然对不上（会误判成要重播，然后弹层，死循环换个形式复现）。
+           所以显式重播由字录「再看一次」负责：它先把 cardDone 置 false 再切回来。 */
+        if (this.cardDone) {
+            /* 看过成字后又回造字 tab（含系统 Back / 顶部切换器）：直接落定，
+               不再自动播、也不再弹层，避免「继续 → 重播 → 弹层」死循环。 */
+            this.settleQuiet()
+        } else {
+            this.startPlay()
+        }
     }
 
     /* 切走时把代次 +1，让还挂着的 onFinish 直接失效，不去动已经销毁的控件。 */
@@ -66,17 +79,33 @@ public class CardScreen {
         }
     }
 
-    func settle(): Unit {
+    /* 落定但不弹层（本次已看过、从字录回来时用）。 */
+    func settleQuiet(): Unit {
         this.settled = true
         this.stage = 4096
+        this.showSheet = false
+    }
+
+    func settle(): Unit {
+        this.settleQuiet()
         this.showSheet = true
+        /* 告诉父组件本次已看过成字，下次进造字 tab 直接落定。 */
+        this.onDone()
     }
 
     /* 点一下卡面 → 跳过播放：代次 +1 让还挂着的 onFinish 直接失效，然后落定 + 弹层。
-       已经落定的话再点也是同一结果（弹层已经开着）。 */
+       已经落定就不再弹层（否则关掉弹层后点一下卡面又弹出来）。 */
     func skip(): Unit {
+        if (this.settled) {
+            return
+        }
         this.gen = this.gen + 1
         this.settle()
+    }
+
+    /* 「继续」= 关弹层，卡面停在落定状态；不重播（重播要显式点字录的「再看一次」）。 */
+    func closeSheet(): Unit {
+        this.showSheet = false
     }
 
     /* 当前这一格（落定后停在最后一格）。 */
@@ -196,6 +225,7 @@ public class CardScreen {
                         /* 公式行 */
                         Row {
                             if (this.cardParts().size > 0) {
+                                /* key 带上字与下标：不传 keyGenerator 时按下标复用，数据变了不重建。 */
                                 ForEach(this.cardParts(), itemGeneratorFunc: {p: String, i: Int64 =>
                                     Row {
                                         if (i > 0) {
@@ -209,6 +239,8 @@ public class CardScreen {
                                         PartChip(glyph: p)
                                     }
                                     .alignItems(VerticalAlign.Center)
+                                }, keyGeneratorFunc: {p: String, i: Int64 =>
+                                    "${this.charId}_${i}"
                                 })
                             } else {
                                 Text(formulaText(this.charId))
@@ -256,6 +288,7 @@ public class CardScreen {
                     .fontColor(Theme.onNight2)
                     .margin(top: 18)
                 Row {
+                    /* 进度点：key 带上播放阶段，阶段变了一定重建。 */
                     ForEach(this.cardStrip().cells, itemGeneratorFunc: {cell: EvoCell, i: Int64 =>
                         Row()
                             .width(if (i == this.currentIndex()) { 18 } else { 6 })
@@ -263,6 +296,8 @@ public class CardScreen {
                             .borderRadius(3)
                             .backgroundColor(if (i == this.currentIndex()) { Theme.gold400 } else { Theme.nightLine })
                             .margin(left: 3, right: 3)
+                    }, keyGeneratorFunc: {cell: EvoCell, i: Int64 =>
+                        "${this.stage}_${i}"
                     })
                 }
                 .width(100.percent)
@@ -275,12 +310,13 @@ public class CardScreen {
             .onClick({event => this.skip()})
 
             /* —— 成字弹层：遮罩 45% 黑 + 上滑 240ms —— */
-            /* 遮罩在卡面之上、弹层之下 */
+            /* 遮罩在卡面之上、弹层之下；点遮罩也是关弹层 */
             if (this.showSheet) {
                 Column()
                     .width(100.percent)
                     .height(100.percent)
                     .backgroundColor(Theme.scrimBlack45)
+                    .onClick({event => this.closeSheet()})
             }
 
             /* 弹层贴底 */
@@ -371,7 +407,7 @@ public class CardScreen {
                             .layoutWeight(1)
                             .margin(right: 6)
                             Column {
-                                PrimaryButton(label: CARD_BTN_CONTINUE, onTap: { => this.startPlay() })
+                                PrimaryButton(label: CARD_BTN_CONTINUE, onTap: { => this.closeSheet() })
                             }
                             .layoutWeight(1)
                             .margin(left: 6)

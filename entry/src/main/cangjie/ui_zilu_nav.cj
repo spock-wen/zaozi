@@ -12,6 +12,9 @@ import ohos.arkui.state_macro_manage.*
 /* 导航：返回 / 字录 / 计数胶囊。 */
 @Component
 public class ZiluNavBar {
+    /* 「‹」：回 EntryView 的造字 tab。 */
+    @Prop var onBack: () -> Unit
+
     func build() {
         Row {
             Text(ZILU_BACK)
@@ -22,6 +25,7 @@ public class ZiluNavBar {
                 .height(32)
                 .borderRadius(16)
                 .textAlign(TextAlign.Center)
+                .onClick({event => this.onBack()})
             Text(ZILU_TITLE)
                 .fontSize(Theme.fsPageTitle)
                 .fontFamily(Theme.serif)

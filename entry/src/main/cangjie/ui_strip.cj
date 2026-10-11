@@ -30,6 +30,8 @@ public class EvoStripView {
 
     func build() {
         Row {
+            /* key 带上字 / 下标 / 选中态：不传 keyGenerator 时按下标复用，
+               换字后格子还是上一个字的内容（古字形演变条不跟字的根因）。 */
             ForEach(this.evoStrip().cells, itemGeneratorFunc: {cell: EvoCell, index: Int64 =>
                 Column {
                     /* —— 格子：圆角 10，描边 1，底 bone-100；深底 night-700 —— */
@@ -107,6 +109,8 @@ public class EvoStripView {
                 .width(this.evoStrip().cellSize)
                 .margin(right: this.evoStrip().gap)
                 .alignItems(HorizontalAlign.Center)
+            }, keyGeneratorFunc: {cell: EvoCell, index: Int64 =>
+                "${this.charId}_${index}_${index == this.selectedIndex}"
             })
         }
         .alignItems(VerticalAlign.Top)

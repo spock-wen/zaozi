@@ -124,6 +124,62 @@ public func ziluCounts(): (Int64, Int64, Int64, Int64) {
     return (ZILU_MADE_IDS.size, xiang, huiyi, zhishi)
 }
 
+/* 分页条 tab（0 全部 / 1 象形 / 2 会意 / 3 指事）→ 造法名；0 与未知返回空串。 */
+public func ziluTabName(tab: Int64): String {
+    if (tab == 1) {
+        return "象形"
+    }
+    if (tab == 2) {
+        return "会意"
+    }
+    if (tab == 3) {
+        return "指事"
+    }
+    return ""
+}
+
+/* 某个分页里已造的字（按 ZILU_MADE_IDS 顺序）。tab 0 = 全部已造的字。
+   字录的分页筛选、切 tab 时改选中、底部网格过滤都走这一个函数，保证三处一致。 */
+public func ziluTabIds(tab: Int64): ArrayList<String> {
+    let out = ArrayList<String>()
+    let name = ziluTabName(tab)
+    var i: Int64 = 0
+    while (i < ZILU_MADE_IDS.size) {
+        let charId = ZILU_MADE_IDS[i]
+        if (tab == 0 || GlyphCatalog.ofChar(charId)[0].method == name) {
+            out.add(charId)
+        }
+        i = i + 1
+    }
+    return out
+}
+
+/* 一个字在不在这个 id 列表里。 */
+public func ziluHasId(ids: ArrayList<String>, charId: String): Bool {
+    var i: Int64 = 0
+    while (i < ids.size) {
+        if (ids[i] == charId) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+/* 某个字在不在这个分页里（tab 0 恒真）。 */
+public func ziluTabHasChar(tab: Int64, charId: String): Bool {
+    return ziluHasId(ziluTabIds(tab), charId)
+}
+
+/* 某个分页第一个已造的字；没有（空分页）返回空串。 */
+public func ziluTabFirstId(tab: Int64): String {
+    let ids = ziluTabIds(tab)
+    if (ids.size > 0) {
+        return ids[0]
+    }
+    return ""
+}
+
 /* 27 格总览：8 已造 + 1 有事签 + 1 有残片线索 + 17 未知。 */
 public func ziluGrid(): ArrayList<ZiluGridCell> {
     let out = ArrayList<ZiluGridCell>()

@@ -21,7 +21,7 @@ public class ZiluPopCard {
     }
 
     func popIndexSafe(): Int64 {
-        if (this.popIndex < this.popStrip().cells.size) {
+        if (this.popIndex >= 0 && this.popIndex < this.popStrip().cells.size) {
             return this.popIndex
         }
         return 0
@@ -113,6 +113,8 @@ public class ZiluPopCard {
                     .textAlign(TextAlign.Center)
                     .onClick({event => this.onPrev()})
                 Row {
+                    /* 圆点 key 带上字 / 当前下标 / 位置：不传 keyGenerator 时按下标复用，
+                       换字或切阶段时圆点不动。 */
                     ForEach(this.popStrip().cells, itemGeneratorFunc: {c: EvoCell, i: Int64 =>
                         Row()
                             .width(if (i == this.popIndexSafe()) { 16 } else { 6 })
@@ -120,6 +122,8 @@ public class ZiluPopCard {
                             .borderRadius(3)
                             .backgroundColor(if (i == this.popIndexSafe()) { Theme.zhu600 } else { Theme.paperLine })
                             .margin(left: 2, right: 2)
+                    }, keyGeneratorFunc: {c: EvoCell, i: Int64 =>
+                        "${this.charId}_${this.popIndex}_${i}"
                     })
                 }
                 .layoutWeight(1)

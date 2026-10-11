@@ -387,6 +387,42 @@ func ziluShape(): Int64 {
     return ck.failures.size
 }
 
+/* v1.1.1 修的分页筛选 / 造于行人：字录切 tab 用。 */
+func tabFilterShape(): Int64 {
+    println("== 分页筛选：ziluTabIds / ziluTabHasChar / ziluTabFirstId / hasMadeMeta ==")
+    let ck = Check()
+    ck.that(ziluTabName(0) == "", "tab 0 没有造法名（全部）")
+    ck.that(ziluTabName(1) == "象形", "tab 1 象形")
+    ck.that(ziluTabName(2) == "会意", "tab 2 会意")
+    ck.that(ziluTabName(3) == "指事", "tab 3 指事")
+    ck.that(ziluTabName(9) == "", "未知 tab 空串")
+    ck.that(ziluTabIds(0).size == 8, "全部 8 个已造")
+    ck.that(ziluTabIds(1).size == 7, "象形 7 个")
+    ck.that(ziluTabIds(2).size == 1, "会意 1 个")
+    ck.that(ziluTabIds(3).size == 0, "指事 0 个（空分页）")
+    ck.that(ziluTabFirstId(1) == "shui", "象形第一个是 水")
+    ck.that(ziluTabFirstId(2) == "xiu", "会意只有 休")
+    ck.that(ziluTabFirstId(3) == "", "指事空分页返回空串")
+    ck.that(ziluTabHasChar(2, "xiu"), "休 在会意里")
+    ck.that(!ziluTabHasChar(2, "shui"), "水 不在会意里")
+    ck.that(ziluTabHasChar(0, "shui"), "tab 0 恒真")
+    ck.that(ziluHasId(ziluTabIds(1), "mu"), "ziluHasId 木 在象形里")
+    ck.that(!ziluHasId(ziluTabIds(1), "xiu"), "ziluHasId 休 不在象形里")
+    /* 已造的字每个都落在某个分页里（不会出现切了 tab 就找不到的字）。 */
+    let made = ziluMadeIds()
+    var i: Int64 = 0
+    while (i < made.size) {
+        let hit = ziluTabHasChar(1, made[i]) || ziluTabHasChar(2, made[i]) || ziluTabHasChar(3, made[i])
+        ck.that(hit, "${made[i]} 落在某个分页里")
+        i = i + 1
+    }
+    ck.that(hasMadeMeta("xiu"), "休 显示 造于/记事人")
+    ck.that(!hasMadeMeta("shui"), "水 不显示 造于/记事人（设计稿没给，不编造）")
+    ck.that(!hasMadeMeta(""), "空 id 不显示")
+    ck.done("tabFilter")
+    return ck.failures.size
+}
+
 func copyShape(): Int64 {
     println("== 文案：白话 / 字义 / 典籍 / 效果 ==")
     let ck = Check()
@@ -448,7 +484,8 @@ main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
-        sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape()
+        sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
+        tabFilterShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")

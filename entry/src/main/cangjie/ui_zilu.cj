@@ -19,6 +19,8 @@ public class ZiluScreen {
     @Prop var selectedId: String
     @Prop var onSelect: (String) -> Unit
     @Prop var onGoCard: () -> Unit
+    /* 字录导航「‹」：回 EntryView 的造字 tab。 */
+    @Prop var onBack: () -> Unit
 
     /* 分页条：0 全部 / 1 象形 / 2 会意 / 3 指事。 */
     @State var tab: Int64 = 0
@@ -42,9 +44,14 @@ public class ZiluScreen {
         return ziluCounts()[3]
     }
 
-    /* 放大卡下标：越界时退回第 0 格。 */
+    /* 当前字演变条的格数（放大卡的上一格 / 下一格按它钳制）。 */
+    func popCount(): Int64 {
+        return buildDetailStrip(this.selectedId).cells.size
+    }
+
+    /* 放大卡下标：越界时退回第 0 格（父组件只透传字段，钳制放在最底层）。 */
     func popIndexSafe(): Int64 {
-        if (this.popIndex < buildDetailStrip(this.selectedId).cells.size) {
+        if (this.popIndex < this.popCount() && this.popIndex >= 0) {
             return this.popIndex
         }
         return 0
@@ -52,6 +59,21 @@ public class ZiluScreen {
 
     func setTab(i: Int64): Unit {
         this.tab = i
+        /* 切分页时若当前选中的字不在这个分页里，就把选中改成该分页第一个已造的字，
+           让详情卡跟着分页走；tab 0（全部）与空分页不动。 */
+        if (i != 0 && !ziluTabHasChar(i, this.selectedId)) {
+            let first = ziluTabFirstId(i)
+            if (first.size > 0) {
+                this.pick(first)
+            }
+        }
+    }
+
+    /* 换字：放大卡归第 0 格并关掉，避免上一个字的阶段残留。 */
+    func pick(id: String): Unit {
+        this.popIndex = 0
+        this.showPop = false
+        this.onSelect(id)
     }
 
     func openPop(i: Int64): Unit {
@@ -60,16 +82,22 @@ public class ZiluScreen {
     }
 
     func prevPop(): Unit {
-        this.popIndex = this.popIndexSafe() - 1
+        let n = this.popCount()
+        if (this.popIndexSafe() > 0 && n > 0) {
+            this.popIndex = this.popIndexSafe() - 1
+        }
     }
 
     func nextPop(): Unit {
-        this.popIndex = this.popIndexSafe() + 1
+        let n = this.popCount()
+        if (n > 0 && this.popIndexSafe() < n - 1) {
+            this.popIndex = this.popIndexSafe() + 1
+        }
     }
 
     func build() {
         Column {
-            ZiluNavBar()
+            ZiluNavBar(onBack: { => this.onBack() })
 
             ZiluTabs(
                 tab: this.tab,
@@ -85,7 +113,9 @@ public class ZiluScreen {
                     ZiluDetailCard(
                         selectedId: this.selectedId,
                         showPop: this.showPop,
-                        popIndex: this.popIndexSafe(),
+                        /* 直接传字段：写成函数调用时状态宏识别不到对 @State 的依赖，
+                           父组件改了子组件不更新（› / ‹ 就这样失效的）。 */
+                        popIndex: this.popIndex,
                         onGoCard: { => this.onGoCard() },
                         onEvoSelect: {i => this.openPop(i)},
                         onPrev: { => this.prevPop()},
@@ -95,7 +125,7 @@ public class ZiluScreen {
                     ZiluGridOverview(
                         tab: this.tab,
                         selectedId: this.selectedId,
-                        onSelect: {id => this.onSelect(id)}
+                        onSelect: {id => this.pick(id)}
                     )
                 }
                 .width(100.percent)

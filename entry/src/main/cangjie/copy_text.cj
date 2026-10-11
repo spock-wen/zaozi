@@ -89,6 +89,12 @@ public func baihuaLines(charId: String, cellIndex: Int64): Array<String> {
     return []
 }
 
+/* 「造于 …」「记事人 阿禾」这两行：设计稿只在「休」那一张给了（zilu_detail_v1），
+   其余字没有这条记录。不编造数据 → 别的字不显示这两行。 */
+public func hasMadeMeta(charId: String): Bool {
+    return charId == ZILU_SELECTED_ID
+}
+
 /* 会意写两个部件（SPEC §4.1）；设计稿只给了「休 = 人 + 木」。 */
 public func formulaParts(charId: String): Array<String> {
     if (charId == "xiu") { return ["人", "木"] }
