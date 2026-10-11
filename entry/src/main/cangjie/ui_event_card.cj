@@ -21,9 +21,10 @@ import std.collection.ArrayList
      2) 拖卡倾斜 ±5° 与下一张缩到 96% —— SPEC §4 待确认 2 自己留了「去掉倾斜、
         只留位移」的退路，这里只做位移 + 55% 透明度；
      3) 数值 / 条宽变化 320ms 缓动 —— .animation 同理留到验过之后再开。
-   手势用了 PanGesture + LongPressGesture（GestureGroup 并置）：这一档在仓颉
-   ArkUI 里没有本仓库先用例，若 DevEco 编译不过，只改本文件的手势那一处即可，
-   点选退路（左右两条常显按钮）照旧能玩。 */
+   手势走 .onTouch（这一版仓颉 ArkUI 没有 PanGesture / LongPressGesture /
+   GestureGroup 那一档，编译期直接报 undeclared type name）：Down 记起点，
+   Move 拿位移算拖动、够 300ms 就算长按，Up / Cancel 收尾，都在本文件的
+   onTouch* 几个函数里。点选退路（左右两条常显按钮）另有一条，不依赖手势。 */
 
 /* 立绘区 184 高（SPEC §4 待确认 5：立绘风格另定，本版是骨色占位）。 */
 @Component
@@ -242,6 +243,16 @@ public class EventCardView {
     @State var dragX: Float64 = 0.0
     @State var held: Bool = false
 
+    /* —— onTouch 的记账字段（不是界面状态，只是这一串触摸的中间量）——
+       touchStartX  Down 时的横坐标，Move 里 dx = 当前 - 它
+       touchStartTs Down 时的时间戳，用来判 300ms 长按
+       touchDrag    位移已经超过 8vp（拖起来就不再算长按）
+       touchHold    长按已经亮过（一次按压只亮一次） */
+    @State var touchStartX: Float64 = 0.0
+    @State var touchStartTs: Int64 = 0
+    @State var touchDrag: Bool = false
+    @State var touchHold: Bool = false
+
     /* 往右拖 = 选右边，往左拖 = 选左边。 */
     func sideOf(x: Float64): Int64 {
         if (x >= 0.0) { return RUN_SIDE_RIGHT }
@@ -313,6 +324,63 @@ public class EventCardView {
         this.onHoldChange(false)
     }
 
+    /* —— onTouch 回调（见文件头：这一版没有手势 API，拖动 / 长按都手算）——
+       按下到抬起之间一次按压算一串事件，中途 Cancel 也算抬起。 */
+
+    /* 触点数组兜底：Cancel 有时不带触点，取不到就当这一下没发生过。 */
+    func onTouchEvent(e: TouchEvent): Unit {
+        if (e.changedTouches.size > 0) {
+            this.onTouchAt(e.changedTouches[0], e)
+            return
+        }
+        if (e.touches.size > 0) {
+            this.onTouchAt(e.touches[0], e)
+        }
+    }
+
+    func onTouchAt(t: TouchObject, e: TouchEvent): Unit {
+        match (e.eventType) {
+            case TouchType.Down => this.onTouchDown(t.screenX, e.timestamp)
+            case TouchType.Move => this.onTouchMove(t.screenX, e.timestamp)
+            case TouchType.Up => this.onTouchUp()
+            case TouchType.Cancel => this.onTouchUp()
+            case _ => ()
+        }
+    }
+
+    /* 按满 300ms 才算长按。时间戳按 ms 比；万一某机型给的是 ns（差 6 个数量级），
+       折回来再比，反正只跟 300 比大小。 */
+    func heldMs(now: Int64): Int64 {
+        let d = now - this.touchStartTs
+        if (d <= 0) { return 0 }
+        if (d > 100000) { return d / 1000000 }
+        return d
+    }
+
+    func onTouchDown(x: Float64, ts: Int64): Unit {
+        this.touchStartX = x
+        this.touchStartTs = ts
+        this.touchDrag = false
+        this.touchHold = false
+        this.dragStart()
+    }
+
+    func onTouchMove(x: Float64, ts: Int64): Unit {
+        let dx = x - this.touchStartX
+        if (dx > 8.0 || dx < -8.0) { this.touchDrag = true }
+        this.dragMove(dx)
+        /* 位移小、按住够久 → 亮一次（亮过就不重复亮）。 */
+        if (!this.touchHold && !this.touchDrag && this.heldMs(ts) >= 300) {
+            this.touchHold = true
+            this.holdOn()
+        }
+    }
+
+    func onTouchUp(): Unit {
+        if (this.touchHold) { this.holdOff() }
+        this.dragEnd()
+    }
+
     func build() {
         Stack {
             /* 下一张垫在后面：55% 透明度（96% 缩放见文件头说明 2）。 */
@@ -332,11 +400,15 @@ public class EventCardView {
                     CardBody(text: this.body)
                     Blank()
                     if (this.allowsLuozi) {
-                        CardLuoziBar(
-                            label: this.luoziLabel,
-                            enabled: this.luoziEnabled,
-                            onTap: { => this.onLuozi() }
-                        )
+                        /* 自建组件不能挂链式属性（@Component 宏不认），套一层
+                           Column 把 margin 放容器上（同 ui_card.cj 的 GhostButton）。 */
+                        Column {
+                            CardLuoziBar(
+                                label: this.luoziLabel,
+                                enabled: this.luoziEnabled,
+                                onTap: { => this.onLuozi() }
+                            )
+                        }
                         .margin(left: 12, right: 12, bottom: 12)
                     }
                 }
@@ -345,8 +417,11 @@ public class EventCardView {
 
                 /* 拖过阈值：卡顶露出这一侧的选项条。 */
                 if (this.pastThreshold()) {
-                    CardOptBar(label: this.optLabel(this.sideOf(this.dragX)), side: this.sideOf(this.dragX))
-                        .align(Alignment.Top)
+                    Column {
+                        CardOptBar(label: this.optLabel(this.sideOf(this.dragX)), side: this.sideOf(this.dragX))
+                    }
+                    .width(100.percent)
+                    .align(Alignment.Top)
                 }
             }
             .width(Theme.cardW)
@@ -355,18 +430,7 @@ public class EventCardView {
             .backgroundColor(Theme.paper50)
             .border(width: this.holdBorderWidth(), color: this.holdBorderColor())
             .offset(x: this.shiftX(), y: 0)
-            .gesture(
-                GestureGroup(GestureMode.Parallel,
-                    PanGesture()
-                        .onActionStart({event: GestureEvent => this.dragStart()})
-                        .onActionUpdate({event: PanGestureEvent => this.dragMove(event.offsetX)})
-                        .onActionEnd({event: GestureEvent => this.dragEnd()})
-                        .onActionCancel({event: GestureEvent => this.dragEnd()}),
-                    LongPressGesture(repeat: false, duration: 300)
-                        .onActionEnd({event: GestureEvent => this.holdOn()})
-                        .onActionCancel({event: GestureEvent => this.holdOff()})
-                )
-            )
+            .onTouch({e: TouchEvent => this.onTouchEvent(e)})
         }
         .width(Theme.cardW)
         .height(Theme.cardH)

@@ -93,25 +93,26 @@ public class HomeHudDim {
                     .borderRadius(3)
                 Row {
                     Text("")
-                        .layoutWeight(this.fillWeight())
+                        /* layoutWeight 只吃 Int32：份数是 Int64，逐个转。 */
+                        .layoutWeight(Int32(this.fillWeight()))
                         .height(6)
                         .backgroundColor(this.fillColor())
                     Text("")
-                        .layoutWeight(this.restWeight())
+                        .layoutWeight(Int32(this.restWeight()))
                         .height(6)
                 }
                 .width(100.percent)
                 .height(6)
                 Row {
                     Text("")
-                        .layoutWeight(RUN_DANGER_LOW)
+                        .layoutWeight(Int32(RUN_DANGER_LOW))
                         .height(6)
                         .backgroundColor(Theme.hudDangerZone)
                     Text("")
-                        .layoutWeight(RUN_DIM_MAX - 2 * RUN_DANGER_LOW)
+                        .layoutWeight(Int32(RUN_DIM_MAX - 2 * RUN_DANGER_LOW))
                         .height(6)
                     Text("")
-                        .layoutWeight(RUN_DANGER_LOW)
+                        .layoutWeight(Int32(RUN_DANGER_LOW))
                         .height(6)
                         .backgroundColor(Theme.hudDangerZone)
                 }

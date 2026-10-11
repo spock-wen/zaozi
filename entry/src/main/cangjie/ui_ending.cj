@@ -272,10 +272,14 @@ public class EndingCardBody {
             .layoutWeight(1)
             .padding(left: 22, right: 22, top: 22)
 
-            EndingBtns(
-                onGenealogy: { => this.onGenealogy() },
-                onNext: { => this.onNext() }
-            )
+            /* 自建组件不能挂链式属性（@Component 宏不认），套一层 Column
+               把 padding 放容器上（同 ui_card.cj 的 GhostButton）。 */
+            Column {
+                EndingBtns(
+                    onGenealogy: { => this.onGenealogy() },
+                    onNext: { => this.onNext() }
+                )
+            }
             .padding(left: 24, right: 24, bottom: 24)
         }
         .width(100.percent)
@@ -328,20 +332,25 @@ public class EndingOverlay {
                 .height(100.percent)
                 .backgroundColor(Theme.scrimBlack45)
 
-            EndingCardBody(
-                generation: this.generation,
-                title: this.title,
-                endingId: this.endingId,
-                dim: this.dim,
-                kind: this.kind,
-                good: this.good,
-                chars: this.chars,
-                onGenealogy: { => this.onGenealogy() },
-                onNext: { => this.onNext() }
-            )
+            /* 自建组件不能挂链式属性（@Component 宏不认），套一层 Column
+               把尺寸 / 位移放容器上（同 ui_card.cj 的 GhostButton）。 */
+            Column {
+                EndingCardBody(
+                    generation: this.generation,
+                    title: this.title,
+                    endingId: this.endingId,
+                    dim: this.dim,
+                    kind: this.kind,
+                    good: this.good,
+                    chars: this.chars,
+                    onGenealogy: { => this.onGenealogy() },
+                    onNext: { => this.onNext() }
+                )
+            }
             .width(100.percent)
             .height(100.percent)
-            .offset(y: this.offsetY())
+            /* offset 的 x / y 都是必填命名参数（本 SDK 没有单参重载）。 */
+            .offset(x: 0, y: this.offsetY())
         }
         .width(100.percent)
         .height(100.percent)

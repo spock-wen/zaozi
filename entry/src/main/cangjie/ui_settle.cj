@@ -462,10 +462,14 @@ public class SettleScreen {
             }
             .layoutWeight(1)
 
-            SettleBtns(
-                onGenealogy: { => this.onGenealogy() },
-                onNext: { => this.onNext() }
-            )
+            /* 自建组件不能挂链式属性（@Component 宏不认），套一层 Column
+               把 margin 放容器上（同 ui_card.cj 的 GhostButton）。 */
+            Column {
+                SettleBtns(
+                    onGenealogy: { => this.onGenealogy() },
+                    onNext: { => this.onNext() }
+                )
+            }
             .margin(left: 12, right: 12, bottom: 16, top: 12)
         }
         .width(100.percent)

@@ -32,12 +32,12 @@ public class PickStatLine {
 
     func build() {
         Row {
-            Text(this.genLine)
+            Text(this.genLine())
                 .fontSize(Theme.fsStatus)
                 .fontFamily(Theme.sans)
                 .fontColor(Theme.ink900)
                 .layoutWeight(1)
-            Text(this.recorder)
+            Text(this.recorder())
                 .fontSize(Theme.fsStatus)
                 .fontFamily(Theme.sans)
                 .fontColor(Theme.ink600)
@@ -378,10 +378,14 @@ public class PickScreen {
             }
             .layoutWeight(1)
 
-            PickFootBtn(
-                picked: this.picked,
-                onTap: { => this.confirm() }
-            )
+            /* 自建组件不能挂链式属性（@Component 宏不认），套一层 Column
+               把 margin 放容器上（同 ui_card.cj 的 GhostButton）。 */
+            Column {
+                PickFootBtn(
+                    picked: this.picked,
+                    onTap: { => this.confirm() }
+                )
+            }
             .margin(bottom: 16)
         }
         .width(100.percent)

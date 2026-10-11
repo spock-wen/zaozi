@@ -172,7 +172,8 @@ public class HomeBoxSlot {
                     .border(width: 1, color: Theme.nightLine)
                     .textAlign(TextAlign.Center)
                     .align(Alignment.Bottom)
-                    .offset(y: Theme.boxTagH / 2)
+                    /* offset 的 x / y 都是必填命名参数（本 SDK 没有单参重载）。 */
+                    .offset(x: 0, y: Theme.boxTagH / 2)
             }
         }
         .width(Theme.boxSlotCell)

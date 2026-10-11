@@ -29,12 +29,12 @@ public class HomeStatLine {
 
     func build() {
         Row {
-            Text(this.genLine)
+            Text(this.genLine())
                 .fontSize(Theme.fsStatus)
                 .fontFamily(Theme.sans)
                 .fontColor(Theme.onNight)
                 .layoutWeight(1)
-            Text(this.recorder)
+            Text(this.recorder())
                 .fontSize(Theme.fsStatus)
                 .fontFamily(Theme.sans)
                 .fontColor(Theme.onNight2)
@@ -153,8 +153,8 @@ public class HomeOptBtns {
 }
 
 /* 操作提示：拖卡 / 长按两行小字（设计稿字匣条右下角）。
-   这一版的手势（PanGesture / LongPressGesture）没有本仓库先用例，
-   这两行就是告诉玩家「卡片可以拖、可以按住」的兜底说明。 */
+   手势走 .onTouch 手算（见 ui_event_card.cj 文件头），这两行就是告诉玩家
+   「卡片可以拖、可以按住」的兜底说明。 */
 @Component
 public class HomeCardTip {
     func build() {
@@ -347,15 +347,21 @@ public class HomeScreen {
 
             /* 按住看分量：两排圆点（上左 / 下右），只在长按中出现。 */
             if (this.held) {
-                HomeWeightDots(
-                    leftDeltas: this.leftDeltas(),
-                    rightDeltas: this.rightDeltas()
-                )
+                /* 自建组件不能挂链式属性（@Component 宏不认），套一层 Column
+                   把 margin 放容器上（同 ui_card.cj 的 GhostButton）。 */
+                Column {
+                    HomeWeightDots(
+                        leftDeltas: this.leftDeltas(),
+                        rightDeltas: this.rightDeltas()
+                    )
+                }
                 .margin(top: 10)
             }
 
             /* 四维资源条。 */
-            HomeHud(dims: this.dims, flashDim: this.flashDim, flashOn: this.flashOn)
+            Column {
+                HomeHud(dims: this.dims, flashDim: this.flashDim, flashOn: this.flashOn)
+            }
             .margin(top: 12)
 
             /* 骨片行 + 余年。 */
@@ -365,16 +371,20 @@ public class HomeScreen {
                 yearsLeft: this.yearsLeft
             )
 
-            /* 事件卡：中间剩下的地方都归它（牌面在 HomeCardStage 里拼）。 */
-            HomeCardStage(
-                cardIndex: this.cardIndex,
-                luoziLabel: this.luoziLabel(),
-                luoziEnabled: this.luoziReady(),
-                onHoldChange: {v => this.holdChange(v)},
-                onPick: {side => this.pick(side)},
-                onLuozi: { => this.luoziTap() }
-            )
+            /* 事件卡：中间剩下的地方都归它（牌面在 HomeCardStage 里拼）。
+               layoutWeight 挂在外层容器上，卡片在剩下的高度里居中。 */
+            Column {
+                HomeCardStage(
+                    cardIndex: this.cardIndex,
+                    luoziLabel: this.luoziLabel(),
+                    luoziEnabled: this.luoziReady(),
+                    onHoldChange: {v => this.holdChange(v)},
+                    onPick: {side => this.pick(side)},
+                    onLuozi: { => this.luoziTap() }
+                )
+            }
             .layoutWeight(1)
+            .justifyContent(FlexAlign.Center)
 
             /* 点选退路。 */
             HomeOptBtns(
