@@ -1,0 +1,11 @@
+[package]
+  name = "ohos_app_cangjie_entry"
+  version = "0.1.0"
+  cjc-version = "1.1.3"
+  output-type = "executable"
+  src-dir = "./src"
+  description = "造字人 pure-logic box check (no ohos SDK on this box)"
+
+[profile]
+  [profile.build]
+    incremental = false

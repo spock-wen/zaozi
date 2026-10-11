@@ -1,0 +1,32 @@
+# Cangjie package manifest for a DevEco [Cangjie] Empty Ability module.
+# cjc-version locked to 1.1.3 (https://cangjie-lang.cn/download/1.1.3).
+# target compile-option / path-option follow the official OpenHarmony
+# Cangjie wrapper sample (filemanagement_filemanagement_cangjie_wrapper).
+# DevEco injects DEVECO_CANGJIE_HOME and kit library paths on sync.
+
+[package]
+  name = "ohos_app_cangjie_entry"
+  version = "1.0.0"
+  cjc-version = "1.1.3"
+  output-type = "dynamic"
+  src-dir = "./src/main/cangjie"
+  description = "造字人 CangjieUI Application"
+
+[profile]
+  [profile.build]
+    incremental = true
+  [profile.build.combined]
+    ohos_app_cangjie_entry = "dynamic"
+  [profile.customized-option]
+    debug = "-g -Woff all"
+    release = "--fast-math -O2 -s -Woff all"
+
+[target]
+  [target.aarch64-linux-ohos]
+    compile-option = "-B \"${DEVECO_CANGJIE_HOME}/compiler/third_party/llvm/bin\" -B \"${DEVECO_OH_NATIVE_HOME}/sysroot/usr/lib/aarch64-linux-ohos\" -L \"${DEVECO_OH_NATIVE_HOME}/sysroot/usr/lib/aarch64-linux-ohos\" -L \"${DEVECO_OH_NATIVE_HOME}/llvm/lib/clang/current/lib/aarch64-linux-ohos\" -L \"${DEVECO_OH_NATIVE_HOME}/llvm/lib/aarch64-linux-ohos\" -L \"${DEVECO_CANGJIE_HOME}/build/linux_ohos_aarch64_llvm/openssl\" --sysroot \"${DEVECO_OH_NATIVE_HOME}/sysroot\""
+  [target.aarch64-linux-ohos.bin-dependencies]
+    path-option = [ "${AARCH64_LIBS}", "${AARCH64_MACRO_LIBS}", "${AARCH64_KIT_LIBS}", "${AARCH64_STDX_LIBS}" ]
+  [target.x86_64-linux-ohos]
+    compile-option = "-B \"${DEVECO_CANGJIE_HOME}/compiler/third_party/llvm/bin\" -B \"${DEVECO_OH_NATIVE_HOME}/sysroot/usr/lib/x86_64-linux-ohos\" -L \"${DEVECO_OH_NATIVE_HOME}/sysroot/usr/lib/x86_64-linux-ohos\" -L \"${DEVECO_OH_NATIVE_HOME}/llvm/lib/clang/current/lib/x86_64-linux-ohos\" -L \"${DEVECO_OH_NATIVE_HOME}/llvm/lib/x86_64-linux-ohos\" -L \"${DEVECO_CANGJIE_HOME}/build/linux_ohos_x86_64_llvm/openssl\" --sysroot \"${DEVECO_OH_NATIVE_HOME}/sysroot\""
+  [target.x86_64-linux-ohos.bin-dependencies]
+    path-option = [ "${X86_64_OHOS_LIBS}", "${X86_64_OHOS_MACRO_LIBS}", "${X86_64_OHOS_KIT_LIBS}" ]

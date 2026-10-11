@@ -1,0 +1,431 @@
+package ohos_app_cangjie_entry
+
+import kit.ArkUI.*
+import ohos.arkui.state_macro_manage.*
+
+/* 造字卡（card_zaozi_v1）：
+   冬夜底 · 状态栏 · 金色标签胶囊 · 事签 · 骨片（字形区 + 公式行 + 卡面档演变条）
+   · 跳过提示 · 进度点 · 成字弹层。
+   播放：每 600ms 进一格，交叉淡化（用 opacity 过渡）；点一下任意处 → 落定 + 弹层。
+   计时器不引入 setInterval 这类未验证 API，用 yilu 里已验证的
+   getUIContext().animateTo(AnimateParam(duration:, onFinish:)) 链式推进。 */
+
+@Component
+public class CardScreen {
+    @Prop var onGoZilu: () -> Unit
+    /* 本次已经看过成字（EntryView 记住）：再进造字 tab 直接落定，不自动播、不弹层。 */
+    @Prop var cardDone: Bool
+    /* 落定时告诉父组件「本次已看过」。 */
+    @Prop var onDone: () -> Unit
+
+    @State var stage: Int64 = 0
+    @State var settled: Bool = false
+    @State var showSheet: Bool = false
+    /* 播放代次：跳过时 +1，让挂着旧代次的 onFinish 直接失效。 */
+    @State var gen: Int64 = 0
+
+    let charId: String = "xiu"
+
+    public func aboutToAppear(): Unit {
+        /* 只认 cardDone：本组件每次进造字 tab 都会重建，跨次数的「重播计数」在这里
+           必然对不上（会误判成要重播，然后弹层，死循环换个形式复现）。
+           所以显式重播由字录「再看一次」负责：它先把 cardDone 置 false 再切回来。 */
+        if (this.cardDone) {
+            /* 看过成字后又回造字 tab（含系统 Back / 顶部切换器）：直接落定，
+               不再自动播、也不再弹层，避免「继续 → 重播 → 弹层」死循环。 */
+            this.settleQuiet()
+        } else {
+            this.startPlay()
+        }
+    }
+
+    /* 切走时把代次 +1，让还挂着的 onFinish 直接失效，不去动已经销毁的控件。 */
+    public func aboutToDisappear(): Unit {
+        this.gen = this.gen + 1
+    }
+
+    func startPlay(): Unit {
+        this.gen = this.gen + 1
+        this.settled = false
+        this.showSheet = false
+        this.stage = 0
+        this.schedule()
+    }
+
+    func schedule(): Unit {
+        let g = this.gen
+        this.getUIContext().animateTo(
+            /* duration 要 Int32 字面量：Theme.playStepMs 是 Int64(600)，直接传会 mismatched types。
+               与 yilu 一致用裸字面量 600（= Theme.playStepMs）。 */
+            AnimateParam(duration: 600, onFinish: Some({ =>
+                if (g == this.gen) {
+                    this.tick()
+                }
+            })),
+            { => }
+        )
+    }
+
+    func tick(): Unit {
+        if (this.settled) {
+            return
+        }
+        let last = buildCardStrip(this.charId).cells.size - 1
+        if (this.stage < last) {
+            this.stage = this.stage + 1
+            this.schedule()
+        } else {
+            this.settle()
+        }
+    }
+
+    /* 落定但不弹层（本次已看过、从字录回来时用）。 */
+    func settleQuiet(): Unit {
+        this.settled = true
+        this.stage = 4096
+        this.showSheet = false
+    }
+
+    func settle(): Unit {
+        this.settleQuiet()
+        this.showSheet = true
+        /* 告诉父组件本次已看过成字，下次进造字 tab 直接落定。 */
+        this.onDone()
+    }
+
+    /* 点一下卡面 → 跳过播放：代次 +1 让还挂着的 onFinish 直接失效，然后落定 + 弹层。
+       已经落定就不再弹层（否则关掉弹层后点一下卡面又弹出来）。 */
+    func skip(): Unit {
+        if (this.settled) {
+            return
+        }
+        this.gen = this.gen + 1
+        this.settle()
+    }
+
+    /* 「继续」= 关弹层，卡面停在落定状态；不重播（重播要显式点字录的「再看一次」）。 */
+    func closeSheet(): Unit {
+        this.showSheet = false
+    }
+
+    /* 当前这一格（落定后停在最后一格）。 */
+    func currentIndex(): Int64 {
+        let last = buildCardStrip(this.charId).cells.size - 1
+        if (this.stage > last) {
+            return last
+        }
+        return this.stage
+    }
+
+    /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
+       buildCardStrip / formulaParts 都是纯函数，反复调用结果一致。 */
+    func cardStrip(): EvoStrip {
+        return buildCardStrip(this.charId)
+    }
+
+    /* 最后一格的下标。 */
+    func cardLastIndex(): Int64 {
+        return this.cardStrip().cells.size - 1
+    }
+
+    func cardParts(): Array<String> {
+        return formulaParts(this.charId)
+    }
+
+    func build() {
+        Stack {
+            /* —— 卡面本体：点一下跳过 —— */
+            Column {
+                /* 状态栏 */
+                Row {
+                    Text(CARD_GEN_LINE)
+                        .fontSize(Theme.fsStatus)
+                        .fontFamily(Theme.sans)
+                        .fontColor(Theme.onNight)
+                        .layoutWeight(1)
+                    Text(if (this.settled) { CARD_BONE_SETTLED } else { CARD_BONE_PLAYING })
+                        .fontSize(Theme.fsStatus)
+                        .fontFamily(Theme.sans)
+                        .fontColor(Theme.onNight2)
+                }
+                .width(100.percent)
+                .height(44)
+                .padding(left: Theme.insetNight, right: Theme.insetNight)
+
+                /* 冬夜标签 + 事签 */
+                Row {
+                    Text(CARD_TAG)
+                        .fontSize(Theme.fsBadge)
+                        .fontFamily(Theme.sans)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(Theme.gold400)
+                        .height(24)
+                        .padding(left: 10, right: 10)
+                        .borderRadius(12)
+                        .border(width: 1, color: Theme.gold400)
+                        .textAlign(TextAlign.Center)
+                    Blank()
+                }
+                .width(100.percent)
+                .padding(left: Theme.insetNight, right: Theme.insetNight)
+
+                Row {
+                    Text(SHIQIAN_LABEL)
+                        .fontSize(Theme.fsShiqian)
+                        .fontFamily(Theme.serif)
+                        .fontColor(Theme.onNight)
+                    Text(SHIQIAN_BODY)
+                        .fontSize(Theme.fsShiqian)
+                        .fontFamily(Theme.serif)
+                        .fontColor(Theme.onNight2)
+                        .layoutWeight(1)
+                        .maxLines(3)
+                }
+                .width(100.percent)
+                .padding(left: Theme.insetNight, right: Theme.insetNight, top: 10)
+
+                /* —— 骨片 328 × 356，四角不等圆角 —— */
+                Stack {
+                    /* 跳过提示（骨片右上角，绝对定位在 Stack 顶部） */
+                    Row {
+                        Blank()
+                        Text(CARD_SKIP_HINT)
+                            .fontSize(11)
+                            .fontFamily(Theme.sans)
+                            .fontColor(Theme.ink400)
+                            .margin(right: 14, top: 12)
+                    }
+                    .width(100.percent)
+                    .height(24)
+                    .align(Alignment.TopEnd)
+
+                    Column {
+                        /* 字形区 176 × 176 */
+                        Column {
+                            if (this.currentIndex() == this.cardLastIndex()) {
+                                Text(this.cardStrip().cells[this.currentIndex()].glyph)
+                                    .fontSize(Theme.fsGlyphHero)
+                                    .fontFamily(Theme.serif)
+                                    .fontWeight(FontWeight.Bold)
+                                    .fontColor(Theme.ink900)
+                            } else {
+                                Image(glyphResource(this.cardStrip().cells[this.currentIndex()].asset))
+                                    .width(Theme.boneGlyphBox)
+                                    .height(Theme.boneGlyphBox)
+                                    .objectFit(ImageFit.Contain)
+                                    .fillColor(if (this.settled) { Theme.ink900 } else { Theme.carve })
+                            }
+                        }
+                        .width(Theme.boneGlyphBox)
+                        .height(Theme.boneGlyphBox)
+                        .justifyContent(FlexAlign.Center)
+                        .alignItems(HorizontalAlign.Center)
+                        .margin(top: Theme.boneGlyphTop)
+
+                        /* 公式行 */
+                        Row {
+                            if (this.cardParts().size > 0) {
+                                /* key 带上字与下标：不传 keyGenerator 时按下标复用，数据变了不重建。 */
+                                ForEach(this.cardParts(), itemGeneratorFunc: {p: String, i: Int64 =>
+                                    Row {
+                                        if (i > 0) {
+                                            Text("＋")
+                                                .fontSize(14)
+                                                .fontFamily(Theme.sans)
+                                                .fontWeight(FontWeight.Bold)
+                                                .fontColor(Theme.ink600)
+                                                .margin(left: 8, right: 8)
+                                        }
+                                        PartChip(glyph: p)
+                                    }
+                                    .alignItems(VerticalAlign.Center)
+                                }, keyGeneratorFunc: {p: String, i: Int64 =>
+                                    "${this.charId}_${i}"
+                                })
+                            } else {
+                                Text(formulaText(this.charId))
+                                    .fontSize(14)
+                                    .fontFamily(Theme.sans)
+                                    .fontWeight(FontWeight.Bold)
+                                    .fontColor(Theme.ink600)
+                            }
+                        }
+                        .width(100.percent)
+                        .height(32)
+                        .margin(top: 12)
+                        .justifyContent(FlexAlign.Center)
+                        .alignItems(VerticalAlign.Center)
+
+                        /* 卡面档演变条：只显示阶段名 */
+                        Column {
+                            EvoStripView(
+                                tierOpt: Some(EvoTier.C),
+                                charId: this.charId,
+                                dark: false,
+                                selectedIndex: this.currentIndex(),
+                                playedUpTo: this.currentIndex(),
+                                showBaihua: false,
+                                tappable: false,
+                                onSelect: {_: Int64 => }
+                            )
+                        }
+                        .margin(top: 20)
+                    }
+                    .width(Theme.boneW)
+                    .height(Theme.boneH)
+                    .backgroundColor(Theme.bone100)
+                    .borderRadius(topLeft: 30, topRight: 22, bottomRight: 34, bottomLeft: 20)
+                    .border(width: 1, color: Theme.bone300)
+                    .padding(left: Theme.cardPad, right: Theme.cardPad)
+                }
+                .width(100.percent)
+                .margin(top: 16)
+
+                /* 提示 + 进度点 */
+                Text(CARD_HINT)
+                    .fontSize(12)
+                    .fontFamily(Theme.sans)
+                    .fontColor(Theme.onNight2)
+                    .margin(top: 18)
+                Row {
+                    /* 进度点：key 带上播放阶段，阶段变了一定重建。 */
+                    ForEach(this.cardStrip().cells, itemGeneratorFunc: {cell: EvoCell, i: Int64 =>
+                        Row()
+                            .width(if (i == this.currentIndex()) { 18 } else { 6 })
+                            .height(6)
+                            .borderRadius(3)
+                            .backgroundColor(if (i == this.currentIndex()) { Theme.gold400 } else { Theme.nightLine })
+                            .margin(left: 3, right: 3)
+                    }, keyGeneratorFunc: {cell: EvoCell, i: Int64 =>
+                        "${this.stage}_${i}"
+                    })
+                }
+                .width(100.percent)
+                .margin(top: 10)
+                .justifyContent(FlexAlign.Center)
+            }
+            .width(100.percent)
+            .height(100.percent)
+            .backgroundColor(Theme.night900)
+            .onClick({event => this.skip()})
+
+            /* —— 成字弹层：遮罩 45% 黑 + 上滑 240ms —— */
+            /* 遮罩在卡面之上、弹层之下；点遮罩也是关弹层 */
+            if (this.showSheet) {
+                Column()
+                    .width(100.percent)
+                    .height(100.percent)
+                    .backgroundColor(Theme.scrimBlack45)
+                    .onClick({event => this.closeSheet()})
+            }
+
+            /* 弹层贴底 */
+            if (this.showSheet) {
+                Column {
+                    Column {
+                        /* 把手 36 × 4 */
+                        Row()
+                            .width(36)
+                            .height(4)
+                            .borderRadius(2)
+                            .backgroundColor(Theme.paperLine)
+                        Text(CARD_SHEET_KEY)
+                            .fontSize(Theme.fsSectionTitle)
+                            .fontFamily(Theme.sans)
+                            .fontWeight(FontWeight.Bold)
+                            .fontColor(Theme.zhu600)
+                            .width(100.percent)
+                            .margin(top: 14)
+                        Text(CARD_SHEET_TITLE)
+                            .fontSize(Theme.fsSheetTitle)
+                            .fontFamily(Theme.serif)
+                            .fontWeight(FontWeight.Bold)
+                            .fontColor(Theme.ink900)
+                            .width(100.percent)
+                            .margin(top: 8)
+                        Row {
+                            PartChip(glyph: "人")
+                            Text("＋")
+                                .fontSize(14)
+                                .fontFamily(Theme.sans)
+                                .fontColor(Theme.ink600)
+                                .margin(left: 8, right: 8)
+                            PartChip(glyph: "木")
+                            Text(CARD_SHEET_SUB)
+                                .fontSize(13)
+                                .fontFamily(Theme.sans)
+                                .fontColor(Theme.ink600)
+                                .margin(left: 8)
+                        }
+                        .width(100.percent)
+                        .margin(top: 10)
+                        .alignItems(VerticalAlign.Center)
+
+                        /* 记忆数值条 */
+                        Row {
+                            Text(CARD_MEMORY_LABEL)
+                                .fontSize(14)
+                                .fontFamily(Theme.sans)
+                                .fontColor(Theme.ink600)
+                                .layoutWeight(1)
+                            Text(CARD_MEMORY_BAR)
+                                .fontSize(16)
+                                .fontFamily(Theme.sans)
+                                .fontWeight(FontWeight.Bold)
+                                .fontColor(Theme.ink900)
+                            Text(CARD_MEMORY_DELTA)
+                                .fontSize(13)
+                                .fontFamily(Theme.sans)
+                                .fontColor(Theme.white)
+                                .backgroundColor(Theme.zhu600)
+                                .height(24)
+                                .padding(left: 8, right: 8)
+                                .borderRadius(12)
+                                .margin(left: 10)
+                                .textAlign(TextAlign.Center)
+                        }
+                        .width(100.percent)
+                        .height(52)
+                        .borderRadius(12)
+                        .backgroundColor(Theme.paper100)
+                        .border(width: 1, color: Theme.paper200)
+                        .padding(left: 16, right: 16)
+                        .margin(top: 16)
+                        .alignItems(VerticalAlign.Center)
+
+                        Text(CARD_SHEET_META)
+                            .fontSize(12)
+                            .fontFamily(Theme.sans)
+                            .fontColor(Theme.ink400)
+                            .width(100.percent)
+                            .margin(top: 10)
+
+                        Row {
+                            Column {
+                                GhostButton(label: CARD_BTN_ZILU, onTap: { => this.onGoZilu() })
+                            }
+                            .layoutWeight(1)
+                            .margin(right: 6)
+                            Column {
+                                PrimaryButton(label: CARD_BTN_CONTINUE, onTap: { => this.closeSheet() })
+                            }
+                            .layoutWeight(1)
+                            .margin(left: 6)
+                        }
+                        .width(100.percent)
+                        .margin(top: 18)
+                    }
+                    .width(100.percent)
+                    .padding(left: 20, right: 20, top: 10, bottom: 20)
+                    .backgroundColor(Theme.paper50)
+                    .borderRadius(topLeft: Theme.sheetRadius, topRight: Theme.sheetRadius)
+                }
+                .width(100.percent)
+                .height(100.percent)
+                .justifyContent(FlexAlign.End)
+            }
+        }
+        .width(100.percent)
+        .height(100.percent)
+    }
+}

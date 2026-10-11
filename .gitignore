@@ -1,0 +1,21 @@
+build/
+.hvigor/
+.idea/
+oh_modules/
+entry/build/
+*.hap
+local.properties
+entry/.cangjie/
+target/
+tools/box_check/src/
+tools/box_check/target/
+tools/box_check/cjpm.lock
+
+# Python：工具脚本的缓存与字节码
+__pycache__/
+*.py[cod]
+tools/__pycache__/
+
+# 命令行构建需要的三个本机文件（见 docs/COMPILE.md §2.1）
+hvigorw
+hvigorw.js
