@@ -183,4 +183,36 @@ public class Theme {
     public static let playStepMs: Int64 = 600
     public static let playFadeMs: Int64 = 300
     public static let sheetUpMs: Int64 = 240
+
+    /* —— v2 SPEC §2.6 代末结算 / §2.7 结局卡（M2 slice 4）——
+       结局卡：paper-50、左右边距 24、顶部色带 8 高、标题 Serif 40 Bold 字距 .06em、
+       原因胶囊 26 高、结局话 Serif 16 / 行高 28、留下的字 40×40。
+       代末页：paper-100；家谱行一行一代（圆点 10、竖线 2、名称 Serif 13 Bold、
+       字 24×24 圆角 6、结局字 11 Medium、「新」角标 16 高）；留下的字 44×44 朱 2。 */
+    /* 结局卡左右边距 24、上圆角 18、顶部色带 8 高。 */
+    public static let endInset: Int64 = 24
+    public static let endRadius: Int64 = 18
+    public static let endBandH: Int64 = 8
+    /* 结局卡标题 Serif 40 Bold（SPEC §2.7 模板 A/B）。 */
+    public static let endTitleFs: Int64 = 40
+    /* 结局话 Serif 16 / 行高 28（SPEC §2.7）。 */
+    public static let endLineFs: Int64 = 16
+    public static let endLineLh: Int64 = 28
+    /* 结局卡「留下的字」40×40。 */
+    public static let endCharCell: Int64 = 40
+    /* 结局卡从下方升起 320ms（SPEC §2.7 触发链）。 */
+    public static let endRiseMs: Int64 = 320
+    /* 触底 / 满 闪朱：一下 200ms，共两下（SPEC §2.1 / §2.7）。 */
+    public static let dimFlashMs: Int64 = 200
+    /* 家谱行：一行一代，行高定死 58（圆点 10 + 竖线 2 按行高连下来）。 */
+    public static let settleRowH: Int64 = 58
+    /* 家谱行圆点 10、竖线 2。 */
+    public static let familyDot: Int64 = 10
+    public static let familyLine: Int64 = 2
+    /* 家谱行「留下的字」24×24 圆角 6。 */
+    public static let familyCharCell: Int64 = 24
+    /* 「新」角标 16 高。 */
+    public static let familyNewTagH: Int64 = 16
+    /* 代末页「这一代留下」44×44。 */
+    public static let keepCharCell: Int64 = 44
 }

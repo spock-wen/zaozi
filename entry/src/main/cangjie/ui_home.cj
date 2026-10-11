@@ -6,8 +6,9 @@ import ohos.arkui.state_macro_manage.*
 /* 主界（home_slide_v1）。M2 slice 1 铺了版式（代次/年 + 字匣三格 + 二级界面入口），
    slice 2 把 SPEC §2.1 四维条、§2.2 骨片行、§2.3 事件卡（拖动 / 按住看分量 /
    点选退路 / 落字灰态）填了进来；slice 3 接上字匣（§2.4 五种格子状态 + 详情弹层）
-   与落字第三选项。结局卡、代末结算是 slice 4。四维条在 ui_hud.cj、骨片行在
-   ui_bones.cj、事件卡在 ui_event_card.cj、字匣在 ui_box.cj / ui_box_sheet.cj，
+   与落字第三选项；slice 4 接上触底闪朱、结局卡与代末结算（ui_ending.cj /
+   ui_settle.cj，路由在 index.cj）。四维条在 ui_hud.cj、骨片行在 ui_bones.cj、
+   事件卡在 ui_event_card.cj、字匣在 ui_box.cj / ui_box_sheet.cj，
    本文件只管这一层的版式。
    同样拆成小 @Component（@Component 宏展开撑不住大 build()）。 */
 
@@ -90,31 +91,25 @@ public class HomeEntryBtns {
     }
 }
 
-/* 结局占位（slice 4 才做结局卡 SPEC §2.7）：一行「结局：<标题>（结算待接）」。
-   title 空串时整行不画。 */
+/* 调试按钮「调试：粮归零」（DEBUG ONLY：M2_DEBUG_FORCE_END 打开才显示，
+   默认 false，见 game_rules.cj）。点一下把「粮」按到 0，然后走完全正常的
+   纯逻辑路径进结局卡 —— 不抄近路改 phase，测的就是真链路。 */
 @Component
-public class HomeEndingHolder {
-    @Prop var title: String
-
-    func text(): String {
-        return homeEndingText(this.title)
-    }
+public class HomeDebugBtn {
+    @Prop var onTap: () -> Unit
 
     func build() {
-        Column {
-            if (this.title.size > 0) {
-                Text(this.text())
-                    .fontSize(Theme.fsPageTitle)
-                    .fontFamily(Theme.serif)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.onNight)
-            }
-        }
-        .width(100.percent)
-        .height(100.percent)
-        .backgroundColor(Theme.night900)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        Text(HOME_DEBUG_ZERO)
+            .fontSize(Theme.fsNote)
+            .fontFamily(Theme.sans)
+            .fontColor(Theme.onNight2)
+            .height(28)
+            .padding(left: 10, right: 10)
+            .borderRadius(14)
+            .border(width: 1, color: Theme.nightLine)
+            .textAlign(TextAlign.Center)
+            .margin(top: 10)
+            .onClick({event => this.onTap()})
     }
 }
 
@@ -247,6 +242,10 @@ public class HomeScreen {
     /* 字匣选中态（-1 = 没有选中）。 */
     @Prop var selectedSlot: Int64
     @Prop var cardIndex: Int64
+    /* 触底 / 溢出闪朱（SPEC §2.1）：正在闪的那一维 + 这一下亮不亮。
+       EntryView 用 animateTo 推进两下（各 ~200ms）。 */
+    @Prop var flashDim: Int64
+    @Prop var flashOn: Bool
     /* 选定一个选项（0 左 / 1 右 / 2 落字）：EntryView 负责 applyChoice / applyLuozi + 存档。 */
     @Prop var onPick: (Int64) -> Unit
     /* 点字匣某一格：EntryView 决定选中谁、开不开详情弹层。 */
@@ -254,6 +253,8 @@ public class HomeScreen {
     @Prop var onOpenZilu: () -> Unit
     @Prop var onOpenEvo: () -> Unit
     @Prop var onOpenCard: () -> Unit
+    /* 调试入口（M2_DEBUG_FORCE_END 打开才显示按钮）。 */
+    @Prop var onDebugZero: () -> Unit
 
     /* 按住看分量中：卡片长按置 true，两排圆点才排在四维条上方。 */
     @State var held: Bool = false
@@ -354,7 +355,7 @@ public class HomeScreen {
             }
 
             /* 四维资源条。 */
-            HomeHud(dims: this.dims)
+            HomeHud(dims: this.dims, flashDim: this.flashDim, flashOn: this.flashOn)
             .margin(top: 12)
 
             /* 骨片行 + 余年。 */
@@ -397,6 +398,11 @@ public class HomeScreen {
                 onOpenEvo: { => this.onOpenEvo() },
                 onOpenCard: { => this.onOpenCard() }
             )
+
+            /* 调试：粮归零（DEBUG ONLY，默认关）。 */
+            if (M2_DEBUG_FORCE_END) {
+                HomeDebugBtn(onTap: { => this.onDebugZero() })
+            }
         }
         .width(100.percent)
         .height(100.percent)

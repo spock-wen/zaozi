@@ -114,9 +114,87 @@ public let BOX_SHEET_LAND: String = "在卡上落字"
 /* 卡底落字条（SPEC §2.3 第三选项：朱底白字 Serif 15 Bold，再点一次确认）。 */
 public let HOME_LUOZI_NEED: String = "先在字匣选一个字"
 public let HOME_LUOZI_ARMED: String = "再点一次确认落字"
-/* 结局占位：slice 4 才做结局卡，现在只落一行字。 */
-public let HOME_ENDING_PREFIX: String = "结局："
-public let HOME_ENDING_SUFFIX: String = "（结算待接）"
+/* —— 结局卡 / 代末结算（M2 slice 4；SPEC §2.6 / §2.7；设计稿 end_fail_v1 H/I、
+   settle_gen_v1 F）。N / Y 由界面替换（见 ui_ending.cj / ui_settle.cj）。 */
+/* 结局卡小标（SPEC §2.7 模板 A/B 顶部小字）。 */
+public let END_KEY: String = "第 N 代 · 结局"
+/* 原因胶囊：「<维名> 见底 / 溢出」（维名来自 homeDimName）。 */
+public let END_WHY_GOOD: String = "四维都在中间"
+/* 家谱记下那一行：「家谱记下：第 N 代，<标题>」。 */
+public let END_GENEALOGY: String = "家谱记下：第 N 代，"
+/* 留下的字那一行：没有落过字时写「未成字」（SPEC §3）。 */
+public let END_CHARS_NONE: String = "未成字"
+/* 结局卡按钮：左描边、右朱（SPEC §2.7）。 */
+public let END_BTN_GENEALOGY: String = "看家谱"
+public let END_BTN_NEXT: String = "往下传"
+/* 代末结算页（settle_gen_v1 F）。小标「代末」（设计稿 .st0 .k 写「一代终了」，
+   这一版按切片说明用「代末」）。 */
+public let SETTLE_KEY: String = "代末"
+public let SETTLE_TITLE: String = "第 N 代记事人放下了刻刀"
+public let SETTLE_SEC_GENEALOGY: String = "家谱 · 添一笔"
+public let SETTLE_SEC_KEEP: String = "这一代留下"
+/* 传事签块：事签是 stub（本 milestone 不传），整块不显示。 */
+public let SETTLE_SEC_SHIQIAN: String = "传给下一代的事签（最多 1 张）"
+/* 「这一代留下」后面那行小字：刻成几个字。 */
+public let SETTLE_KEEP_META: String = "刻成 N 字"
+/* 代末页按钮：左描边（家谱独立页不在本切片，点了只是提示）、右朱回开局挑字。 */
+public let SETTLE_BTN_GENEALOGY: String = "看家谱"
+public let SETTLE_BTN_NEXT: String = "下一代"
+/* 家谱独立页（full version）不在本切片：「看家谱」按钮点了只落一句提示。 */
+public let SETTLE_GENEALOGY_STUB: String = "家谱独立页下一版做"
+/* 调试按钮（M2_DEBUG_FORCE_END 打开才显示；见 game_rules.cj）。 */
+public let HOME_DEBUG_ZERO: String = "调试：粮归零"
+
+/* 结局话：每个结局 id 一句，Serif 16 / 行高 28，最多 3 行（SPEC §2.7 模板 A/B）。
+   设计稿只给了「失祀」「寿终传笔」两句原文，其余是同一口径的占位文案，
+   等玩法稿（/workspace/zaozi-formal/v2/INVENTORY.md 记的内容缺口）补真文案。 */
+public func endingLine(id: String): String {
+    if (id == "jinian") { return "仓里见底的那天，雪还没停。族人把最后一点粮种也煮了。" }
+    if (id == "shisi") { return "没人再信祭祀，族人说是你的刻骨招来了灾，把你赶走。" }
+    if (id == "jiushui") { return "河又改道，旧水重来，骨片沉在泥里，一块也没捞上来。" }
+    if (id == "binghuo") { return "外头打进来了，你抱着字匣躲在树洞，刀没有丢。" }
+    if (id == "cangman") { return "粮仓堆到顶，外头的人闻着味来了，一把火烧了个干净。" }
+    if (id == "fenggu") { return "人人都来求字，字被当成符咒封进骨匣，再没人肯问它的意思。" }
+    if (id == "suyuan") { return "旧年的字翻出来对质，两姓各执一义，结下了解不开的怨。" }
+    if (id == "bingzu") { return "外姓的人搬了进来，说了算，你的字被并进了他们的写法。" }
+    if (id == "shouzhong") { return "这一冬没有大事。你把刻刀交给徒弟，骨片收进了树洞。" }
+    /* 认不出的结局 id：给一句通用的收尾，界面不空、也不崩。 */
+    return "这一代到此为止，字匣收进了树洞。"
+}
+
+/* 原因胶囊文案：善终给 END_WHY_GOOD，失败给「<维名> <见底/溢出>」。
+   dim / kind 都是 RunState 的原始字段（结束语见 endingOfState）。 */
+public func endingWhyText(dim: Int64, kind: String): String {
+    if (kind == RUN_KIND_GOOD) { return END_WHY_GOOD }
+    let name = homeDimName(dim)
+    if (name.size == 0) { return kind }
+    return name + " " + kind
+}
+
+/* 「家谱记下：第 N 代，<标题>」。 */
+public func endingGenealogyText(generation: Int64, title: String): String {
+    return END_GENEALOGY.replace("N", "${generation}") + title
+}
+
+/* 结局卡小标「第 N 代 · 结局」（N 由界面替换）。 */
+public func endingKeyText(generation: Int64): String {
+    return END_KEY.replace("N", "${generation}")
+}
+
+/* 代末页主标「第 N 代记事人放下了刻刀」。 */
+public func settleTitleText(generation: Int64): String {
+    return SETTLE_TITLE.replace("N", "${generation}")
+}
+
+/* 家谱行的名称「第 N 代记事人」（一律不起人名，SPEC §2.6）。 */
+public func familyRowName(generation: Int64): String {
+    return "第 ${generation} 代记事人"
+}
+
+/* 「这一代留下」那行小字：刻成几个字。 */
+public func settleKeepMeta(count: Int64): String {
+    return SETTLE_KEEP_META.replace("N", "${count}")
+}
 
 /* 四维名（粮 信 记 外，与 RunState.dims 顺序一致）。认不出的下标给空串。 */
 public func homeDimName(i: Int64): String {
@@ -130,12 +208,6 @@ public func homeDimName(i: Int64): String {
 /* 「余年 N 年」把 N 替成实数。 */
 public func homeYearsText(yearsLeft: Int64): String {
     return HOME_YEARS_LEFT.replace("N", "${yearsLeft}")
-}
-
-/* 结局占位行：结局标题由 endingOfState 给，没有结局时给空串（界面整行不显示）。 */
-public func homeEndingText(title: String): String {
-    if (title.size == 0) { return "" }
-    return HOME_ENDING_PREFIX + title + HOME_ENDING_SUFFIX
 }
 
 /* 卡底落字条：选中的那个字叫什么（设计稿 C「落「水」· 以河为界」，

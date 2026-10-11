@@ -567,6 +567,16 @@ func tokenShape(): Int64 {
     let (nm2, er2) = splitStageLabel("小篆 · 秦")
     ck.that(nm2 == "小篆" && er2 == "秦", "splitStageLabel 小篆 · 秦")
     ck.that(ZILU_TOTAL == 27, "字录总数 27")
+    /* M2 slice 4：结局卡 / 代末结算 token（SPEC §2.6 / §2.7）。 */
+    ck.that(Theme.endInset == 24 && Theme.endBandH == 8 && Theme.endRadius == 18,
+        "结局卡 边距 24 / 色带 8 / 圆角 18")
+    ck.that(Theme.endTitleFs == 40 && Theme.endLineFs == 16 && Theme.endLineLh == 28,
+        "结局卡 标题 40 / 结局话 16/28")
+    ck.that(Theme.endCharCell == 40 && Theme.endRiseMs == 320, "结局卡 字 40×40 / 升起 320ms")
+    ck.that(Theme.dimFlashMs == 200, "闪朱一下 200ms")
+    ck.that(Theme.familyDot == 10 && Theme.familyLine == 2, "家谱行 圆点 10 / 竖线 2")
+    ck.that(Theme.familyCharCell == 24 && Theme.familyNewTagH == 16, "家谱行 字 24 / 新角标 16")
+    ck.that(Theme.keepCharCell == 44 && Theme.settleRowH == 58, "代末页 留下的字 44 / 行高 58")
     ck.done("tokens")
     return ck.failures.size
 }
@@ -1307,12 +1317,200 @@ func boxRulesShape(): Int64 {
     return ck.failures.size
 }
 
+/* ————— M2 slice 4 代末结算（game_rules.cj / copy_text.cj）————— */
+
+/* 一个「本代落过两个字」的状态（字匣 shui/ri/ren，落了前两格）。 */
+func settleRun(): RunState {
+    let s = runAfterPick(newRunState(), ["shui", "ri", "ren"])
+    s.generation = 3
+    s.boxLanded = [true, true, false]
+    return s
+}
+
+/* 结局卡 / 代末结算：留下的字、家谱行、settleAndNextGeneration、调试开关。 */
+func settleShape(): Int64 {
+    println("== M2 结算：留下的字 / 家谱行 / 下一代 / 调试开关 ==")
+    let ck = Check()
+
+    /* —— 调试开关默认关（禁止带着 true 出包）—— */
+    ck.that(!M2_DEBUG_FORCE_END, "M2_DEBUG_FORCE_END 默认 false（禁止带着 true 出包）")
+
+    /* —— 留下的字 = 字匣里落过的那几格 —— */
+    let s = settleRun()
+    ck.that(landedChars(s).size == 2, "落下 2 个字（got ${landedChars(s).size}）")
+    ck.that(landedChars(s)[0] == "shui" && landedChars(s)[1] == "ri", "留下的字按字匣顺序（got ${landedChars(s)[0]},${landedChars(s)[1]}）")
+    ck.that(landedGlyphs(s).size == 2 && landedGlyphs(s)[0] == "水", "留下的字给字形（界面直接画）")
+    let none = runAfterPick(newRunState(), ["shui", "ri"])
+    ck.that(landedChars(none).size == 0, "一个字没落 → 空（界面写「未成字」）")
+    let sq = runAfterPick(newRunState(), ["shiqian", "ri"])
+    sq.boxLanded = [true, false]
+    ck.that(landedChars(sq).size == 0, "事签格不算「留下的字」")
+
+    /* —— debugForceDimZero：把某一维按到 0，再走正常判结局路径 —— */
+    let home = runAfterPick(newRunState(), ["shui"])
+    let dz = debugForceDimZero(home, 0)
+    ck.that(dz.dims[0] == 0, "调试把粮按到 0（got ${dz.dims[0]}）")
+    ck.that(dz.phase == RUN_PHASE_ENDING, "调试也进结局（phase 2）")
+    ck.that(dz.endingId == "jinian", "粮 见底 → 饥年（got ${dz.endingId}）")
+    ck.that(dz.endingDim == 0 && dz.endingKind == RUN_KIND_BOTTOM, "调试结局带原因维 / kind")
+    ck.that(home.dims[0] == 50 && home.phase == RUN_PHASE_HOME, "debugForceDimZero 不改原状态")
+    let dz2 = debugForceDimZero(home, 1)
+    ck.that(dz2.endingId == "shisi" && dz2.endingDim == 1, "换一维就是另一个结局（got ${dz2.endingId}）")
+    let dzBad = debugForceDimZero(home, 9)
+    ck.that(dzBad.endingDim == 0, "认不出的维按「粮」算（got ${dzBad.endingDim}）")
+    let dzNeg = debugForceDimZero(home, -3)
+    ck.that(dzNeg.endingDim == 0, "负维按「粮」算（got ${dzNeg.endingDim}）")
+    let dzTwice = debugForceDimZero(dz, 0)
+    ck.that(dzTwice.sameAs(dz), "已经在结局里 → 原样返回")
+    let dzSettle = debugForceDimZero(home, 0)
+    dzSettle.phase = RUN_PHASE_SETTLE
+    ck.that(debugForceDimZero(dzSettle, 0).sameAs(dzSettle), "结算页上 → 原样返回")
+    /* 四维各按一遍：每一维的见底结局都对得上（溢出那一侧走 applyChoice，
+       在 game-rules 里已经断言过，这里只验「按到 0」这一条调试路径）。 */
+    var dd: Int64 = 0
+    while (dd < RUN_DIM_COUNT) {
+        let z = debugForceDimZero(home, dd)
+        ck.that(z.dims[dd] == 0, "第 ${dd} 维被按到 0（got ${z.dims[dd]}）")
+        ck.that(z.phase == RUN_PHASE_ENDING, "第 ${dd} 维按到 0 → 进结局")
+        ck.that(z.endingDim == dd, "第 ${dd} 维 endingDim（got ${z.endingDim}）")
+        ck.that(z.endingKind == RUN_KIND_BOTTOM, "第 ${dd} 维 kind 见底（got ${z.endingKind}）")
+        dd = dd + 1
+    }
+
+    /* —— 家谱行：上一代 + 本代 —— */
+    let withFam = settleRun()
+    withFam.dims = [0, 50, 50, 50]
+    withFam.phase = RUN_PHASE_ENDING
+    withFam.endingId = "jinian"
+    withFam.endingDim = 0
+    withFam.endingKind = RUN_KIND_BOTTOM
+    let prevChars: Array<String> = ["mu"]
+    withFam.family = [FamilyEntry(1, "兵祸", false, prevChars), FamilyEntry(2, "寿终传笔", true, [])]
+    let rows = familyRows(withFam)
+    ck.that(rows.size == 3, "家谱行 = 上一代 2 条 + 本代（got ${rows.size}）")
+    ck.that(rows[0].generation == 1 && rows[2].generation == 3, "最老在上、本代在最下")
+    ck.that(rows[2].endingTitle == "饥年" && !rows[2].endingGood, "本代那行写这一代的结局")
+    ck.that(rows[2].chars.size == 2 && rows[2].chars[0] == "shui", "本代那行带这一代留下的字")
+    ck.that(familyEntryGlyphs(rows[2])[0] == "水", "家谱行的字给字形（24×24 那一排）")
+    ck.that(familyIsThisGen(rows[2], 3) && !familyIsThisGen(rows[0], 3), "「新」角标只画本代那一行")
+    ck.that(familyRowName(3) == "第 3 代记事人", "家谱行名称一律「第 N 代记事人」（got ${familyRowName(3)}）")
+    ck.that(familyRows(newRunState()).size == 0, "没有结局也没有家谱 → 空列表")
+    let alive = runAfterPick(newRunState(), ["shui"])
+    alive.family = [FamilyEntry(1, "兵祸", false, prevChars)]
+    ck.that(familyRows(alive).size == 1, "主界中段（没结局）只列存档里的家谱")
+
+    /* —— settleAndNextGeneration —— */
+    let next = settleAndNextGeneration(withFam)
+    ck.that(next.generation == 4, "下一代 代次 +1（got ${next.generation}）")
+    ck.that(next.phase == RUN_PHASE_PICK, "下一代 回开局挑字页（phase 0）")
+    ck.that(next.family.size == 3, "家谱多一条（got ${next.family.size}）")
+    ck.that(next.family[2].generation == 3, "新的一条是刚结束的这一代")
+    ck.that(next.family[2].endingTitle == "饥年" && !next.family[2].endingGood, "新的一条记结局")
+    ck.that(next.family[2].chars.size == 2 && next.family[2].chars[1] == "ri", "新的一条记留下的字")
+    ck.that(next.family[0].generation == 1 && next.family[1].generation == 2, "老家谱原样留着")
+    ck.that(next.dims[0] == 50 && next.dims[1] == 50 && next.dims[2] == 50 && next.dims[3] == 50,
+        "下一代 四维归 50")
+    ck.that(next.year == 1 && next.yearsLeft == 12, "下一代 年 / 余年 归位")
+    ck.that(next.boneEmpty == 2 && next.boneShiqian == 0, "下一代 骨片归位")
+    ck.that(next.boxChars.size == 0 && next.boxLanded.size == 0, "下一代 字匣清空")
+    ck.that(next.cardIndex == 0 && next.cardsSeen == 0, "下一代 牌堆归零")
+    ck.that(next.endingId == "" && next.endingDim == -1 && next.endingKind == "",
+        "下一代 清掉上一代结局字段")
+    ck.that(withFam.family.size == 2 && withFam.phase == RUN_PHASE_ENDING,
+        "settleAndNextGeneration 不改原状态")
+    /* 没有结局时原样返回（界面层靠这个拦住误点） */
+    ck.that(settleAndNextGeneration(alive).sameAs(alive), "主界中段不能结算 → 原样返回")
+    ck.that(settleAndNextGeneration(newRunState()).sameAs(newRunState()), "新开局不能结算 → 原样返回")
+    /* 家谱连续三代：一代一代往下传，家谱一条条长 */
+    var chain = newRunState()
+    var g: Int64 = 0
+    while (g < 3) {
+        let st = runAfterPick(chain, ["shui"])
+        st.boxLanded = [true]
+        st.dims = [0, 50, 50, 50]
+        st.phase = RUN_PHASE_ENDING
+        st.endingId = "jinian"
+        st.endingDim = 0
+        st.endingKind = RUN_KIND_BOTTOM
+        chain = settleAndNextGeneration(st)
+        g = g + 1
+    }
+    ck.that(chain.generation == 4, "连传三代到第 4 代（got ${chain.generation}）")
+    ck.that(chain.family.size == 3, "家谱 3 条（got ${chain.family.size}）")
+    ck.that(chain.family[0].generation == 1 && chain.family[2].generation == 3, "家谱按代排")
+    ck.that(familyRows(chain).size == 3, "第 4 代开局前家谱还是 3 行")
+
+    /* 善终那一版：模板 B 只换色和文案，规则一模一样 */
+    let good = runAfterPick(newRunState(), ["shui", "ri"])
+    good.boxLanded = [true, false]
+    good.generation = 2
+    good.yearsLeft = 0
+    good.phase = RUN_PHASE_ENDING
+    good.endingId = "shouzhong"
+    good.endingDim = -1
+    good.endingKind = RUN_KIND_GOOD
+    let goodEntry = familyEntryOf(good)
+    match (goodEntry) {
+        case Some(e) =>
+            ck.that(e.generation == 2 && e.endingTitle == "寿终传笔" && e.endingGood, "善终家谱条")
+            ck.that(e.chars.size == 1 && e.chars[0] == "shui", "善终家谱条记留下的字")
+        case None => ck.that(false, "善终状态该有家谱条")
+    }
+    let goodNext = settleAndNextGeneration(good)
+    ck.that(goodNext.generation == 3 && goodNext.family.size == 1, "善终也照样开下一代")
+    ck.that(goodNext.family[0].endingGood, "家谱里这条记的是善终")
+    /* 家谱条存档往返（2+ 代，含善终与失败、有字与没字） */
+    let roundTrip = serializeRunState(goodNext)
+    match (parseRunState(roundTrip)) {
+        case Some(back) =>
+            ck.that(back.sameAs(goodNext), "结算后的状态照样往返")
+            ck.that(back.family.size == 1 && back.family[0].endingTitle == "寿终传笔", "往返 善终家谱条")
+            ck.that(back.family[0].chars.size == 1 && back.family[0].chars[0] == "shui", "往返 家谱留下的字")
+            ck.that(back.generation == 3 && back.phase == RUN_PHASE_PICK, "往返 代次 / phase")
+        case None => ck.that(false, "结算后的状态往返 parse 失败")
+    }
+    /* phase 2 / 3 的存档也能往返（杀掉再进回原页） */
+    match (parseRunState(serializeRunState(withFam))) {
+        case Some(end) =>
+            ck.that(end.phase == RUN_PHASE_ENDING && end.endingId == "jinian", "结局状态往返")
+            ck.that(end.family.size == 2 && end.family[0].endingTitle == "兵祸", "结局状态往返 家谱")
+            ck.that(familyRows(end).size == 3, "读档回来家谱行还是 3 行")
+        case None => ck.that(false, "结局状态往返 parse 失败")
+    }
+    match (parseRunState(serializeRunState(next))) {
+        case Some(st) =>
+            ck.that(st.phase == RUN_PHASE_SETTLE || st.phase == RUN_PHASE_PICK, "结算后 phase 在界内")
+            ck.that(st.family.size == 3, "结算后家谱 3 条往返不丢")
+        case None => ck.that(false, "结算后状态往返 parse 失败")
+    }
+
+    /* —— 结局卡文案 —— */
+    ck.that(endingLine("shisi").size > 0, "失祀 有结局话")
+    ck.that(endingLine("shouzhong").size > 0, "寿终传笔 有结局话")
+    ck.that(endingLine("不存在").size > 0, "认不出的结局 id 也给一句兜底（界面不空）")
+    ck.that(endingWhyText(1, RUN_KIND_BOTTOM) == "信 见底", "原因胶囊 信 见底（got ${endingWhyText(1, RUN_KIND_BOTTOM)}）")
+    ck.that(endingWhyText(0, RUN_KIND_TOP) == "粮 溢出", "原因胶囊 粮 溢出（got ${endingWhyText(0, RUN_KIND_TOP)}）")
+    ck.that(endingWhyText(-1, RUN_KIND_GOOD) == END_WHY_GOOD, "善终原因胶囊（got ${endingWhyText(-1, RUN_KIND_GOOD)}）")
+    ck.that(endingGenealogyText(6, "失祀") == "家谱记下：第 6 代，失祀",
+        "家谱记下一行（got ${endingGenealogyText(6, "失祀")}）")
+    ck.that(endingKeyText(6) == "第 6 代 · 结局", "结局卡小标（got ${endingKeyText(6)}）")
+    ck.that(settleTitleText(4) == "第 4 代记事人放下了刻刀", "代末主标（got ${settleTitleText(4)}）")
+    ck.that(settleKeepMeta(2) == "刻成 2 字", "「这一代留下」小字（got ${settleKeepMeta(2)}）")
+    ck.that(END_CHARS_NONE == "未成字", "没成字写 未成字")
+    ck.that(END_BTN_NEXT == "往下传" && SETTLE_BTN_NEXT == "下一代", "两个出口按钮")
+    ck.that(SETTLE_KEY == "代末", "代末页小标 代末")
+    ck.that(HOME_DEBUG_ZERO == "调试：粮归零", "调试按钮文案（got ${HOME_DEBUG_ZERO}）")
+    ck.done("settle")
+    return ck.failures.size
+}
+
 main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
-        tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape() + boxRulesShape()
+        tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape() + boxRulesShape() +
+        settleShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")

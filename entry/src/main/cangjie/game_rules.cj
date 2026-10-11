@@ -276,3 +276,131 @@ public func applyLuozi(prev: RunState, slot: Int64): RunState {
     s.boxLanded = landed.toArray()
     return s
 }
+
+/* ————— 代末结算（SPEC §2.6 / §2.7）—————
+
+   结局卡（phase 2）之后的收尾：把这一代写进家谱、开下一代（phase 0 开局挑字）。
+   界面在 ui_ending.cj / ui_settle.cj，规则全在这里。 */
+
+/* 这一代「留下的字」= 字匣里落过的那几格（SPEC §2.4 / §3：本代刻成的字）。
+   没有落过 → 空数组，界面写「未成字」。事签占位格不算字。 */
+public func landedChars(s: RunState): Array<String> {
+    let out = ArrayList<String>()
+    var i: Int64 = 0
+    while (i < s.boxChars.size && i < s.boxLanded.size) {
+        if (s.boxLanded[i] && !boxSlotIsShiqianId(s.boxChars[i])) {
+            out.add(s.boxChars[i])
+        }
+        i = i + 1
+    }
+    return out.toArray()
+}
+
+/* 同一批字的字形（界面直接画：家谱行 24×24、结局卡 40×40）。 */
+public func landedGlyphs(s: RunState): Array<String> {
+    let ids = landedChars(s)
+    let out = ArrayList<String>()
+    var i: Int64 = 0
+    while (i < ids.size) {
+        out.add(ziluGlyphOf(ids[i]))
+        i = i + 1
+    }
+    return out.toArray()
+}
+
+/* 这一代家谱条怎么记（结局标题 / 善终 / 留下的字）。 */
+public func familyEntryOf(s: RunState): Option<FamilyEntry> {
+    match (endingOfState(s)) {
+        case Some(info) =>
+            return Some(FamilyEntry(s.generation, info.title, info.good, landedChars(s)))
+        case None => return Option<FamilyEntry>.None
+    }
+}
+
+/* 家谱行在界面上要的顺序：最老的在最上、最新一代在最下（设计稿 .tl）。
+   上一代们来自存档的 family，本代这一条由结局现算（settleAndNextGeneration 落定
+   之后它才进 family）—— 所以代末结算页至少能看到「上一代 + 本代」两行。 */
+public func familyRows(s: RunState): Array<FamilyEntry> {
+    let out = ArrayList<FamilyEntry>()
+    var i: Int64 = 0
+    while (i < s.family.size) {
+        out.add(s.family[i])
+        i = i + 1
+    }
+    match (familyEntryOf(s)) {
+        case Some(e) => out.add(e)
+        case None => ()
+    }
+    return out.toArray()
+}
+
+/* 这一代是不是家谱里最新一条（「新」角标 / 朱点画在它身上）。 */
+public func familyIsThisGen(e: FamilyEntry, generation: Int64): Bool {
+    return e.generation == generation
+}
+
+/* 家谱条留下的字（字 id → 字形，家谱行 24×24 那一排直接画）。 */
+public func familyEntryGlyphs(e: FamilyEntry): Array<String> {
+    let out = ArrayList<String>()
+    var i: Int64 = 0
+    while (i < e.chars.size) {
+        out.add(ziluGlyphOf(e.chars[i]))
+        i = i + 1
+    }
+    return out.toArray()
+}
+
+/* 「往下传」：这一代写进家谱，然后开下一代（SPEC §2.6）。
+   返回新状态（原状态不改，界面层换引用触发重绘）：
+     family 追加一条（代、结局标题、善终、落过的字）
+     代次 +1，年 / 余年 / 四维 / 骨片 / 字匣 / 牌堆 / 结局字段全部归开局值
+     phase 回 0（开局挑字页）
+   没有结局（phase 不是 2）时原样返回 —— 界面层靠这个拦住误点。 */
+public func settleAndNextGeneration(prev: RunState): RunState {
+    match (familyEntryOf(prev)) {
+        case Some(entry) =>
+            let s = startGeneration(prev)
+            let fam = ArrayList<FamilyEntry>()
+            var i: Int64 = 0
+            while (i < prev.family.size) {
+                fam.add(prev.family[i])
+                i = i + 1
+            }
+            fam.add(entry)
+            s.family = fam.toArray()
+            return s
+        case None => return prev
+    }
+}
+
+/* =============================================================================
+   调试开关 M2_DEBUG_FORCE_END（DEBUG ONLY，默认 false）
+   -----------------------------------------------------------------------------
+   把这个开关置 true，主界底部会多一颗小按钮「调试：粮归零」，点一下把「粮」这一维
+   直接按到 0，然后走完全正常的纯逻辑路径（debugForceDimZero → runDetectEnding
+   那一套）进 phase 2 结局卡 —— 不抄近路、不直接改 phase，测的就是真链路。
+   唯一用途：本机 / 测试机上不打完 12 年就能看到结局卡与代末结算。
+   正式出包（尤其 release）必须是 false，否则主界多一颗按钮、四维条数值也和
+   设计稿不一致。
+   tools/box_check 里有断言守着的：M2_DEBUG_FORCE_END == false。
+   ============================================================================= */
+public let M2_DEBUG_FORCE_END: Bool = false
+
+/* 调试入口：把某一维按到 0 并重新判结局（见上面 M2_DEBUG_FORCE_END）。
+   dim 认不出 / 不在界内时按「粮」算；原状态不改，返回新状态。
+   已经是 phase 2 / 3 时原样返回（调试按钮只在主界出现）。 */
+public func debugForceDimZero(prev: RunState, dim: Int64): RunState {
+    if (prev.phase == RUN_PHASE_ENDING || prev.phase == RUN_PHASE_SETTLE) { return prev }
+    let d = if (dim < 0 || dim >= RUN_DIM_COUNT) { 0 } else { dim }
+    let s = cloneRunState(prev)
+    let dims = ArrayList<Int64>()
+    var i: Int64 = 0
+    while (i < s.dims.size) {
+        dims.add(if (i == d) { 0 } else { s.dims[i] })
+        i = i + 1
+    }
+    s.dims = dims.toArray()
+    /* 正常路径判结局：见底那一维是什么结局，结局卡就显示什么。 */
+    runDetectEnding(s)
+    return s
+}
