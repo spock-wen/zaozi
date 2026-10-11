@@ -42,6 +42,9 @@ public let ZILU_TAB_ALL: String = "全部"
 public let ZILU_TAB_XIANG: String = "象形"
 public let ZILU_TAB_HUIYI: String = "会意"
 public let ZILU_TAB_ZHISHI: String = "指事"
+/* 某一页已造的字一个都没有时的空态文案（指事 0 → 「暂无指事字」，
+   造法名由 zilu_model.ziluTabEmptyText 拼；tab 0 与未知 tab 用这条）。 */
+public let ZILU_TAB_EMPTY: String = "暂无此类字"
 public let ZILU_REPLAY: String = "▶ 再看一次"
 public let ZILU_SEC_MEANING: String = "白话字义"
 public let ZILU_SEC_CLASSIC: String = "典籍"

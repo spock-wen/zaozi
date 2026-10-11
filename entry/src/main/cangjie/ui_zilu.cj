@@ -49,16 +49,33 @@ public class ZiluScreen {
         return buildDetailStrip(this.selectedId).cells.size
     }
 
-    /* 放大卡下标：越界时退回第 0 格（父组件只透传字段，钳制放在最底层）。 */
+    /* 这一页已造的字一个都没有（指事 0）。tab 0（全部）恒非空。
+       空分页不画详情卡，画一张空态卡片，不残留上一个字的详情（QA L2）。 */
+    func tabEmpty(): Bool {
+        return this.tab != 0 && ziluTabFirstId(this.tab).size == 0
+    }
+
+    /* 放大卡下标：钳到 [0, size-1]；空格子没有合法下标 → -1（调用方判过 n > 0）。 */
     func popIndexSafe(): Int64 {
-        if (this.popIndex < this.popCount() && this.popIndex >= 0) {
-            return this.popIndex
+        let n = this.popCount()
+        if (n <= 0) {
+            return -1
         }
-        return 0
+        if (this.popIndex < 0) {
+            return 0
+        }
+        if (this.popIndex > n - 1) {
+            return n - 1
+        }
+        return this.popIndex
     }
 
     func setTab(i: Int64): Unit {
         this.tab = i
+        /* 切分页先关掉放大卡、下标归零：上一个字的阶段状态不留到下一个分页
+           （QA L7 那个闪退就是留着放大卡再换字触发的）。 */
+        this.showPop = false
+        this.popIndex = 0
         /* 切分页时若当前选中的字不在这个分页里，就把选中改成该分页第一个已造的字，
            让详情卡跟着分页走；tab 0（全部）与空分页不动。 */
         if (i != 0 && !ziluTabHasChar(i, this.selectedId)) {
@@ -110,17 +127,36 @@ public class ZiluScreen {
 
             Scroll {
                 Column(space: 0) {
-                    ZiluDetailCard(
-                        selectedId: this.selectedId,
-                        showPop: this.showPop,
-                        /* 直接传字段：写成函数调用时状态宏识别不到对 @State 的依赖，
-                           父组件改了子组件不更新（› / ‹ 就这样失效的）。 */
-                        popIndex: this.popIndex,
-                        onGoCard: { => this.onGoCard() },
-                        onEvoSelect: {i => this.openPop(i)},
-                        onPrev: { => this.prevPop()},
-                        onNext: { => this.nextPop()}
-                    )
+                    /* 这一页一个字都没有（指事 0）→ 不画详情卡，画空态卡片，
+                       不残留上一个字的详情；下面的总览网格照旧（该页筛出 0 格）。 */
+                    if (this.tabEmpty()) {
+                        Column {
+                            Text(ziluTabEmptyText(this.tab))
+                                .fontSize(14)
+                                .fontFamily(Theme.sans)
+                                .fontColor(Theme.ink400)
+                                .width(100.percent)
+                                .textAlign(TextAlign.Center)
+                        }
+                        .width(100.percent)
+                        .padding(top: 32, bottom: 32, left: 16, right: 16)
+                        .backgroundColor(Theme.paper50)
+                        .borderRadius(16)
+                        .border(width: 1, color: Theme.paperLine)
+                        .margin(top: 12)
+                    } else {
+                        ZiluDetailCard(
+                            selectedId: this.selectedId,
+                            showPop: this.showPop,
+                            /* 直接传字段：写成函数调用时状态宏识别不到对 @State 的依赖，
+                               父组件改了子组件不更新（› / ‹ 就这样失效的）。 */
+                            popIndex: this.popIndex,
+                            onGoCard: { => this.onGoCard() },
+                            onEvoSelect: {i => this.openPop(i)},
+                            onPrev: { => this.prevPop()},
+                            onNext: { => this.nextPop()}
+                        )
+                    }
 
                     ZiluGridOverview(
                         tab: this.tab,

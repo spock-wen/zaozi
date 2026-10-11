@@ -157,6 +157,13 @@ public func splitStageLabel(label: String): (String, String) {
    不传则按 SPEC：6 格（繁简不同）用紧凑档 S，否则标准档 M。 */
 public func buildEvoStrip(charId: String, tierOverride: Option<EvoTier>): EvoStrip {
     let rows = GlyphCatalog.ofChar(charId)
+    /* 字表里没有这个 id（切分页 / 换字那一瞬 charId 可能还是空串）时
+       rows[0] 会越界把界面炸掉 → 返回一条空格子，由界面层 hasCells()
+       判断整块不画（SPEC §5 空格规则：什么都没有就什么都不放）。 */
+    if (rows.size == 0) {
+        let (cell0, gap0, track0) = evoGeometry(EvoTier.M)
+        return EvoStrip(charId, "", "", "", ArrayList<EvoCell>(), EvoTier.M, cell0, gap0, track0)
+    }
     let first = rows[0]
     /* 繁简写法是否相同：trad == 简体 → 一格「繁简同形」。 */
     let sameForm = (first.trad == first.glyph)

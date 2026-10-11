@@ -138,6 +138,34 @@ public func ziluTabName(tab: Int64): String {
     return ""
 }
 
+/* 空分页的提示：「暂无${造法名}字」（指事 0 → 暂无指事字）；
+   tab 0 与未知 tab 没有造法名，退回 copy_text 的通用文案。 */
+public func ziluTabEmptyText(tab: Int64): String {
+    let name = ziluTabName(tab)
+    if (name.size > 0) {
+        return "暂无${name}字"
+    }
+    return ZILU_TAB_EMPTY
+}
+
+/* 一个字的造法 / 字形。字表里没有这个 id（切分页 / 换字那一瞬 selectedId
+   可能还没跟上）时返回空串，不越界 —— 界面层一律走这两个函数取值。 */
+public func ziluMethodOf(charId: String): String {
+    let rows = GlyphCatalog.ofChar(charId)
+    if (rows.size > 0) {
+        return rows[0].method
+    }
+    return ""
+}
+
+public func ziluGlyphOf(charId: String): String {
+    let rows = GlyphCatalog.ofChar(charId)
+    if (rows.size > 0) {
+        return rows[0].glyph
+    }
+    return ""
+}
+
 /* 某个分页里已造的字（按 ZILU_MADE_IDS 顺序）。tab 0 = 全部已造的字。
    字录的分页筛选、切 tab 时改选中、底部网格过滤都走这一个函数，保证三处一致。 */
 public func ziluTabIds(tab: Int64): ArrayList<String> {

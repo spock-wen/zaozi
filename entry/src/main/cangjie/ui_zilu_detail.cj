@@ -16,9 +16,15 @@ public class ZiluGlyphHead {
     @Prop var onGoCard: () -> Unit
 
     /* build() 里不能有顶层 let（@Component 宏展开会失败），取值都走成员函数。
+       大字 / 造法都走 zilu_model 的安全取值：字表里没这个字时返回空串，
+       不越界（切分页 / 换字那一瞬 selectedId 可能还没跟上）。
        这两个函数都是纯函数，反复调用结果一致。 */
-    func ziluFirst(): GlyphRow {
-        return GlyphCatalog.ofChar(this.selectedId)[0]
+    func ziluGlyph(): String {
+        return ziluGlyphOf(this.selectedId)
+    }
+
+    func ziluMethod(): String {
+        return ziluMethodOf(this.selectedId)
     }
 
     func ziluParts(): Array<String> {
@@ -29,7 +35,7 @@ public class ZiluGlyphHead {
         Row {
             /* 大字方块 112 × 112 */
             Column {
-                Text(this.ziluFirst().glyph)
+                Text(this.ziluGlyph())
                     .fontSize(Theme.fsZiluBig)
                     .fontFamily(Theme.serif)
                     .fontWeight(FontWeight.Bold)
@@ -44,7 +50,20 @@ public class ZiluGlyphHead {
             .alignItems(HorizontalAlign.Center)
 
             Column(space: 8) {
-                MethodBadge(method: this.ziluFirst().method)
+                /* 造法徽标：原来是 MethodBadge(method: this.ziluFirst().method)，
+                   函数调用传给子组件 @Prop 不被状态宏跟踪，换字不重渲染
+                   （QA L3：徽标恒「会意」）→ 这里内联成 Text，样式与 MethodBadge
+                   完全一致，字直接取当前选中字。MethodBadge 本身留着给别处用。 */
+                Text(this.ziluMethod())
+                    .fontSize(Theme.fsBadge)
+                    .fontFamily(Theme.sans)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(methodBadgeFg(this.ziluMethod()))
+                    .backgroundColor(methodBadgeBg(this.ziluMethod()))
+                    .height(22)
+                    .padding(left: 8, right: 8)
+                    .borderRadius(6)
+                    .textAlign(TextAlign.Center)
                 Row {
                     if (this.ziluParts().size > 0) {
                         /* key 带上字与下标：换字时公式行要重建。 */
@@ -159,6 +178,11 @@ public class ZiluDetailCard {
         return Array<EffectRow>(src.size, {i: Int64 => src[i]})
     }
 
+    /* 当前字演变条的格数：0（字表里没这个字）时放大卡整块不画。 */
+    func popCount(): Int64 {
+        return buildDetailStrip(this.selectedId).cells.size
+    }
+
     func build() {
         Column {
             ZiluGlyphHead(
@@ -228,8 +252,10 @@ public class ZiluDetailCard {
                 }
                 .margin(top: 10)
 
-                /* —— 放大卡：宽 188，字形区 144×144 圆角 14 —— */
-                if (this.showPop) {
+                /* —— 放大卡：宽 188，字形区 144×144 圆角 14 ——
+                   当前字一条格子都没有（切分页 / 换字那一瞬）时不画，
+                   画出来也是一张空卡。 */
+                if (this.showPop && this.popCount() > 0) {
                     ZiluPopCard(
                         charId: this.selectedId,
                         popIndex: this.popIndex,
