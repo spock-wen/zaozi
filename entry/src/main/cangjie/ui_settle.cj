@@ -470,6 +470,9 @@ public class SettleScreen {
                     onNext: { => this.onNext() }
                 )
             }
+            /* 容器也要给宽度：Column 默认 alignItems 是 Center，不写 100%
+               会缩成内容宽，里面 SettleBtns 的 100% 就没有基准了。 */
+            .width(100.percent)
             .margin(left: 12, right: 12, bottom: 16, top: 12)
         }
         .width(100.percent)

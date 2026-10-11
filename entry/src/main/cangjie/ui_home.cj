@@ -355,6 +355,9 @@ public class HomeScreen {
                         rightDeltas: this.rightDeltas()
                     )
                 }
+                /* 容器也要给宽度：Column 默认 alignItems 是 Center，不写 100%
+                   会缩成内容宽，里面 HomeWeightDots 的 100% 就没有基准了。 */
+                .width(100.percent)
                 .margin(top: 10)
             }
 
@@ -362,6 +365,9 @@ public class HomeScreen {
             Column {
                 HomeHud(dims: this.dims, flashDim: this.flashDim, flashOn: this.flashOn)
             }
+            /* 容器也要给宽度：Column 默认 alignItems 是 Center，不写 100%
+               会缩成内容宽，里面 HomeHud 的 100% 就没有基准了。 */
+            .width(100.percent)
             .margin(top: 12)
 
             /* 骨片行 + 余年。 */
@@ -372,7 +378,8 @@ public class HomeScreen {
             )
 
             /* 事件卡：中间剩下的地方都归它（牌面在 HomeCardStage 里拼）。
-               layoutWeight 挂在外层容器上，卡片在剩下的高度里居中。 */
+               layoutWeight 挂在外层容器上（自建组件不能自己挂链式属性），
+               容器拉伸后卡片照旧贴在剩下的高度顶上，跟原来的排法一致。 */
             Column {
                 HomeCardStage(
                     cardIndex: this.cardIndex,
@@ -384,7 +391,9 @@ public class HomeScreen {
                 )
             }
             .layoutWeight(1)
-            .justifyContent(FlexAlign.Center)
+            /* 容器也要给宽度：Column 默认 alignItems 是 Center，不写 100%
+               会缩成内容宽，里面 HomeCardStage 的 100% 就没有基准了。 */
+            .width(100.percent)
 
             /* 点选退路。 */
             HomeOptBtns(

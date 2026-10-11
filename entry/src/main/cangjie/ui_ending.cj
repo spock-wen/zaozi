@@ -280,6 +280,9 @@ public class EndingCardBody {
                     onNext: { => this.onNext() }
                 )
             }
+            /* 容器也要给宽度：Column 默认 alignItems 是 Center，不写 100%
+               会缩成内容宽，里面 EndingBtns 的 100% 就没有基准了。 */
+            .width(100.percent)
             .padding(left: 24, right: 24, bottom: 24)
         }
         .width(100.percent)
