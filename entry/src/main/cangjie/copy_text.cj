@@ -54,6 +54,26 @@ public let ZILU_SEC_STORY: String = "小故事"
 public let ZILU_SEC_EFFECT: String = "效果"
 public let ZILU_GRID_SUMMARY: String = "已造 8 · 手里有事签 1 · 有残片线索 1 · 未知 17"
 
+/* —— 开局挑字（ziku_pick_v1 D / SPEC §2.4、§3）——
+   PICK_GEN_LINE / PICK_RECORDER / HOME_GEN_LINE 里的 N / Y 由界面替换。 */
+public let PICK_TITLE: String = "挑字入字匣"
+public let PICK_HINT: String =
+    "带进字匣的字，这一代能落在卡上；落过的字这一代冬夜不能当部件。上一代传下的事签占 1 格。"
+public let PICK_GEN_LINE: String = "第 N 代 · 开局"
+public let PICK_RECORDER: String = "第 N 代记事人"
+public let PICK_SLOT_EMPTY: String = "＋"
+public let PICK_BTN_NEED: String = "还差 N 个字"
+public let PICK_BTN_GO: String = "就带这些开局"
+
+/* —— 主界（home_slide_v1；M2 slice 1 只有占位内容）—— */
+public let HOME_GEN_LINE: String = "第 N 代 · 第 Y 年"
+public let HOME_RECORDER: String = "第 N 代记事人"
+public let HOME_BOX_TITLE: String = "字匣"
+public let HOME_BOX_EMPTY: String = "这一代没有带字"
+public let HOME_BTN_ZILU: String = "字录"
+public let HOME_BTN_EVO: String = "演变条"
+public let HOME_BTN_CARD: String = "造字卡"
+
 public func baihuaLines(charId: String, cellIndex: Int64): Array<String> {
     /* 与设计稿 common.py 的 BAIHUA 一致：每阶段一行，竖线是手动断行，
        每行 ≤5 字；下标含最后那格繁简。 */

@@ -11,6 +11,7 @@ package ohos_app_cangjie_entry
  * 注意：所有被同步进来的文件都在同一个 package（ohos_app_cangjie_entry）
  * 里，所以这里不能再 `import ohos_app_cangjie_entry.*` —— cjpm 会报
  * "imports root package ... outputType executable"。
+ * M2 起多同步一个 run_state.cj（RunState / 序列化 / 开局挑字规则）。
  */
 
 import std.collection.ArrayList
@@ -570,12 +571,256 @@ func tokenShape(): Int64 {
     return ck.failures.size
 }
 
+/* 坏档（字段数不对 / 版本不符 / 有字段不是数 / 不自洽）一律 parse 成 None。 */
+func runParseBad(raw: String): Bool {
+    match (parseRunState(raw)) {
+        case Some(_) => return false
+        case None => return true
+    }
+}
+
+/* M2 RunState：新开局数值 / 挑字落定 / 序列化往返 / 坏档容错 / 开局挑字规则。 */
+func runStateShape(): Int64 {
+    println("== M2 RunState：新开局 / 挑字落定 / 序列化往返 / 坏档 / 开局挑字 ==")
+    let ck = Check()
+
+    /* —— 新开局 —— */
+    let s = newRunState()
+    ck.that(s.generation == 1, "新开局 第 1 代（got ${s.generation}）")
+    ck.that(s.year == 1, "新开局 第 1 年")
+    ck.that(s.yearsLeft == 12, "新开局 余年 12（got ${s.yearsLeft}）")
+    ck.that(s.dims.size == 4, "四维 4 个（got ${s.dims.size}）")
+    var d: Int64 = 0
+    while (d < s.dims.size) {
+        ck.that(s.dims[d] == 50, "第 ${d} 维开局 50（got ${s.dims[d]}）")
+        d = d + 1
+    }
+    ck.that(s.boneEmpty == 2, "新开局 空骨片 2（got ${s.boneEmpty}）")
+    ck.that(s.boneShiqian == 0, "新开局 事签骨片 0")
+    ck.that(s.boxChars.size == 0, "新开局 字匣空")
+    ck.that(s.boxLanded.size == 0, "新开局 landed 空")
+    ck.that(s.phase == RUN_PHASE_PICK, "新开局 phase 0 = 开局挑字页")
+    ck.that(RUN_PHASE_HOME == 1 && RUN_PHASE_ENDING == 2 && RUN_PHASE_SETTLE == 3, "phase 取值 0..3")
+    ck.that(s.cardIndex == 0 && s.cardsSeen == 0, "新开局 牌堆下标 0")
+    ck.that(s.endingId == "" && s.endingDim == -1 && s.endingKind == "", "新开局 没有结局")
+    ck.that(s.family.size == 0, "新开局 家谱空")
+
+    /* —— 挑字落定 —— */
+    let made: Array<String> = ["shui", "ri", "ren"]
+    s.confirmPick(made)
+    ck.that(s.boxChars.size == 3, "挑 3 个字进字匣（got ${s.boxChars.size}）")
+    ck.that(s.boxChars[0] == "shui" && s.boxChars[2] == "ren", "字匣按挑选顺序排")
+    ck.that(s.boxLanded.size == 3, "landed 与 chars 等长")
+    var l: Int64 = 0
+    while (l < s.boxLanded.size) {
+        ck.that(!s.boxLanded[l], "第 ${l} 格本代未落")
+        l = l + 1
+    }
+    ck.that(s.phase == RUN_PHASE_HOME, "落定后 phase 1 = 主界")
+    ck.that(s.boxAt(0) == "shui" && s.boxAt(9) == "", "boxAt 越界返回空串")
+    ck.that(!s.landedAt(9), "landedAt 越界 false")
+
+    /* —— cloneRunState / runAfterPick：复制一份再改，@State 才认（引用变化）—— */
+    s.generation = 3
+    s.year = 5
+    s.yearsLeft = 8
+    s.dims = [11, 22, 33, 44]
+    s.boneEmpty = 4
+    s.boneShiqian = 1
+    s.cardIndex = 2
+    s.cardsSeen = 6
+    s.endingId = ""
+    s.endingDim = -1
+    s.phase = RUN_PHASE_PICK
+    let cloneChars: Array<String> = ["tian"]
+    s.family = [FamilyEntry(2, "兵祸", false, cloneChars)]
+    let clone = cloneRunState(s)
+    ck.that(clone.sameAs(s), "cloneRunState 逐字段相等")
+    ck.that(clone.boxChars.size == 3 && clone.boxChars[0] == "shui", "clone 字匣原样")
+    ck.that(clone.family.size == 1 && clone.family[0].endingTitle == "兵祸", "clone 家谱原样")
+    let afterPick = runAfterPick(clone, made)
+    ck.that(afterPick.generation == 3 && afterPick.year == 5 && afterPick.yearsLeft == 8,
+        "runAfterPick 只改字匣 / phase")
+    ck.that(afterPick.dims[0] == 11 && afterPick.dims[3] == 44, "runAfterPick 四维不动")
+    ck.that(afterPick.boneEmpty == 4 && afterPick.boneShiqian == 1, "runAfterPick 骨片不动")
+    ck.that(afterPick.cardIndex == 2 && afterPick.cardsSeen == 6, "runAfterPick 牌堆不动")
+    ck.that(afterPick.family.size == 1 && afterPick.family[0].endingTitle == "兵祸",
+        "runAfterPick 家谱不动")
+    ck.that(afterPick.boxChars.size == 3 && afterPick.boxChars[2] == "ren", "runAfterPick 字匣换成挑的")
+    ck.that(afterPick.boxLanded.size == 3 && !afterPick.boxLanded[0] && !afterPick.boxLanded[2],
+        "runAfterPick landed 全 false")
+    ck.that(afterPick.phase == RUN_PHASE_HOME, "runAfterPick phase 进主界")
+    /* 原对象不被改写（界面层靠这个换引用触发重绘） */
+    ck.that(clone.phase == RUN_PHASE_PICK, "runAfterPick 不改原状态")
+    ck.that(clone.sameAs(s), "原状态还是原样")
+
+    /* —— 序列化往返（逐字段，含家谱）—— */
+    s.generation = 2
+    s.year = 7
+    s.yearsLeft = 5
+    s.dims = [40, 12, 88, 61]
+    s.boneEmpty = 1
+    s.boneShiqian = 3
+    s.boxLanded = [true, false, true]
+    s.phase = RUN_PHASE_HOME
+    s.cardIndex = 4
+    s.cardsSeen = 9
+    s.endingId = "jinian"
+    s.endingDim = 1
+    s.endingKind = "dim_zero"
+    let famChars: Array<String> = ["xiu", "ben"]
+    s.family = [FamilyEntry(1, "饥年", false, famChars), FamilyEntry(2, "寿终传笔", true, [])]
+    let raw = serializeRunState(s)
+    ck.that(raw.startsWith("zaozi_run|v${RUN_SAVE_VERSION}"), "存档头带版本（got ${raw}）")
+    match (parseRunState(raw)) {
+        case Some(back) =>
+            ck.that(back.sameAs(s), "往返后逐字段相等")
+            ck.that(back.generation == 2 && back.year == 7 && back.yearsLeft == 5, "往返 代/年/余年")
+            ck.that(back.dims[0] == 40 && back.dims[1] == 12 && back.dims[2] == 88 && back.dims[3] == 61,
+                "往返 四维")
+            ck.that(back.boneEmpty == 1 && back.boneShiqian == 3, "往返 骨片")
+            ck.that(back.boxChars.size == 3 && back.boxChars[1] == "ri", "往返 字匣")
+            ck.that(back.boxLanded[0] && !back.boxLanded[1] && back.boxLanded[2], "往返 landed")
+            ck.that(back.phase == RUN_PHASE_HOME, "往返 phase")
+            ck.that(back.cardIndex == 4 && back.cardsSeen == 9, "往返 牌堆")
+            ck.that(back.endingId == "jinian" && back.endingDim == 1 && back.endingKind == "dim_zero",
+                "往返 结局")
+            ck.that(back.family.size == 2, "往返 家谱 2 条")
+            ck.that(back.family[0].generation == 1 && back.family[0].endingTitle == "饥年",
+                "往返 家谱第 1 条")
+            ck.that(!back.family[0].endingGood && back.family[1].endingGood, "往返 家谱善终位")
+            ck.that(back.family[0].chars.size == 2 && back.family[0].chars[1] == "ben",
+                "往返 家谱留下的字")
+            ck.that(back.family[1].chars.size == 0, "往返 家谱空字列表")
+        case None => ck.that(false, "完整存档往返 parse 不该失败")
+    }
+    /* 新开局（全默认值）也要能原样往返 */
+    match (parseRunState(serializeRunState(newRunState()))) {
+        case Some(fresh) => ck.that(fresh.sameAs(newRunState()), "新开局原样往返")
+        case None => ck.that(false, "新开局往返 parse 失败")
+    }
+    /* 空字匣 + 空家谱的存档串里没有空字段 */
+    ck.that(!serializeRunState(newRunState()).contains("||"), "空列表写成 -，不出现空字段")
+
+    /* —— 坏档 → None（调用方回退新开局，绝不崩）—— */
+    ck.that(runParseBad(""), "空串 → None")
+    ck.that(runParseBad("hello"), "垃圾串 → None")
+    ck.that(runParseBad(raw.replace("v1", "v0")), "旧版本 → None")
+    ck.that(runParseBad(raw.replace("|7|", "|abc|")), "年份不是数字 → None")
+    ck.that(runParseBad(raw[0..raw.size - 4]), "整行被截断 → None")
+    ck.that(runParseBad(raw.replace("40,12,88,61", "40,12,88")), "四维少一维 → None")
+    ck.that(runParseBad(raw.replace("1,0,1", "1,0")), "landed 与 chars 不等长 → None")
+    ck.that(runParseBad(raw.replace("1~饥年~0~xiu,ben;2~寿终传笔~1~-", "1~饥年~0")),
+        "家谱字段数不对 → None")
+    ck.that(runParseBad(raw.replace("2~寿终传笔~1~-", "2~寿终传笔~1")), "家谱最后一条被截断 → None")
+    ck.that(runParseBad(raw.replace("zaozi_run", "other_run")), "存档头不对 → None")
+    ck.that(runParseBad(raw.replace("|1|", "|9|").replace("|2|", "|9|")), "phase 越界 → None")
+
+    /* —— startGeneration：代次 +1，其余归开局值，家谱留着 —— */
+    let prev = newRunState()
+    prev.generation = 4
+    prev.year = 11
+    prev.yearsLeft = 2
+    prev.dims = [3, 99, 20, 71]
+    prev.boneEmpty = 0
+    prev.boneShiqian = 5
+    prev.boxChars = ["shui"]
+    prev.boxLanded = [true]
+    prev.phase = RUN_PHASE_SETTLE
+    prev.cardIndex = 6
+    prev.cardsSeen = 12
+    prev.endingId = "shisi"
+    let keepFam: Array<String> = ["he"]
+    prev.family = [FamilyEntry(3, "失祀", false, keepFam)]
+    let next = startGeneration(prev)
+    ck.that(next.generation == 5, "下一代 代次 +1（got ${next.generation}）")
+    ck.that(next.year == 1 && next.yearsLeft == 12, "下一代 年 / 余年 归位")
+    ck.that(next.dims[0] == 50 && next.dims[1] == 50 && next.dims[2] == 50 && next.dims[3] == 50,
+        "下一代 四维归 50")
+    ck.that(next.boneEmpty == 2 && next.boneShiqian == 0, "下一代 骨片归位")
+    ck.that(next.boxChars.size == 0 && next.boxLanded.size == 0, "下一代 字匣清空")
+    ck.that(next.phase == RUN_PHASE_PICK, "下一代 回开局挑字页")
+    ck.that(next.cardIndex == 0 && next.cardsSeen == 0, "下一代 牌堆归零")
+    ck.that(next.endingId == "" && next.endingDim == -1, "下一代 清掉上一代结局")
+    ck.that(next.family.size == 1, "家谱留着（got ${next.family.size}）")
+    ck.that(next.family[0].generation == 3 && next.family[0].endingTitle == "失祀",
+        "家谱第 1 条还是第 3 代")
+
+    /* —— 开局挑字规则 —— */
+    ck.that(PICK_BTN_NEED == "还差 N 个字", "文案 还差 N 个字（got ${PICK_BTN_NEED}）")
+    ck.that(PICK_BTN_GO == "就带这些开局", "文案 就带这些开局（got ${PICK_BTN_GO}）")
+    ck.that(PICK_TITLE == "挑字入字匣", "挑字页标题")
+    ck.that(PICK_GEN_LINE == "第 N 代 · 开局", "挑字页代次行（N 待替换）")
+    let avail = pickAvailable()
+    ck.that(avail == ZILU_MADE_IDS.size, "可挑的字 = 已造的字（got ${avail}）")
+    let one = pickToggle([], "shui")
+    ck.that(one.size == 1 && one[0] == "shui", "空格挑第一个")
+    let two = pickToggle(one, "ri")
+    ck.that(two.size == 2 && two[0] == "shui" && two[1] == "ri", "顺序 = 挑选顺序")
+    let three = pickToggle(two, "ren")
+    ck.that(three.size == 3, "挑满 3 个")
+    let four = pickToggle(three, "mu")
+    ck.that(four.size == 3 && four[2] == "ren", "满 3 个后第 4 个字收不进来")
+    let back2 = pickToggle(three, "ri")
+    ck.that(back2.size == 2 && back2[0] == "shui" && back2[1] == "ren", "收回后剩下的保持顺序")
+    ck.that(pickToggle(three, "ren").size == 2, "收回最后一个")
+    ck.that(pickToggle([], "shui").size == 1, "收回不存在的字等于挑上")
+    ck.that(pickIndexOf(two, "ri") == 1, "ri 是第 2 个挑的（下标 1）")
+    ck.that(pickIndexOf(two, "mu") == -1, "没挑的字下标 -1")
+    ck.that(pickOrderOf(two, "shui") == 1 && pickOrderOf(two, "ri") == 2, "序号 1..3")
+    ck.that(pickOrderOf(two, "mu") == 0, "没挑的字序号 0")
+    ck.that(pickRemaining([], 8) == 3, "一个字没挑 → 还差 3")
+    ck.that(pickRemaining(one, 8) == 2, "挑了 1 个 → 还差 2")
+    ck.that(pickRemaining(two, 8) == 1, "挑了 2 个 → 还差 1")
+    ck.that(pickRemaining(three, 8) == 0, "挑了 3 个 → 还差 0")
+    ck.that(pickRemaining([], 2) == 2, "只造了 2 个字 → 还差 2")
+    ck.that(pickRemaining(two, 2) == 0, "只造了 2 个字、挑了 2 个 → 还差 0")
+    ck.that(pickRemaining([], 0) == 0, "一个字都没造 → 允许空着开局")
+    ck.that(pickButtonText([], 8) == "还差 3 个字", "0 个 → 还差 3 个字")
+    ck.that(pickButtonText(one, 8) == "还差 2 个字", "1 个 → 还差 2 个字")
+    ck.that(pickButtonText(two, 8) == "还差 1 个字", "2 个 → 还差 1 个字")
+    ck.that(pickButtonText(three, 8) == PICK_BTN_GO, "3 个 → 就带这些开局")
+    ck.that(pickButtonText(two, 2) == PICK_BTN_GO, "可挑不足 3 个且挑满 → 就带这些开局")
+    ck.that(pickButtonText([], 0) == PICK_BTN_GO, "没有字可挑 → 就带这些开局")
+    ck.that(!pickCanConfirm([], 8), "没挑满不能确认")
+    ck.that(!pickCanConfirm(two, 8), "差 1 个不能确认")
+    ck.that(pickCanConfirm(three, 8), "挑满 3 个能确认")
+    ck.that(pickCanConfirm(two, 2), "不足 3 个字时挑满就能确认")
+    ck.that(pickCanConfirm([], 0), "没有字也能开局")
+    /* 挑字网格 = 字录那个 27 格，选中态按 picked 算 */
+    let cells = pickGridCells(three)
+    ck.that(cells.size == ZILU_TOTAL, "挑字网格还是 ${ZILU_TOTAL} 格（got ${cells.size}）")
+    var madeCells: Int64 = 0
+    var selCells: Int64 = 0
+    var newBadges: Int64 = 0
+    var g: Int64 = 0
+    while (g < cells.size) {
+        let c = cells[g]
+        if (c.isMade()) {
+            madeCells = madeCells + 1
+            ck.that(ziluIsMade(c.charId), "可挑格都是已造的字 ${c.charId}")
+            ck.that(c.glyph.size > 0, "已造格有字 ${c.charId}")
+            ck.that(c.isSelected == ziluIsMadeOf(three, c.charId), "选中态按 picked 算 ${c.charId}")
+        } else {
+            ck.that(!c.isSelected, "没造出来的格不能挑（下标 ${g}）")
+        }
+        if (c.isNew) { newBadges = newBadges + 1 }
+        if (c.isSelected) { selCells = selCells + 1 }
+        g = g + 1
+    }
+    ck.that(madeCells == ZILU_MADE_IDS.size, "可挑格 = 已造字数（got ${madeCells}）")
+    ck.that(selCells == 3, "只有挑中的 3 格带选中态（got ${selCells}）")
+    ck.that(newBadges == 0, "挑字网格不显示「新」角标")
+    ck.done("run-state")
+    return ck.failures.size
+}
+
 main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
-        tabFilterShape() + ziluSeedShape()
+        tabFilterShape() + ziluSeedShape() + runStateShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")
