@@ -423,6 +423,96 @@ func tabFilterShape(): Int64 {
     return ck.failures.size
 }
 
+/* DEBUG 种子：ZILU_DEBUG_SEED_ZHISHI 打开时追加指事字「本」。
+   默认必须是 false（这里断言守着，防止带着 true 出包）；
+   打开后的效果走参数化函数验，不改全局常量。 */
+func ziluSeedShape(): Int64 {
+    println("== 指事徽标种子（DEBUG ONLY，默认关）==")
+    let ck = Check()
+    ck.that(!ZILU_DEBUG_SEED_ZHISHI, "ZILU_DEBUG_SEED_ZHISHI 默认 false（禁止带着 true 出包）")
+    ck.that(ZILU_BASE_MADE_IDS.size == 8, "基线列表 8 个（got ${ZILU_BASE_MADE_IDS.size}）")
+    ck.that(ZILU_MADE_IDS.size == 8, "默认已造列表 8（got ${ZILU_MADE_IDS.size}）")
+    ck.that(ZILU_DEBUG_SEED_CHAR_ID == "ben", "种子字是 本(ben)")
+    /* 默认列表 = 基线列表，一个不多一个不少 */
+    var b: Int64 = 0
+    while (b < ZILU_BASE_MADE_IDS.size) {
+        ck.that(ZILU_MADE_IDS[b] == ZILU_BASE_MADE_IDS[b], "默认第 ${b} 个 id 与基线一致")
+        b = b + 1
+    }
+    /* 关：不开种子时一个 ben 都不加 */
+    let off = ziluBuildMadeIds(false)
+    ck.that(off.size == 8, "ziluBuildMadeIds(false) 还是 8（got ${off.size}）")
+    ck.that(ziluIndexOfOf(off, "ben") == -1, "关种子时 本 不在已造列表")
+    /* 开：追加本，指事分页不再是空的 */
+    let on = ziluBuildMadeIds(true)
+    ck.that(on.size == 9, "ziluBuildMadeIds(true) 9 个（got ${on.size}）")
+    ck.that(ziluIndexOfOf(on, "ben") == 8, "本 追加在最后一位")
+    ck.that(ziluIsMadeOf(on, "ben"), "开种子时 本 已造")
+    var keep: Int64 = 0
+    while (keep < ZILU_BASE_MADE_IDS.size) {
+        ck.that(on[keep] == ZILU_BASE_MADE_IDS[keep], "开种子不丢基线第 ${keep} 个字")
+        keep = keep + 1
+    }
+    /* 计数：全部 9 = 象形 7 + 会意 1 + 指事 1 */
+    let (sAll, sXiang, sHuiyi, sZhishi) = ziluCountsOf(on)
+    ck.that(sAll == 9, "种子 全部 9（got ${sAll}）")
+    ck.that(sXiang == 7, "种子 象形 7（got ${sXiang}）")
+    ck.that(sHuiyi == 1, "种子 会意 1（got ${sHuiyi}）")
+    ck.that(sZhishi == 1, "种子 指事 1（got ${sZhishi}）")
+    ck.that(sAll == sXiang + sHuiyi + sZhishi, "种子 9 = 象形+会意+指事")
+    /* 分页：指事 tab 只有本，第一个也是本 */
+    let zsIds = ziluTabIdsOf(on, 3)
+    ck.that(zsIds.size == 1, "种子 指事分页 1 个字（got ${zsIds.size}）")
+    ck.that(zsIds[0] == "ben", "种子 指事分页只有 本（got ${zsIds[0]}）")
+    ck.that(ziluTabFirstIdOf(on, 3) == "ben", "种子 指事第一个字是 本")
+    ck.that(ziluTabIdsOf(on, 0).size == 9, "种子 全部分页 9 个字")
+    ck.that(ziluTabIdsOf(on, 1).size == 7, "种子 象形分页 7 个字")
+    ck.that(ziluTabIdsOf(on, 2).size == 1, "种子 会意分页 1 个字")
+    /* 空分页文案：指事 tab 有字了，但文案函数只按 tab 走，仍然可用 */
+    ck.that(ziluTabName(3) == "指事", "tab 3 造法名 指事")
+    ck.that(ziluTabEmptyText(3) == "暂无指事字", "指事空分页文案 暂无指事字")
+    /* 徽标读的造法：本 是 指事 */
+    ck.that(ziluMethodOf("ben") == "指事", "本 造法 指事（got ${ziluMethodOf("ben")}）")
+    ck.that(ziluMethodOf("ben") == ziluTabName(3), "本 的造法 = tab 3 造法名")
+    ck.that(ziluGlyphOf("ben") == "本", "本 的字形是 本")
+    /* 27 格总览在 9 个已造下仍然铺满：9 + 事签 + 残片 + 16 未知 */
+    let grid = ziluGridOf(on)
+    ck.that(grid.size == ZILU_TOTAL, "种子 27 格（got ${grid.size}）")
+    ck.that(ziluUnknownCountOf(on) == 16, "种子 未知 16（got ${ziluUnknownCountOf(on)}）")
+    ck.that(ziluUnknownCountOf(on) >= 0, "种子 未知数不为负")
+    var made: Int64 = 0
+    var unk: Int64 = 0
+    var sel: Int64 = 0
+    var benSeen: Int64 = 0
+    var g: Int64 = 0
+    while (g < grid.size) {
+        let cell = grid[g]
+        if (cell.isMade()) {
+            made = made + 1
+            if (cell.charId == "ben") {
+                benSeen = benSeen + 1
+                ck.that(cell.glyph == "本", "种子 本 格显示 本")
+            }
+        } else if (cell.stateIs(ZiluCellState.Unknown)) {
+            unk = unk + 1
+        }
+        if (cell.isSelected) {
+            sel = sel + 1
+            ck.that(cell.charId == "xiu", "种子 选中的仍是休")
+        }
+        g = g + 1
+    }
+    ck.that(made == 9, "种子 已造 9 格（got ${made}）")
+    ck.that(unk == 16, "种子 未知 16 格（got ${unk}）")
+    ck.that(benSeen == 1, "种子 本 在网格里只有一格")
+    ck.that(sel == 1, "种子 只有一格选中")
+    /* 默认那侧的旧行为一格不动 */
+    ck.that(ziluGridOf(ZILU_MADE_IDS).size == 27, "默认 27 格")
+    ck.that(ziluUnknownCountOf(ZILU_MADE_IDS) == 17, "默认 未知 17")
+    ck.done("zilu-seed")
+    return ck.failures.size
+}
+
 func copyShape(): Int64 {
     println("== 文案：白话 / 字义 / 典籍 / 效果 ==")
     let ck = Check()
@@ -485,7 +575,7 @@ main(): Int64 {
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
-        tabFilterShape()
+        tabFilterShape() + ziluSeedShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")

@@ -61,12 +61,13 @@ HarmonyOS 上的仓颉（Cangjie）+ ArkUI 二维「造字」小游戏，锁定�
 │   └── box_check/
 │       ├── cjpm.toml                  # 本机（无 ohos SDK）校验工程
 │       ├── sync.sh                    # 只同步纯逻辑 .cj 进校验工程
-│       ├── main.cj                    # 1798 条断言的驱动
+│       ├── main.cj                    # 2103 条断言的驱动
 │       └── parse_check.sh             # 逐文件 cjc parser + 整包类型检查
 ├── README.md
 └── docs/
     ├── COMPILE.md                     # DevEco / 命令行编译步骤
-    └── SCAFFOLD_REPORT.md             # 脚手架报告：做了什么、验到什么、没验什么
+    ├── SCAFFOLD_REPORT.md             # 脚手架报告：做了什么、验到什么、没验什么
+    └── VERIFY_指事徽标.md             # DEBUG ONLY 种子：怎么打验证包看指事徽标
 ```
 
 ## 同步字形资源
@@ -92,7 +93,7 @@ python3 tools/unify_frame.py --help # 重新归一化（改画框规则时用）
 ## 在本机校验（不需要 ohos SDK）
 
 ```bash
-# 1. 纯逻辑：编译 + 1798 条断言
+# 1. 纯逻辑：编译 + 2103 条断言
 source /home/box/.cangjie-sdk/6.1/cangjie/envsetup.sh
 cd tools/box_check && ./sync.sh && cjpm build && cjpm run
 
