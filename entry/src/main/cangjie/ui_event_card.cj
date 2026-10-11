@@ -58,7 +58,7 @@ public class CardArt {
                 .backgroundColor(Theme.bone200)
 
             /* 人物胶囊 24 高（左上）。 */
-            Text(this.who)
+            Text(this.who())
                 .height(Theme.whoCapsuleH)
                 .padding(left: 10, right: 10)
                 .borderRadius(12)
@@ -73,7 +73,7 @@ public class CardArt {
                 .margin(left: 12, top: 12)
 
             /* 季节 · 序号 11（右上）。 */
-            Text(this.season)
+            Text(this.season())
                 .fontSize(Theme.seasonFs)
                 .fontFamily(Theme.sans)
                 .fontColor(Theme.ink600)
