@@ -24,13 +24,30 @@ import std.collection.ArrayList
    手势走 .onTouch（这一版仓颉 ArkUI 没有 PanGesture / LongPressGesture /
    GestureGroup 那一档，编译期直接报 undeclared type name）：Down 记起点，
    Move 拿位移算拖动、够 300ms 就算长按，Up / Cancel 收尾，都在本文件的
-   onTouch* 几个函数里。点选退路（左右两条常显按钮）另有一条，不依赖手势。 */
+   onTouch* 几个函数里。点选退路（左右两条常显按钮）另有一条，不依赖手势。
+   R2（e4c8def 烟测 FAIL：拖动完全没响应、卡片也不位移）之后：
+     · onTouch 挂在外层那个不位移的容器上，.offset 只加在里面的卡片上
+       （卡片一移，触摸点的局部坐标跟着偏，dx 就算错了）；
+     · 横坐标优先取 touches[0]（设备上验过的那一个），changedTouches 只兜底；
+     · Up / Cancel 不读坐标，按最后一次 Move 的 dx 收尾（Up 不一定带坐标）；
+     · 位移 / 侧别 / 阈值的决策抽成 home_mirror.cj 的纯函数（box_check 断言）。
+   R1 / R3 之后 props 只剩原始值：牌面按 cardIndex 现算，落字条按字匣原始值
+   在 CardLuoziBar 里现算。 */
 
-/* 立绘区 184 高（SPEC §4 待确认 5：立绘风格另定，本版是骨色占位）。 */
+/* 立绘区 184 高（SPEC §4 待确认 5：立绘风格另定，本版是骨色占位）。
+   cardIndex 是原始值（R1：函数调用结果不当 @Prop 传），人物胶囊与
+   「季节 · 序号」都在本组件里按牌堆现算。 */
 @Component
 public class CardArt {
-    @Prop var who: String
-    @Prop var season: String
+    @Prop var cardIndex: Int64
+
+    func who(): String {
+        return eventCardAt(this.cardIndex).who
+    }
+
+    func season(): String {
+        return eventCardAt(this.cardIndex).seasonLabel(this.cardIndex, eventCardCount())
+    }
 
     func build() {
         Stack {
@@ -77,13 +94,18 @@ public class CardArt {
 }
 
 /* 卡文：Serif 16 / 行高 26，内边距 18（SPEC §2.3）。牌堆每张 ≤40 字，
-   正常三行内放得下；maxLines 只是兜底，不让长文案把卡撑爆。 */
+   正常三行内放得下；maxLines 只是兜底，不让长文案把卡撑爆。
+   cardIndex 是原始值，卡文在本组件里按牌堆现算。 */
 @Component
 public class CardBody {
-    @Prop var text: String
+    @Prop var cardIndex: Int64
+
+    func bodyText(): String {
+        return eventCardAt(this.cardIndex).body
+    }
 
     func build() {
-        Text(this.text)
+        Text(this.bodyText())
             .width(100.percent)
             .fontSize(Theme.cardBodyFs)
             .fontFamily(Theme.serif)
@@ -95,14 +117,26 @@ public class CardBody {
 }
 
 /* 卡顶选项条 64 高（拖过阈值后露出这一侧的选项；night-900 86%，Serif 16 Bold）。
-   side 决定文案靠哪一头（往右拖 → 右边的选项，靠右对齐）。 */
+   cardIndex + dragX 是原始值（R1），文案与靠哪一头都在本组件里现算：
+   往右拖 → 右边的选项，靠右对齐。 */
 @Component
 public class CardOptBar {
-    @Prop var label: String
-    @Prop var side: Int64
+    @Prop var cardIndex: Int64
+    @Prop var dragX: Float64
+
+    /* 拖到哪一侧（纯逻辑在 home_mirror.cj 的 dragSideOf）。 */
+    func side(): Int64 {
+        return dragSideOf(this.dragX)
+    }
+
+    func label(): String {
+        let card = eventCardAt(this.cardIndex)
+        if (this.side() == RUN_SIDE_LEFT) { return card.left.label }
+        return card.right.label
+    }
 
     func build() {
-        Text(this.label)
+        Text(this.label())
             .width(100.percent)
             .height(Theme.optBarH)
             .backgroundColor(Theme.optBarNight)
@@ -111,33 +145,82 @@ public class CardOptBar {
             .fontWeight(FontWeight.Bold)
             .fontColor(Theme.onNight)
             .padding(left: 30, right: 30)
-            .textAlign(if (this.side == RUN_SIDE_LEFT) { TextAlign.Start } else { TextAlign.End })
+            .textAlign(if (this.side() == RUN_SIDE_LEFT) { TextAlign.Start } else { TextAlign.End })
     }
 }
 
 /* 卡底落字条 48 高、圆角 12（SPEC §2.3 第三选项：朱底白字 Serif 15 Bold，
-   再点一次确认落字）。字匣里选中一个可落的字才有朱底那一版（enabled）；
-   卡允许落字但没选字 → 灰态「先在字匣选一个字」，点了不动。 */
+   再点一次确认落字）。
+   R3（e4c8def 烟测 FAIL：字匣选中可落的字，落字条还是灰态）：传进来的全是
+   原始值（cardIndex / 字匣三格 / landed 掩码 / selectedSlot / 武装态），
+   「能不能点、文案写什么」都在本组件里按 home_mirror.cj 的 luoziBarStateOf
+   现算 —— 不用函数调用结果当 @Prop 传（那样不参与重绘跟踪）。 */
 @Component
 public class CardLuoziBar {
-    @Prop var label: String
-    @Prop var enabled: Bool
+    /* 当前这一张卡（许不许落字按它算）。 */
+    @Prop var cardIndex: Int64
+    /* 字匣三格的字 id + 有几格有字 + 哪些格本代已落（位掩码）。 */
+    @Prop var box0: String
+    @Prop var box1: String
+    @Prop var box2: String
+    @Prop var boxCount: Int64
+    @Prop var landedMask: Int64
+    /* 字匣选中态（-1 = 没有选中）。 */
+    @Prop var selectedSlot: Int64
+    /* 「准备落」记在哪个格子、哪张卡上（界面态，换了选中 / 换了卡就不算）。 */
+    @Prop var armedSlot: Int64
+    @Prop var armedCard: Int64
     @Prop var onTap: () -> Unit
 
+    /* 原始值 → HomeMirror（纯逻辑在 home_mirror.cj，box_check 有断言）。 */
+    func mirror(): HomeMirror {
+        let m = HomeMirror()
+        m.boxCount = this.boxCount
+        m.box0 = this.box0
+        m.box1 = this.box1
+        m.box2 = this.box2
+        m.landedMask = this.landedMask
+        return m
+    }
+
+    /* 这一张卡许不许落字。 */
+    func allowsLuozi(): Bool {
+        return eventCardAt(this.cardIndex).allowsLuozi
+    }
+
+    /* 落字条状态：LUOZI_BAR_NEED / READY / ARMED。 */
+    func state(): Int64 {
+        return luoziBarStateOf(this.mirror(), this.allowsLuozi(), this.selectedSlot,
+            this.armedSlot, this.armedCard, this.cardIndex)
+    }
+
+    func enabled(): Bool {
+        return luoziBarEnabled(this.state())
+    }
+
+    /* 选中格里的字形（落「X」字用）。 */
+    func selectedGlyph(): String {
+        return ziluGlyphOf(homeMirrorBoxId(this.mirror(), this.selectedSlot))
+    }
+
+    func label(): String {
+        return luoziBarLabelOf(this.state(), this.selectedGlyph())
+    }
+
     func build() {
-        Text(this.label)
+        Text(this.label())
             .width(100.percent)
             .height(Theme.luoziBarH)
             .borderRadius(12)
-            .backgroundColor(if (this.enabled) { Theme.zhu600 } else { Theme.paper200 })
+            .backgroundColor(if (this.enabled()) { Theme.zhu600 } else { Theme.paper200 })
             .fontSize(Theme.fsButton)
             .fontFamily(Theme.serif)
             .fontWeight(FontWeight.Bold)
-            .fontColor(if (this.enabled) { Theme.white } else { Theme.ink400 })
+            .fontColor(if (this.enabled()) { Theme.white } else { Theme.ink400 })
             .textAlign(TextAlign.Center)
-            .enabled(this.enabled)
+            .enabled(this.enabled())
             .onClick({event =>
-                if (this.enabled) {
+                if (this.enabled()) {
                     this.onTap()
                 }
             })
@@ -146,16 +229,28 @@ public class CardLuoziBar {
 
 /* 按住看分量的一排圆点：四列对齐四维条，圆点大小 5 / 8 / 12 三档，
    没有增减的那一维不画点；只表分量大小，不表涨跌（SPEC §2.9）。
-   side 是左边那两个字（「左」/「右」），金色 10 Bold。 */
+   side 是左边那两个字（「左」/「右」），金色 10 Bold。
+   cardIndex + sideCode 是原始值（R1：数组 / 函数调用结果不当 @Prop 传），
+   增减在成员函数里按牌堆现算。 */
 @Component
 public class WeightDotRow {
-    @Prop var deltas: Array<Int64>
+    @Prop var cardIndex: Int64
+    /* RUN_SIDE_LEFT / RUN_SIDE_RIGHT：这一排看哪一边。 */
+    @Prop var sideCode: Int64
     @Prop var side: String
+
+    /* 这一排的四维增减。 */
+    func deltas(): Array<Int64> {
+        let card = eventCardAt(this.cardIndex)
+        if (this.sideCode == RUN_SIDE_LEFT) { return card.left.deltas }
+        return card.right.deltas
+    }
 
     /* 第 i 维的圆点档位（0 = 不画）。 */
     func tierAt(i: Int64): Int64 {
-        if (i < 0 || i >= this.deltas.size) { return RUN_WEIGHT_NONE }
-        return weightTier(this.deltas[i])
+        let d = this.deltas()
+        if (i < 0 || i >= d.size) { return RUN_WEIGHT_NONE }
+        return weightTier(d[i])
     }
 
     /* 四维的下标（0/1/2/3）。ArrayList 是为了跟仓库里其它 ForEach 调用一致。 */
@@ -197,23 +292,24 @@ public class WeightDotRow {
 }
 
 /* 两排圆点：上排左选项、下排右选项（states_v1 ①）。
-   deltas 是原始数组（函数调用当 @Prop 传进来不参与重绘跟踪）。 */
+   cardIndex 是原始值，两边增减在 WeightDotRow 里按牌堆现算。 */
 @Component
 public class HomeWeightDots {
-    @Prop var leftDeltas: Array<Int64>
-    @Prop var rightDeltas: Array<Int64>
+    @Prop var cardIndex: Int64
 
     func build() {
         Column(space: 4) {
-            WeightDotRow(deltas: this.leftDeltas, side: HOME_HOLD_LEFT)
-            WeightDotRow(deltas: this.rightDeltas, side: HOME_HOLD_RIGHT)
+            WeightDotRow(cardIndex: this.cardIndex, sideCode: RUN_SIDE_LEFT, side: HOME_HOLD_LEFT)
+            WeightDotRow(cardIndex: this.cardIndex, sideCode: RUN_SIDE_RIGHT, side: HOME_HOLD_RIGHT)
         }
         .width(100.percent)
     }
 }
 
-/* 这一张卡。props 全是简单类型（仓颉 @Prop 对 class 实例只认引用，
-   牌面字段拆开传，父组件从 RunState / 牌堆现算）。
+/* 这一张卡。R1 之后 props 只剩原始值：牌面字段（人物 / 季节 · 序号 / 卡文 /
+   左右选项文案与增减 / 许不许落字）全部由 cardIndex 一个下标在本组件自己的
+   成员函数里从牌堆现算 —— class 字段（this.run.*）与函数调用结果当 @Prop
+   传都不参与重绘跟踪，那就是主界选卡后不刷新的根因。
      dragX   拖动位移（vp，未钳；钳过的位移见 shiftX）
      held    按住看分量中（松手 / 下一次拖动 / 取消 → 收起圆点）
    交互三条路：
@@ -223,17 +319,18 @@ public class HomeWeightDots {
      点选   左右两条常显按钮由主界面给（HomeOptBtns），点一下即选 */
 @Component
 public class EventCardView {
-    @Prop var who: String
-    @Prop var season: String
-    @Prop var body: String
-    @Prop var leftLabel: String
-    @Prop var rightLabel: String
-    @Prop var leftDeltas: Array<Int64>
-    @Prop var rightDeltas: Array<Int64>
-    @Prop var allowsLuozi: Bool
-    @Prop var luoziEnabled: Bool
-    /* 落字条上的文案（选中了哪个字 / 还没选），由主界面按字匣状态现算。 */
-    @Prop var luoziLabel: String
+    /* 当前这一张卡（牌堆循环，读档回到同一张）。 */
+    @Prop var cardIndex: Int64
+    /* 字匣三格的字 id + 有几格有字 + 哪些格本代已落（位掩码）+ 选中态。 */
+    @Prop var box0: String
+    @Prop var box1: String
+    @Prop var box2: String
+    @Prop var boxCount: Int64
+    @Prop var landedMask: Int64
+    @Prop var selectedSlot: Int64
+    /* 「准备落」记在哪个格子、哪张卡上（界面态；落字条按它出武装文案）。 */
+    @Prop var armedSlot: Int64
+    @Prop var armedCard: Int64
     /* 点落字条：第一次按下只是「准备落」，再点一次才真的落（主界面记 armed）。 */
     @Prop var onLuozi: () -> Unit
     /* 按住状态回传：圆点排在主界面四维条上方，那一层才是它的父组件。 */
@@ -246,39 +343,32 @@ public class EventCardView {
     /* —— onTouch 的记账字段（不是界面状态，只是这一串触摸的中间量）——
        touchStartX  Down 时的横坐标，Move 里 dx = 当前 - 它
        touchStartTs Down 时的时间戳，用来判 300ms 长按
+       touchLastDx  最后一次 Move 算出来的位移（Up 不一定带坐标，松手按它算）
        touchDrag    位移已经超过 8vp（拖起来就不再算长按）
        touchHold    长按已经亮过（一次按压只亮一次） */
     @State var touchStartX: Float64 = 0.0
     @State var touchStartTs: Int64 = 0
+    @State var touchLastDx: Float64 = 0.0
     @State var touchDrag: Bool = false
     @State var touchHold: Bool = false
 
-    /* 往右拖 = 选右边，往左拖 = 选左边。 */
-    func sideOf(x: Float64): Int64 {
-        if (x >= 0.0) { return RUN_SIDE_RIGHT }
-        return RUN_SIDE_LEFT
+    /* —— 牌面字段：都由 cardIndex 现算（成员函数里算，不当 @Prop 传）—— */
+    func card(): EventCard {
+        return eventCardAt(this.cardIndex)
+    }
+
+    func allowsLuozi(): Bool {
+        return this.card().allowsLuozi
     }
 
     /* 过没过拖拽阈值（±60vp）。 */
     func pastThreshold(): Bool {
-        let t = Float64(Theme.swipeThreshold)
-        if (this.dragX >= t) { return true }
-        if (this.dragX <= -t) { return true }
-        return false
+        return dragPastThreshold(this.dragX, Theme.swipeThreshold)
     }
 
     /* 位移钳到 ±14（SPEC §2.3；倾斜见文件头说明 2）。 */
     func shiftX(): Int64 {
-        let cap = Float64(Theme.swipeShift)
-        if (this.dragX > cap) { return Theme.swipeShift }
-        if (this.dragX < -cap) { return -Theme.swipeShift }
-        return Int64(this.dragX)
-    }
-
-    /* 卡顶选项条上的文案（拖到哪一侧就露哪一条）。 */
-    func optLabel(side: Int64): String {
-        if (side == RUN_SIDE_LEFT) { return this.leftLabel }
-        return this.rightLabel
+        return dragClampShift(this.dragX, Theme.swipeShift)
     }
 
     /* 按住时的外圈：gold-400 2 + rgba(216,180,106,.18) 8（SPEC §2.9）。 */
@@ -303,9 +393,11 @@ public class EventCardView {
         this.dragX = x
     }
 
-    func dragEnd(): Unit {
-        let past = this.pastThreshold()
-        let side = this.sideOf(this.dragX)
+    /* 松手：位移按最后一次 Move 的 dx 算（Up / Cancel 不一定带坐标）。
+       过阈值 → 选这一侧；没过 → 弹回中间（dragX 归零）。 */
+    func dragEnd(dx: Float64): Unit {
+        let past = dragPastThreshold(dx, Theme.swipeThreshold)
+        let side = dragSideOf(dx)
         this.dragX = 0.0
         this.held = false
         this.onHoldChange(false)
@@ -325,16 +417,21 @@ public class EventCardView {
     }
 
     /* —— onTouch 回调（见文件头：这一版没有手势 API，拖动 / 长按都手算）——
-       按下到抬起之间一次按压算一串事件，中途 Cancel 也算抬起。 */
+       按下到抬起之间一次按压算一串事件，中途 Cancel 也算抬起。
+       R2（e4c8def 烟测 FAIL：拖动完全没响应）：
+         · onTouch 挂在外层那个不位移的容器上，offset 只加在里面的卡片上 ——
+           不然卡片一移，触摸点的局部坐标跟着偏，dx 就算错了；
+         · 横坐标优先取 touches[0]（设备上验过的那一个），changedTouches 只作兜底；
+         · Up / Cancel 不读坐标，按最后一次 Move 的 dx 收尾。 */
 
-    /* 触点数组兜底：Cancel 有时不带触点，取不到就当这一下没发生过。 */
+    /* 这一次事件的触点：touches 优先，空了才看 changedTouches。 */
     func onTouchEvent(e: TouchEvent): Unit {
-        if (e.changedTouches.size > 0) {
-            this.onTouchAt(e.changedTouches[0], e)
-            return
-        }
         if (e.touches.size > 0) {
             this.onTouchAt(e.touches[0], e)
+            return
+        }
+        if (e.changedTouches.size > 0) {
+            this.onTouchAt(e.changedTouches[0], e)
         }
     }
 
@@ -349,7 +446,7 @@ public class EventCardView {
     }
 
     /* 按满 300ms 才算长按。时间戳按 ms 比；万一某机型给的是 ns（差 6 个数量级），
-       折回来再比，反正只跟 300 比大小。 */
+       折回来再比，反正只跟 300 比大小。长按只是加分项：判不出来也照样能拖。 */
     func heldMs(now: Int64): Int64 {
         let d = now - this.touchStartTs
         if (d <= 0) { return 0 }
@@ -360,6 +457,7 @@ public class EventCardView {
     func onTouchDown(x: Float64, ts: Int64): Unit {
         this.touchStartX = x
         this.touchStartTs = ts
+        this.touchLastDx = 0.0
         this.touchDrag = false
         this.touchHold = false
         this.dragStart()
@@ -367,6 +465,7 @@ public class EventCardView {
 
     func onTouchMove(x: Float64, ts: Int64): Unit {
         let dx = x - this.touchStartX
+        this.touchLastDx = dx
         if (dx > 8.0 || dx < -8.0) { this.touchDrag = true }
         this.dragMove(dx)
         /* 位移小、按住够久 → 亮一次（亮过就不重复亮）。 */
@@ -378,10 +477,12 @@ public class EventCardView {
 
     func onTouchUp(): Unit {
         if (this.touchHold) { this.holdOff() }
-        this.dragEnd()
+        this.dragEnd(this.touchLastDx)
     }
 
     func build() {
+        /* 外层容器：不位移，onTouch 挂在它上面（R2：位移会让局部坐标跑偏）。
+           里面那个 Stack 才是会跟着手指移动的卡片。 */
         Stack {
             /* 下一张垫在后面：55% 透明度（96% 缩放见文件头说明 2）。 */
             Text("")
@@ -396,16 +497,23 @@ public class EventCardView {
             /* 这一张。 */
             Stack {
                 Column {
-                    CardArt(who: this.who, season: this.season)
-                    CardBody(text: this.body)
+                    CardArt(cardIndex: this.cardIndex)
+                    CardBody(cardIndex: this.cardIndex)
                     Blank()
-                    if (this.allowsLuozi) {
+                    if (this.allowsLuozi()) {
                         /* 自建组件不能挂链式属性（@Component 宏不认），套一层
                            Column 把 margin 放容器上（同 ui_card.cj 的 GhostButton）。 */
                         Column {
                             CardLuoziBar(
-                                label: this.luoziLabel,
-                                enabled: this.luoziEnabled,
+                                cardIndex: this.cardIndex,
+                                box0: this.box0,
+                                box1: this.box1,
+                                box2: this.box2,
+                                boxCount: this.boxCount,
+                                landedMask: this.landedMask,
+                                selectedSlot: this.selectedSlot,
+                                armedSlot: this.armedSlot,
+                                armedCard: this.armedCard,
                                 onTap: { => this.onLuozi() }
                             )
                         }
@@ -421,7 +529,7 @@ public class EventCardView {
                 /* 拖过阈值：卡顶露出这一侧的选项条。 */
                 if (this.pastThreshold()) {
                     Column {
-                        CardOptBar(label: this.optLabel(this.sideOf(this.dragX)), side: this.sideOf(this.dragX))
+                        CardOptBar(cardIndex: this.cardIndex, dragX: this.dragX)
                     }
                     .width(100.percent)
                     .align(Alignment.Top)
@@ -432,10 +540,11 @@ public class EventCardView {
             .borderRadius(Theme.cardRadius)
             .backgroundColor(Theme.paper50)
             .border(width: this.holdBorderWidth(), color: this.holdBorderColor())
+            /* 位移只加在这一层里面：外层容器不动，触摸坐标才稳（R2）。 */
             .offset(x: this.shiftX(), y: 0)
-            .onTouch({e: TouchEvent => this.onTouchEvent(e)})
         }
         .width(Theme.cardW)
         .height(Theme.cardH)
+        .onTouch({e: TouchEvent => this.onTouchEvent(e)})
     }
 }

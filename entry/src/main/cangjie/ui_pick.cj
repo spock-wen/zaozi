@@ -14,7 +14,11 @@ import std.collection.ArrayList
      PickGrid      网格（同字录：60×60、间距 9、一行 5 格）
      PickFootBtn   底部主按钮（灰「还差 N 个字」/ 朱「就带这些开局」）
      PickScreen    组装 + 自己的 @State（picked）
-   挑字规则（挑/收回/上限 3/不足 3 个字）与落定都在 run_state.cj，这里只摆版式。 */
+   挑字规则（挑/收回/上限 3/不足 3 个字）与落定都在 run_state.cj，这里只摆版式。
+   O1（e4c8def 烟测观察项：挑了字，上方三个大格还是「＋ / 第 n 格」）之后，
+   三个大格各收一个原始 String（字 id），格子内部自己换字形、算序号 ——
+   原来收 picked 数组当 @Prop 再用不带 key 的 ForEach 摆，数组 @Prop 没验过，
+   ForEach 还会按下标复用子组件、不重跑 itemGeneratorFunc，格子就不翻面。 */
 
 /* 顶行：左「第 N 代 · 开局」，右「第 N 代记事人」（设计稿 .stat）。
    代次是原始字段，文案在子组件里拼（函数调用当 @Prop 传进来不参与重绘跟踪）。 */
@@ -49,21 +53,26 @@ public class PickStatLine {
 }
 
 /* 一个大格：空 = 1.5 虚线 + 「＋」；满 = 字（Serif 30 Bold）+ 右上角朱序号。
-   点满的格子就是把这个字收回（SPEC §2.4：挑字入字匣）。 */
+   点满的格子就是把这个字收回（SPEC §2.4：挑字入字匣）。
+   charId 是原始值（picked 存的是字id "shui"），字形在本组件里现换。 */
 @Component
 public class PickBigSlot {
-    @Prop var glyph: String
+    @Prop var charId: String
     /* 0 = 空格；>0 = 第几个挑的（右上角序号）。 */
     @Prop var order: Int64
     @Prop var onTap: () -> Unit
 
     func filled(): Bool {
-        return this.glyph.size > 0
+        return this.charId.size > 0
+    }
+
+    func glyph(): String {
+        return ziluGlyphOf(this.charId)
     }
 
     func build() {
         Column {
-            Text(if (this.filled()) { this.glyph } else { PICK_SLOT_EMPTY })
+            Text(if (this.filled()) { this.glyph() } else { PICK_SLOT_EMPTY })
                 .fontSize(if (this.filled()) { Theme.fsGridChar } else { 20 })
                 .fontFamily(if (this.filled()) { Theme.serif } else { Theme.sans })
                 .fontWeight(FontWeight.Bold)
@@ -98,48 +107,64 @@ public class PickBigSlot {
     }
 }
 
-/* 三个大格（64×64、间距 12），按挑选顺序从左到右排。 */
+/* 三个大格（64×64、间距 12），按挑选顺序从左到右排。
+   O1（e4c8def 烟测观察项：挑了字，上方三格还是「＋ / 第 n 格」）：
+   原来这里收 picked 数组当 @Prop、再用不带 key 的 ForEach 摆三格 —— 数组
+   @Prop 没验过，ForEach 还会按下标复用子组件、不重跑 itemGeneratorFunc，
+   于是挑了字格子不翻面（下面网格有 key 带序号，所以网格那侧是好的）。
+   现在按 R1 的路子走：三个格子各收一个原始 String（字 id），格子内部自己
+   换字形、算序号；三个格子显式摆出来，不依赖 ForEach 复用。 */
 @Component
 public class PickBigSlots {
-    @Prop var picked: Array<String>
+    /* 三格的字 id（空串 = 空格）。 */
+    @Prop var slot0: String
+    @Prop var slot1: String
+    @Prop var slot2: String
     @Prop var onRemove: (String) -> Unit
 
-    func slotAt(i: Int64): String {
-        if (i >= 0 && i < this.picked.size) { return this.picked[i] }
-        return ""
-    }
-
-    func caption(i: Int64): String {
-        if (this.slotAt(i).size > 0) { return "第 ${i + 1} 格" }
+    func caption(id: String, at: Int64): String {
+        if (id.size > 0) { return "第 ${at + 1} 格" }
         return "点下方的字"
-    }
-
-    /* 三格的下标（0/1/2）。ArrayList 是为了跟仓库里其它 ForEach 调用一致。 */
-    func slotIndexes(): ArrayList<Int64> {
-        let out = ArrayList<Int64>()
-        out.add(0)
-        out.add(1)
-        out.add(2)
-        return out
     }
 
     func build() {
         Row(space: 12) {
-            ForEach(this.slotIndexes(), itemGeneratorFunc: {i: Int64, at: Int64 =>
-                Column {
-                    PickBigSlot(
-                        /* picked 存的是字id（"shui"），大格里要显示字形（"水"）。 */
-                        glyph: ziluGlyphOf(this.slotAt(i)),
-                        order: if (this.slotAt(i).size > 0) { i + 1 } else { 0 },
-                        onTap: { => this.onRemove(this.slotAt(i)) }
-                    )
-                    Text(this.caption(i))
-                        .fontSize(Theme.fsStageName)
-                        .fontFamily(Theme.sans)
-                        .fontColor(Theme.ink600)
-                        .margin(top: 6)
-                }
-            })
+            Column {
+                PickBigSlot(
+                    charId: this.slot0,
+                    order: if (this.slot0.size > 0) { 1 } else { 0 },
+                    onTap: { => this.onRemove(this.slot0) }
+                )
+                Text(this.caption(this.slot0, 0))
+                    .fontSize(Theme.fsStageName)
+                    .fontFamily(Theme.sans)
+                    .fontColor(Theme.ink600)
+                    .margin(top: 6)
+            }
+            Column {
+                PickBigSlot(
+                    charId: this.slot1,
+                    order: if (this.slot1.size > 0) { 2 } else { 0 },
+                    onTap: { => this.onRemove(this.slot1) }
+                )
+                Text(this.caption(this.slot1, 1))
+                    .fontSize(Theme.fsStageName)
+                    .fontFamily(Theme.sans)
+                    .fontColor(Theme.ink600)
+                    .margin(top: 6)
+            }
+            Column {
+                PickBigSlot(
+                    charId: this.slot2,
+                    order: if (this.slot2.size > 0) { 3 } else { 0 },
+                    onTap: { => this.onRemove(this.slot2) }
+                )
+                Text(this.caption(this.slot2, 2))
+                    .fontSize(Theme.fsStageName)
+                    .fontFamily(Theme.sans)
+                    .fontColor(Theme.ink600)
+                    .margin(top: 6)
+            }
         }
         .width(100.percent)
         .padding(14)
@@ -328,15 +353,29 @@ public class PickScreen {
     @Prop var onConfirm: (Array<String>) -> Unit
 
     @State var picked: Array<String> = []
+    /* 三个大格的原始值镜子（O1：挑了字大格不翻面）。 picked 数组只留在本层
+       给 PickGrid / PickFootBtn / 落定用，大格那三个 @Prop 逐个收原始 String。 */
+    @State var slot0: String = ""
+    @State var slot1: String = ""
+    @State var slot2: String = ""
+
+    /* picked 变完就把三格镜子跟上（不跟着走，大格就停在旧值）。 */
+    func syncSlots(): Unit {
+        this.slot0 = if (this.picked.size > 0) { this.picked[0] } else { "" }
+        this.slot1 = if (this.picked.size > 1) { this.picked[1] } else { "" }
+        this.slot2 = if (this.picked.size > 2) { this.picked[2] } else { "" }
+    }
 
     func toggle(id: String): Unit {
         this.picked = pickToggle(this.picked, id)
+        this.syncSlots()
     }
 
     func remove(id: String): Unit {
         /* 空格（没有字）点了什么都不做。 */
         if (id.size == 0) { return }
         this.picked = pickToggle(this.picked, id)
+        this.syncSlots()
     }
 
     func confirm(): Unit {
@@ -365,7 +404,9 @@ public class PickScreen {
                         .lineHeight(19)
 
                     PickBigSlots(
-                        picked: this.picked,
+                        slot0: this.slot0,
+                        slot1: this.slot1,
+                        slot2: this.slot2,
                         onRemove: {id => this.remove(id)}
                     )
 

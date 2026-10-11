@@ -1504,13 +1504,222 @@ func settleShape(): Int64 {
     return ck.failures.size
 }
 
+/* ————— M2 烟测 R1/R2/R3：主界刷新镜子 / 拖卡决策 / 落字条状态机 ————— */
+
+/* landed 位掩码：字匣三格「本代已落」↔ Int64（数组 @Prop 没验过，用原始值）。 */
+func landedMaskShape(): Int64 {
+    println("== R1 landed 位掩码：三格 ↔ Int64 位掩码 ==")
+    let ck = Check()
+    ck.that(runLandedMaskEncode([false, false, false]) == 0, "一个没落 → 0")
+    ck.that(runLandedMaskEncode([true, false, false]) == 1, "只落第 1 格 → 1")
+    ck.that(runLandedMaskEncode([false, true, false]) == 2, "只落第 2 格 → 2")
+    ck.that(runLandedMaskEncode([false, false, true]) == 4, "只落第 3 格 → 4")
+    ck.that(runLandedMaskEncode([true, true, true]) == 7, "三格全落 → 7")
+    ck.that(runLandedMaskEncode([true, true, false]) == 3, "落前两格 → 3")
+    ck.that(runLandedMaskEncode([]) == 0, "空字匣 → 0")
+    /* 只认前 3 格（字匣上限 RUN_PICK_CAP），多出来的忽略 */
+    ck.that(runLandedMaskEncode([true, true, true, true]) == 7, "第 4 格不编码")
+    /* 掩码 → 逐格读回来，与编码前一致 */
+    var cases: Array<Array<Bool>> = [[false, false, false], [true, false, false],
+        [false, true, false], [false, false, true], [true, true, false], [true, false, true],
+        [false, true, true], [true, true, true]]
+    var c: Int64 = 0
+    while (c < cases.size) {
+        let mask = runLandedMaskEncode(cases[c])
+        var i: Int64 = 0
+        while (i < cases[c].size) {
+            ck.that(runLandedAtMask(mask, i) == cases[c][i],
+                "掩码 ${mask} 第 ${i} 格读回 ${cases[c][i]}")
+            i = i + 1
+        }
+        c = c + 1
+    }
+    /* 越界一律没落（界面不判空） */
+    ck.that(!runLandedAtMask(7, -1), "掩码 7 负下标 → 没落")
+    ck.that(!runLandedAtMask(7, 3), "掩码 7 第 4 格 → 没落")
+    ck.that(!runLandedAtMask(0, 0), "掩码 0 → 没落")
+    ck.that(runLandedBit(0) == 1 && runLandedBit(1) == 2 && runLandedBit(2) == 4, "位权 1/2/4")
+    ck.done("landed-mask")
+    return ck.failures.size
+}
+
+/* R1：RunState → 主界那一组原始值（HomeMirror）。 */
+func homeMirrorShape(): Int64 {
+    println("== R1 主界刷新：RunState → 原始值镜子 ==")
+    let ck = Check()
+    /* 新开局（还没挑字）：镜子就是开局值，字匣 0 格 */
+    let fresh = homeMirrorOf(newRunState())
+    ck.that(fresh.generation == 1 && fresh.year == 1 && fresh.yearsLeft == 12, "开局 代/年/余年")
+    ck.that(fresh.dim0 == 50 && fresh.dim1 == 50 && fresh.dim2 == 50 && fresh.dim3 == 50, "开局 四维 50")
+    ck.that(fresh.boneEmpty == 2 && fresh.boneShiqian == 0, "开局 骨片")
+    ck.that(fresh.cardIndex == 0, "开局 牌堆下标 0")
+    ck.that(fresh.boxCount == 0, "开局 字匣 0 格")
+    ck.that(fresh.box0 == "" && fresh.box1 == "" && fresh.box2 == "", "开局 三格都空")
+    ck.that(fresh.landedMask == 0, "开局 一格都没落")
+
+    /* 挑过 3 个字：三格有 id，都没有落 */
+    let s = runAfterPick(newRunState(), ["shui", "ri", "ren"])
+    let m = homeMirrorOf(s)
+    ck.that(m.boxCount == 3, "挑了 3 个字 → 3 格（got ${m.boxCount}）")
+    ck.that(m.box0 == "shui" && m.box1 == "ri" && m.box2 == "ren", "三格按挑选顺序")
+    ck.that(m.landedMask == 0, "刚挑完一字未落")
+    ck.that(homeMirrorBoxId(m, 0) == "shui" && homeMirrorBoxId(m, 2) == "ren", "按格取 id")
+    ck.that(homeMirrorBoxId(m, -1) == "" && homeMirrorBoxId(m, 3) == "", "越界取 id → 空串")
+
+    /* 只带 2 个字：第 3 格是空格，boxCount 说了算 */
+    let two = homeMirrorOf(runAfterPick(newRunState(), ["shui", "ri"]))
+    ck.that(two.boxCount == 2, "带 2 个字 → 2 格（got ${two.boxCount}）")
+    ck.that(two.box2 == "", "第 3 格没有字")
+    ck.that(homeMirrorBoxId(two, 2) == "", "只带了 2 个字时第 3 格取 id → 空串")
+    ck.that(homeBoxSlotState(two, BOX_SLOT_NONE, 1) == BOX_SLOT_OK, "第 2 格可落")
+    ck.that(homeBoxSlotState(two, BOX_SLOT_NONE, 2) == BOX_SLOT_EMPTY, "第 3 格空格")
+
+    /* 选过卡之后：年份 / 四维 / 牌堆 / 余年全部跟上（R1 就是不刷新这些） */
+    let played = applyChoice(s, RUN_SIDE_LEFT)
+    let pm = homeMirrorOf(played)
+    ck.that(pm.year == 1 && pm.yearsLeft == 12, "3 张卡才过一年")
+    ck.that(pm.dim0 == 60 && pm.dim1 == 46, "四维跟上（got ${pm.dim0}/${pm.dim1}）")
+    ck.that(pm.cardIndex == 1, "牌堆下标跟上（got ${pm.cardIndex}）")
+    ck.that(!homeMirrorSame(m, pm), "选过卡镜子变了（R1 修的正是这个）")
+    var three: RunState = played
+    var n: Int64 = 0
+    while (n < 2) {
+        three = applyChoice(three, RUN_SIDE_LEFT)
+        n = n + 1
+    }
+    let tm = homeMirrorOf(three)
+    ck.that(tm.year == 2 && tm.yearsLeft == 11, "看满 3 张 → 第 2 年、余年 11（got ${tm.year}/${tm.yearsLeft}）")
+    ck.that(tm.cardIndex == 3, "牌堆走到第 3 张（got ${tm.cardIndex}）")
+    ck.that(homeMirrorSame(homeMirrorOf(three), tm), "同一个状态镜子是稳定的")
+
+    /* 落过字：掩码那一位立起来，字匣格子状态跟着变 */
+    let lz = applyLuozi(s, 1)
+    let lm = homeMirrorOf(lz)
+    ck.that(lm.landedMask == 2, "落了第 2 格 → 掩码 2（got ${lm.landedMask}）")
+    ck.that(homeBoxSlotState(lm, BOX_SLOT_NONE, 1) == BOX_SLOT_LANDED, "第 2 格 本代已落")
+    ck.that(homeBoxSlotState(lm, BOX_SLOT_NONE, 0) == BOX_SLOT_OK, "旁边没落的格照旧可落")
+    ck.that(lm.boxCount == 3 && lm.box1 == "ri", "落过的字还留在字匣里")
+    ck.that(lm.cardIndex == 1, "落字牌堆也前进（got ${lm.cardIndex}）")
+
+    /* 镜子逐格状态与 game_rules 那条路（boxSlotState）完全一致 */
+    var i: Int64 = 0
+    while (i < RUN_PICK_CAP + 2) {
+        ck.that(homeBoxSlotState(m, 1, i) == boxSlotState(s, 1, i), "镜子版与 RunState 版一致（第 ${i} 格）")
+        ck.that(homeBoxSlotState(lm, 2, i) == boxSlotState(lz, 2, i), "落过后镜子版一致（第 ${i} 格）")
+        i = i + 1
+    }
+
+    /* 事签占一格（stub）：镜子照样带得出事签态 */
+    let sq = runAfterPick(newRunState(), ["shiqian", "ri"])
+    let sqm = homeMirrorOf(sq)
+    ck.that(homeBoxSlotState(sqm, BOX_SLOT_NONE, 0) == BOX_SLOT_SHIQIAN, "事签格 → 事签")
+    ck.that(homeBoxSlotState(sqm, BOX_SLOT_NONE, 1) == BOX_SLOT_OK, "事签旁边可落")
+
+    /* 选卡刷新之后 old/new 两个镜子逐字段都该不一样（界面靠这个换引用） */
+    ck.that(homeMirrorSame(homeMirrorOf(newRunState()), fresh), "新开局镜子可重复")
+    ck.done("home-mirror")
+    return ck.failures.size
+}
+
+/* R2：拖卡决策（dx → 侧 / 钳位移 / 阈值）。 */
+func dragShape(): Int64 {
+    println("== R2 拖卡：位移 → 选侧 / 钳位 / 阈值 ==")
+    let ck = Check()
+    /* 侧：右正左负，0 算右边 */
+    ck.that(dragSideOf(0.0) == RUN_SIDE_RIGHT, "dx 0 → 右边")
+    ck.that(dragSideOf(1.0) == RUN_SIDE_RIGHT, "往右拖 → 右边")
+    ck.that(dragSideOf(999.0) == RUN_SIDE_RIGHT, "拖很远也是右边")
+    ck.that(dragSideOf(-0.5) == RUN_SIDE_LEFT, "往左拖 → 左边")
+    ck.that(dragSideOf(-999.0) == RUN_SIDE_LEFT, "往左拖很远 → 左边")
+    /* 位移钳到 ±Theme.swipeShift（14） */
+    ck.that(dragClampShift(0.0, Theme.swipeShift) == 0, "没拖不动")
+    ck.that(dragClampShift(7.0, Theme.swipeShift) == 7, "小位移原样")
+    ck.that(dragClampShift(-7.0, Theme.swipeShift) == -7, "负小位移原样")
+    ck.that(dragClampShift(14.0, Theme.swipeShift) == Theme.swipeShift, "正好到上限")
+    ck.that(dragClampShift(80.0, Theme.swipeShift) == Theme.swipeShift, "超过上限钳住")
+    ck.that(dragClampShift(-80.0, Theme.swipeShift) == -Theme.swipeShift, "负的也钳住")
+    ck.that(dragClampShift(1000.0, 5) == 5, "换一个上限照钳")
+    /* 阈值 ±Theme.swipeThreshold（60） */
+    ck.that(!dragPastThreshold(0.0, Theme.swipeThreshold), "没拖不过阈值")
+    ck.that(!dragPastThreshold(59.0, Theme.swipeThreshold), "差 1 不过阈值")
+    ck.that(dragPastThreshold(60.0, Theme.swipeThreshold), "正好 60 过阈值（含）")
+    ck.that(dragPastThreshold(61.0, Theme.swipeThreshold), "超过 60 过阈值")
+    ck.that(!dragPastThreshold(-59.0, Theme.swipeThreshold), "负差 1 不过")
+    ck.that(dragPastThreshold(-60.0, Theme.swipeThreshold), "负正好 60 过")
+    ck.that(dragPastThreshold(-200.0, Theme.swipeThreshold), "负很远也过")
+    /* 过阈值的那一下，侧别与位移方向一致（松手选中的就是这一侧） */
+    ck.that(dragSideOf(80.0) == RUN_SIDE_RIGHT && dragPastThreshold(80.0, Theme.swipeThreshold),
+        "往右拖过阈值 → 松手选右")
+    ck.that(dragSideOf(-80.0) == RUN_SIDE_LEFT && dragPastThreshold(-80.0, Theme.swipeThreshold),
+        "往左拖过阈值 → 松手选左")
+    ck.that(Theme.swipeThreshold == 60 && Theme.swipeShift == 14, "SPEC §2.3 阈值 60 / 位移 14")
+    ck.done("drag")
+    return ck.failures.size
+}
+
+/* R3：卡底落字条状态机（原始值 → NEED / READY / ARMED + 文案）。 */
+func luoziBarShape(): Int64 {
+    println("== R3 落字条：没选中灰态 / 选中可落朱态 / 再点一次武装 ==")
+    let ck = Check()
+    let pool = eventCardPool()
+    let ok = pool[0]   /* he_di：允许落字 */
+    let no = pool[1]   /* lie_hu：不允许落字 */
+    let s = runAfterPick(newRunState(), ["shui", "ri", "ren"])
+    let m = homeMirrorOf(s)
+
+    /* 没选中 → 灰态 */
+    ck.that(luoziBarStateOf(m, ok.allowsLuozi, BOX_SLOT_NONE, BOX_SLOT_NONE, -1, 0) == LUOZI_BAR_NEED,
+        "没选中 → 灰态")
+    ck.that(!luoziBarEnabled(LUOZI_BAR_NEED), "灰态点了不动")
+    ck.that(luoziBarLabelOf(LUOZI_BAR_NEED, "水") == HOME_LUOZI_NEED, "灰态文案 先在字匣选一个字")
+    /* 选中一个可落的字 → 朱态，文案带字形 */
+    ck.that(luoziBarStateOf(m, ok.allowsLuozi, 0, BOX_SLOT_NONE, -1, 0) == LUOZI_BAR_READY,
+        "选中可落的字 → 朱态")
+    ck.that(luoziBarEnabled(LUOZI_BAR_READY), "朱态可点")
+    ck.that(luoziBarLabelOf(LUOZI_BAR_READY, "水") == "落「水」字", "朱态文案 落「水」字（got ${luoziBarLabelOf(LUOZI_BAR_READY, "水")}）")
+    ck.that(luoziBarStateOf(m, ok.allowsLuozi, 2, BOX_SLOT_NONE, -1, 0) == LUOZI_BAR_READY,
+        "选第 3 格也是朱态")
+    /* 再点一次（武装记在这一个格子、这一张卡上）→ 武装态 */
+    ck.that(luoziBarStateOf(m, ok.allowsLuozi, 1, 1, 0, 0) == LUOZI_BAR_ARMED, "同格同卡再点 → 武装态")
+    ck.that(luoziBarEnabled(LUOZI_BAR_ARMED), "武装态照样可点（点了才真落）")
+    ck.that(luoziBarLabelOf(LUOZI_BAR_ARMED, "日") == HOME_LUOZI_ARMED, "武装态文案 再点一次确认落字")
+    /* 换了格子 / 换了卡就不算武装过 */
+    ck.that(luoziBarStateOf(m, ok.allowsLuozi, 0, 1, 0, 0) == LUOZI_BAR_READY, "换了选中格 → 回到朱态")
+    ck.that(luoziBarStateOf(m, ok.allowsLuozi, 1, 1, 3, 0) == LUOZI_BAR_READY, "换了卡 → 回到朱态")
+    /* 卡不允许落字 → 灰态（界面整条隐藏） */
+    ck.that(luoziBarStateOf(m, no.allowsLuozi, 0, 0, 0, 0) == LUOZI_BAR_NEED, "这一张不允许落字 → 灰态")
+    ck.that(luoziBarStateOf(m, no.allowsLuozi, BOX_SLOT_NONE, BOX_SLOT_NONE, -1, 0) == LUOZI_BAR_NEED,
+        "不允许 + 没选中 → 灰态")
+    /* 空格 / 事签格 / 已落格 → 灰态 */
+    let two = homeMirrorOf(runAfterPick(newRunState(), ["shui", "ri"]))
+    ck.that(luoziBarStateOf(two, ok.allowsLuozi, 2, BOX_SLOT_NONE, -1, 0) == LUOZI_BAR_NEED, "空格 → 灰态")
+    let sq = homeMirrorOf(runAfterPick(newRunState(), ["shiqian", "ri"]))
+    ck.that(luoziBarStateOf(sq, ok.allowsLuozi, 0, 0, 0, 0) == LUOZI_BAR_NEED, "事签格 → 灰态")
+    let lz = homeMirrorOf(applyLuozi(s, 1))
+    ck.that(luoziBarStateOf(lz, ok.allowsLuozi, 1, 1, 1, 1) == LUOZI_BAR_NEED, "本代已落的格 → 灰态")
+    ck.that(luoziBarStateOf(lz, ok.allowsLuozi, 0, BOX_SLOT_NONE, -1, 1) == LUOZI_BAR_READY,
+        "已落旁边那格照样朱态")
+    /* 落字条状态机与 game_rules 的 canLuozi 一致（朱态 ⟺ 落得下去） */
+    ck.that(luoziBarEnabled(luoziBarStateOf(m, ok.allowsLuozi, 0, BOX_SLOT_NONE, -1, 0)) ==
+        canLuozi(s, ok, 0), "朱态 ⟺ canLuozi（选中第 1 格）")
+    ck.that(luoziBarEnabled(luoziBarStateOf(m, ok.allowsLuozi, BOX_SLOT_NONE, BOX_SLOT_NONE, -1, 0)) ==
+        canLuozi(s, ok, BOX_SLOT_NONE), "灰态 ⟺ 落不下去（没选中）")
+    ck.that(luoziBarEnabled(luoziBarStateOf(m, no.allowsLuozi, 0, BOX_SLOT_NONE, -1, 0)) ==
+        canLuozi(s, no, 0), "灰态 ⟺ 落不下去（卡不允许）")
+    /* 三种状态码互不重复 */
+    ck.that(LUOZI_BAR_NEED != LUOZI_BAR_READY && LUOZI_BAR_READY != LUOZI_BAR_ARMED &&
+        LUOZI_BAR_NEED != LUOZI_BAR_ARMED, "状态码 0/1/2 互不重复")
+    ck.done("luozi-bar")
+    return ck.failures.size
+}
+
 main(): Int64 {
     println("造字人 box check — 纯逻辑（无 kit/ohos 依赖）")
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
         tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape() + boxRulesShape() +
-        settleShape()
+        settleShape() + landedMaskShape() + homeMirrorShape() + dragShape() + luoziBarShape()
     println("")
     if (bad != 0) {
         println("HARNESS RESULT: FAIL (${bad} broken assertions)")

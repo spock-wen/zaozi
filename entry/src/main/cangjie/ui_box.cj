@@ -18,7 +18,10 @@ import std.collection.ArrayList
      事签     骨片形（不等圆角）+ carve 字；本 slice 是 stub，见 game_rules 的
               BOX_SHIQIAN_ID
      空       1 虚线 night-line + 「＋」（只在本代带的字不足 3 个时出现）
-   同样拆成小 @Component（@Component 宏展开撑不住大 build()）。 */
+   同样拆成小 @Component（@Component 宏展开撑不住大 build()）。
+   R1（e4c8def 烟测 FAIL）之后字匣不收数组：三格各收一个原始 String（字 id），
+   加一个 boxCount（有几格有字）和一个 landedMask（哪些格本代已落，位掩码），
+   格子状态在 HomeBoxSlot 里按 home_mirror.cj 的纯逻辑现算。 */
 
 /* 选中外发光：比格子大 3px 的一圈 zhu-600 25%（设计稿 0 0 0 3px rgba(181,67,46,.25)）。
    ArkUI 这一版的 shadow 在本仓库没有先用例，先用垫一层同色圆角块的办法。 */
@@ -33,33 +36,61 @@ public class BoxSlotGlow {
     }
 }
 
-/* 字匣一格。state / glyph / onTap 都由父组件按原始字段算好递进来
-   （函数调用当 @Prop 传进来不参与重绘跟踪）。 */
+/* 字匣一格。传进来的全是原始值（R1：函数调用结果 / 数组不当 @Prop 传），
+   格子状态与字形都在本组件自己的成员函数里按原始值现算。 */
 @Component
 public class HomeBoxSlot {
-    @Prop var state: Int64
-    @Prop var glyph: String
+    /* 这一格是第几格（0..2）。 */
+    @Prop var slot: Int64
+    /* 字匣三格的字 id + 有几格有字 + 哪些格本代已落（位掩码）。 */
+    @Prop var box0: String
+    @Prop var box1: String
+    @Prop var box2: String
+    @Prop var boxCount: Int64
+    @Prop var landedMask: Int64
+    /* 界面选中态（-1 = 没有选中）。 */
+    @Prop var selectedSlot: Int64
     @Prop var onTap: () -> Unit
 
+    /* 原始值 → HomeMirror（纯逻辑在 home_mirror.cj，box_check 有断言）。 */
+    func mirror(): HomeMirror {
+        let m = HomeMirror()
+        m.boxCount = this.boxCount
+        m.box0 = this.box0
+        m.box1 = this.box1
+        m.box2 = this.box2
+        m.landedMask = this.landedMask
+        return m
+    }
+
+    func state(): Int64 {
+        return homeBoxSlotState(this.mirror(), this.selectedSlot, this.slot)
+    }
+
+    /* 格内的字形（事签 / 空格 → 空串，由状态那一支摆）。 */
+    func glyph(): String {
+        return ziluGlyphOf(homeMirrorBoxId(this.mirror(), this.slot))
+    }
+
     func isOk(): Bool {
-        return this.state == BOX_SLOT_OK
+        return this.state() == BOX_SLOT_OK
     }
 
     func isSelected(): Bool {
-        return this.state == BOX_SLOT_SELECTED
+        return this.state() == BOX_SLOT_SELECTED
     }
 
     func isLanded(): Bool {
-        return this.state == BOX_SLOT_LANDED
+        return this.state() == BOX_SLOT_LANDED
     }
 
     func isShiqian(): Bool {
-        return this.state == BOX_SLOT_SHIQIAN
+        return this.state() == BOX_SLOT_SHIQIAN
     }
 
     /* 空格只在开局挑字不足 3 个字时出现（本代会带几个字是开局定死的）。 */
     func isEmpty(): Bool {
-        return this.state == BOX_SLOT_EMPTY
+        return this.state() == BOX_SLOT_EMPTY
     }
 
     /* 空格 / 事签格点了不开层（事签是 stub，本来也不会出现）。 */
@@ -97,19 +128,19 @@ public class HomeBoxSlot {
     /* 格内的字（事签格写「事签」两个字，空格写「＋」）。 */
     func text(): String {
         if (this.isShiqian()) { return BOX_SLOT_SHIQIAN_TEXT }
-        if (this.glyph.size > 0) { return this.glyph }
+        if (this.glyph().size > 0) { return this.glyph() }
         return BOX_SLOT_EMPTY_MARK
     }
 
     func fontSize(): Int64 {
         if (this.isShiqian()) { return Theme.boxShiqianFs }
-        if (this.glyph.size > 0) { return Theme.boxSlotFs }
+        if (this.glyph().size > 0) { return Theme.boxSlotFs }
         return 20
     }
 
     func fontFamily(): String {
         if (this.isShiqian()) { return Theme.sans }
-        if (this.glyph.size > 0) { return Theme.serif }
+        if (this.glyph().size > 0) { return Theme.serif }
         return Theme.sans
     }
 
@@ -183,26 +214,36 @@ public class HomeBoxSlot {
 }
 
 /* 字匣条：小标题 + 三格（SPEC §2.4 主界字匣条 104 高）。
-   boxChars / boxLanded / selectedSlot 都是原始值，状态在成员函数里现算。 */
+   box0..box2 / boxCount / landedMask / selectedSlot 都是原始值（R1：数组与
+   函数调用结果不当 @Prop 传），格子状态由 HomeBoxSlot 自己按原始值现算。 */
 @Component
 public class HomeBoxBar {
-    @Prop var boxChars: Array<String>
-    @Prop var boxLanded: Array<Bool>
+    /* 字匣三格的字 id（boxChars 存的是 id，字形在格子里换）。 */
+    @Prop var box0: String
+    @Prop var box1: String
+    @Prop var box2: String
+    /* 有几格有字（开局不足 3 个字时后面是空格）。 */
+    @Prop var boxCount: Int64
+    /* 哪些格本代已落（位掩码，第 i 位 = 第 i 格）。 */
+    @Prop var landedMask: Int64
     /* 界面选中态：-1 = 没有选中（game_rules 的 BOX_SLOT_NONE）。 */
     @Prop var selectedSlot: Int64
     /* 点某一格：EntryView 决定选中谁、开不开详情弹层。 */
     @Prop var onSelect: (Int64) -> Unit
 
-    func stateAt(i: Int64): Int64 {
-        return boxSlotStateOf(this.boxChars, this.boxLanded, this.selectedSlot, i)
+    /* 原始值 → HomeMirror（算格子状态 / key 用；纯逻辑在 home_mirror.cj）。 */
+    func mirror(): HomeMirror {
+        let m = HomeMirror()
+        m.boxCount = this.boxCount
+        m.box0 = this.box0
+        m.box1 = this.box1
+        m.box2 = this.box2
+        m.landedMask = this.landedMask
+        return m
     }
 
-    /* 格子里显示的字。boxChars 存的是字id（"shui"），字形走 ziluGlyphOf 换，
-       事签占位 id 换不出来 → 空格子那一支由 HomeBoxSlot 按状态摆。 */
-    func glyphAt(i: Int64): String {
-        if (i < 0 || i >= this.boxChars.size) { return "" }
-        if (boxSlotIsShiqianId(this.boxChars[i])) { return "" }
-        return ziluGlyphOf(this.boxChars[i])
+    func stateAt(i: Int64): Int64 {
+        return homeBoxSlotState(this.mirror(), this.selectedSlot, i)
     }
 
     /* 三格的下标（0/1/2）。ArrayList 是为了跟仓库里其它 ForEach 调用一致。 */
@@ -242,8 +283,13 @@ public class HomeBoxBar {
                 Row(space: Theme.boxSlotGap) {
                     ForEach(this.slotIndexes(), itemGeneratorFunc: {i: Int64, at: Int64 =>
                         HomeBoxSlot(
-                            state: this.stateAt(i),
-                            glyph: this.glyphAt(i),
+                            slot: i,
+                            box0: this.box0,
+                            box1: this.box1,
+                            box2: this.box2,
+                            boxCount: this.boxCount,
+                            landedMask: this.landedMask,
+                            selectedSlot: this.selectedSlot,
                             onTap: { => this.onSelect(i) }
                         )
                     }, keyGeneratorFunc: {i: Int64, at: Int64 =>

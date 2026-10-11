@@ -10,7 +10,53 @@ import ohos.arkui.state_macro_manage.*
    冷启：aboutToAppear 里读档（run_store.cj → Preferences）——新装 / 坏档都是
    开局挑字页；挑字落定即存档，杀掉再进直接回主界。phase 2 / 3 的存档
    （结局卡 / 代末结算）杀掉再进也回到原页，不丢进度。
-   版式数值全部来自 /workspace/zaozi-formal/v2/SPEC.md，见 theme.cj。 */
+   版式数值全部来自 /workspace/zaozi-formal/v2/SPEC.md，见 theme.cj。
+
+   R1（e4c8def 烟测 FAIL：选卡后主界一点都不重绘）之后多了一组「原始值镜子」
+   （mGen / mYear / ... / mLanded / mRev）：ArkUI-Cangjie 这一版的 @Prop 只认
+   原始值变化，class 类型 @State 的字段（this.run.year）与函数调用结果当 @Prop
+   传都不参与重绘跟踪。所有改状态的地方统一走 commitRun()：换引用 + 刷新镜子
+   + 存档，漏一处就有一块界面停在旧值。镜子形状与映射在 home_mirror.cj（纯逻辑，
+   box_check 有断言）。 */
+
+/* 二级界面那一层：字录 / 演变条 / 造字卡（从 EntryView 的 build 里拆出来，
+   @Component 宏展开撑不住大 build()）。props 全是原始值 / 闭包。 */
+@Component
+public class EntrySubScreen {
+    /* 0 无 / 1 字录 / 2 演变条 / 3 造字卡（进来之前 EntryView 已经判过非 0）。 */
+    @Prop var sub: Int64
+    /* 字录当前选中的字；造字卡这一局看成没成过。 */
+    @Prop var ziluSelected: String
+    @Prop var cardDone: Bool
+    @Prop var onZiluSelect: (String) -> Unit
+    @Prop var onZiluGoCard: () -> Unit
+    @Prop var onZiluBack: () -> Unit
+    @Prop var onCardDone: () -> Unit
+    @Prop var onCardGoZilu: () -> Unit
+
+    func build() {
+        /* 外层 Column 不带尺寸修饰：跟拆出去之前那一层一模一样（各二级界面
+           自己写 100%，父层只负责竖排）。 */
+        Column {
+            if (this.sub == 1) {
+                ZiluScreen(
+                    selectedId: this.ziluSelected,
+                    onSelect: {id => this.onZiluSelect(id)},
+                    onGoCard: { => this.onZiluGoCard() },
+                    onBack: { => this.onZiluBack() }
+                )
+            } else if (this.sub == 2) {
+                EvoStripScreen()
+            } else {
+                CardScreen(
+                    cardDone: this.cardDone,
+                    onDone: { => this.onCardDone() },
+                    onGoZilu: { => this.onCardGoZilu() }
+                )
+            }
+        }
+    }
+}
 
 @Entry
 @Component
@@ -42,20 +88,75 @@ class EntryView {
     /* 「看家谱」按钮的提示（家谱独立页不在本切片）：非空时页面底部露一行小字。 */
     @State var stubText: String = ""
 
+    /* —— 存档状态的「原始值镜子」（R1 烟测的修复核心）——
+       ArkUI-Cangjie 这一版的 @Prop 只认原始值变化：class 类型 @State 的字段
+       （this.run.year / this.run.dims / this.run.boxChars）递给子组件不参与重绘
+       跟踪，函数调用结果当 @Prop 传也一样 —— e4c8def 上「选卡后主界一点都不重绘」
+       就是这个原因（存档写了、EntryView 自己的 if/else 也切了，子组件不刷新）。
+       所以这里把 HomeScreen 要显示的每个值都摊成一个原始 @State，commitRun()
+       里跟 this.run 一起换。形状与映射见 home_mirror.cj（纯逻辑，box_check 有断言）。 */
+    @State var mGen: Int64 = 1
+    @State var mYear: Int64 = 1
+    @State var mYearsLeft: Int64 = RUN_YEARS_START
+    @State var mDim0: Int64 = RUN_DIM_START
+    @State var mDim1: Int64 = RUN_DIM_START
+    @State var mDim2: Int64 = RUN_DIM_START
+    @State var mDim3: Int64 = RUN_DIM_START
+    @State var mBoneEmpty: Int64 = RUN_BONE_EMPTY_START
+    @State var mBoneShiqian: Int64 = 0
+    @State var mCardIndex: Int64 = 0
+    /* 字匣三格的字 id + 有几格有字 + 哪些格本代已落（位掩码）。 */
+    @State var mBox0: String = ""
+    @State var mBox1: String = ""
+    @State var mBox2: String = ""
+    @State var mBoxCount: Int64 = 0
+    @State var mLanded: Int64 = 0
+    /* 提交过一次存档就 +1：兜底让主界重绘（原始值没变但状态确实换了的情况）。 */
+    @State var mRev: Int64 = 0
+
     /* 冷启读档。新装 / 存档坏 → 新开局（phase 0 挑字页）。
        读档回来就是 phase 2 / 3（结局卡 / 代末结算）时不再闪朱、直接出卡。 */
     public func aboutToAppear(): Unit {
         this.run = RunStore.load()
+        this.syncMirrors(this.run)
         this.endingShown = this.run.phase != RUN_PHASE_HOME
+    }
+
+    /* 唯一的存档提交口：换引用 + 刷新原始值镜子 + 存档。
+       所有改状态的地方（挑字落定 / 选卡 / 落字 / 调试 / 往下传）都走这里，
+       不直接 this.run = ... —— 漏了哪一处，主界就有一块停在旧值（R1）。 */
+    func commitRun(next: RunState): Unit {
+        this.run = next
+        this.syncMirrors(next)
+        this.mRev = this.mRev + 1
+        RunStore.save(next)
+    }
+
+    /* RunState → 那组原始 @State（纯映射在 home_mirror.cj）。 */
+    func syncMirrors(s: RunState): Unit {
+        let m = homeMirrorOf(s)
+        this.mGen = m.generation
+        this.mYear = m.year
+        this.mYearsLeft = m.yearsLeft
+        this.mDim0 = m.dim0
+        this.mDim1 = m.dim1
+        this.mDim2 = m.dim2
+        this.mDim3 = m.dim3
+        this.mBoneEmpty = m.boneEmpty
+        this.mBoneShiqian = m.boneShiqian
+        this.mCardIndex = m.cardIndex
+        this.mBoxCount = m.boxCount
+        this.mBox0 = m.box0
+        this.mBox1 = m.box1
+        this.mBox2 = m.box2
+        this.mLanded = m.landedMask
     }
 
     /* 挑字落定：挑的字进字匣、phase 进主界，随即存档（杀掉再进回主界）。
        复制一份新状态赋回 @State —— class 类型的 @State 认的是引用变化，
        只改内部字段不保证触发重绘。 */
     func confirmPick(picked: Array<String>): Unit {
-        let next = runAfterPick(this.run, picked)
-        this.run = next
-        RunStore.save(next)
+        this.commitRun(runAfterPick(this.run, picked))
         this.stubText = ""
         this.flashOn = false
         this.flashDim = -1
@@ -100,15 +201,13 @@ class EntryView {
             let next = applyLuozi(this.run, this.selectedSlot)
             /* 没落下（卡不允许 / 没选中可落的格）：状态、选中都别动。 */
             if (next.cardsSeen == this.run.cardsSeen) { return }
-            this.run = next
-            RunStore.save(next)
+            this.commitRun(next)
             this.selectedSlot = BOX_SLOT_NONE
             if (next.phase == RUN_PHASE_ENDING) { this.startFlash(next.endingDim) }
             return
         }
         let next = applyChoice(this.run, side)
-        this.run = next
-        RunStore.save(next)
+        this.commitRun(next)
         /* 选完这一张，字匣的选中跟着清掉（下一张重新挑）。 */
         this.selectedSlot = BOX_SLOT_NONE
         /* 落到结局：那一维的条先闪朱两下，然后主界压暗、结局卡升起。 */
@@ -120,8 +219,7 @@ class EntryView {
     func debugZero(): Unit {
         let next = debugForceDimZero(this.run, 0)
         if (next.sameAs(this.run)) { return }
-        this.run = next
-        RunStore.save(next)
+        this.commitRun(next)
         this.selectedSlot = BOX_SLOT_NONE
         this.startFlash(next.endingDim)
     }
@@ -172,8 +270,7 @@ class EntryView {
         this.flashDim = -1
         this.endingShown = true
         this.selectedSlot = BOX_SLOT_NONE
-        this.run = next
-        RunStore.save(next)
+        this.commitRun(next)
         this.stubText = ""
     }
 
@@ -260,20 +357,17 @@ class EntryView {
     func build() {
         Stack {
             Column {
-            if (this.sub == 1) {
-                ZiluScreen(
-                    selectedId: this.ziluSelected,
-                    onSelect: {id => this.ziluSelected = id},
-                    onGoCard: { => this.replayCard() },
-                    onBack: { => this.sub = 0 }
-                )
-            } else if (this.sub == 2) {
-                EvoStripScreen()
-            } else if (this.sub == 3) {
-                CardScreen(
+            if (this.sub == 1 || this.sub == 2 || this.sub == 3) {
+                /* 二级界面：字录 / 演变条 / 造字卡（拆一层，build 才撑得住）。 */
+                EntrySubScreen(
+                    sub: this.sub,
+                    ziluSelected: this.ziluSelected,
                     cardDone: this.cardDone,
-                    onDone: { => this.cardDone = true },
-                    onGoZilu: { => this.goZilu() }
+                    onZiluSelect: {id => this.ziluSelected = id},
+                    onZiluGoCard: { => this.replayCard() },
+                    onZiluBack: { => this.sub = 0 },
+                    onCardDone: { => this.cardDone = true },
+                    onCardGoZilu: { => this.goZilu() }
                 )
             } else if (this.run.phase == RUN_PHASE_PICK) {
                 PickScreen(
@@ -292,19 +386,28 @@ class EntryView {
                     onNext: { => this.settleNext() }
                 )
             } else {
+                /* 只递原始值（R1：class 字段 / 函数调用结果 / 数组都不当 @Prop 传），
+                   牌面文案与落字条状态由下游各层按 cardIndex / 字匣原始值现算。 */
                 HomeScreen(
-                    generation: this.run.generation,
-                    year: this.run.year,
-                    yearsLeft: this.run.yearsLeft,
-                    dims: this.run.dims,
-                    boneEmpty: this.run.boneEmpty,
-                    boneShiqian: this.run.boneShiqian,
-                    boxChars: this.run.boxChars,
-                    boxLanded: this.run.boxLanded,
+                    generation: this.mGen,
+                    year: this.mYear,
+                    yearsLeft: this.mYearsLeft,
+                    dim0: this.mDim0,
+                    dim1: this.mDim1,
+                    dim2: this.mDim2,
+                    dim3: this.mDim3,
+                    boneEmpty: this.mBoneEmpty,
+                    boneShiqian: this.mBoneShiqian,
+                    cardIndex: this.mCardIndex,
+                    box0: this.mBox0,
+                    box1: this.mBox1,
+                    box2: this.mBox2,
+                    boxCount: this.mBoxCount,
+                    landedMask: this.mLanded,
                     selectedSlot: this.selectedSlot,
-                    cardIndex: this.run.cardIndex,
                     flashDim: this.flashDim,
                     flashOn: this.flashOn,
+                    rev: this.mRev,
                     onPick: {side => this.pick(side)},
                     onSelectSlot: {i => this.selectBoxSlot(i)},
                     onOpenZilu: { => this.openSub(1) },

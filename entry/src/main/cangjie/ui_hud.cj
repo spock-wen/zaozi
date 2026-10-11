@@ -9,21 +9,38 @@ import std.collection.ArrayList
      HomeHud     四列等分、列间距 8、左右边距 16
    整条一色（hud-fill = on-night），没有每维一色（SPEC §4 待确认 3）；
    两端各 15% 是淡朱危险区，数值掉进去时填充和维名转朱（hud-warn）。
-   数值 10fp 二级色、等宽数字；归零 / 满那一下由结局卡那一侧处理（slice 4）。 */
+   数值 10fp 二级色、等宽数字；归零 / 满那一下由结局卡那一侧处理（slice 4）。
+   R1（e4c8def 烟测 FAIL）之后四维逐维一个原始 @Prop（dim0..dim3）：
+   数组 @Prop 没验过，玩起来会变的值不走数组。 */
 
-/* 一列。dims / at / flash 都是原始值（函数调用当 @Prop 传进来不参与重绘跟踪），
-   取值、颜色、份数全在成员函数里算。
+/* 一列。dim0..dim3 / at / flash 都是原始值（函数调用当 @Prop 传进来不参与重绘
+   跟踪，R1 烟测的根因之一），取值、颜色、份数全在成员函数里算。
    flash = 触底 / 溢出那一下的「闪朱」（SPEC §2.1 归零/满 闪朱 2 次）：闪的时候
    维名与数值反转成朱底白字，两下各 ~200ms，由 EntryView 用 animateTo 推进。 */
 @Component
 public class HomeHudDim {
-    @Prop var dims: Array<Int64>
+    /* 四维逐个传（数组 @Prop 没验过，R1 之后玩起来会变的值一律走原始值）。 */
+    @Prop var dim0: Int64
+    @Prop var dim1: Int64
+    @Prop var dim2: Int64
+    @Prop var dim3: Int64
+    /* 这一列画第几维（0..3）。 */
     @Prop var at: Int64
-    @Prop var flash: Bool
+    /* 正在闪朱的那一维（-1 = 没有）+ 这一下亮不亮。 */
+    @Prop var flashDim: Int64
+    @Prop var flashOn: Bool
 
     func value(): Int64 {
-        if (this.at < 0 || this.at >= this.dims.size) { return 0 }
-        return this.dims[this.at]
+        if (this.at == 0) { return this.dim0 }
+        if (this.at == 1) { return this.dim1 }
+        if (this.at == 2) { return this.dim2 }
+        if (this.at == 3) { return this.dim3 }
+        return 0
+    }
+
+    /* 这一维正在闪朱没有（闪的时候维名与数值反转成朱底白字）。 */
+    func flash(): Bool {
+        return this.flashOn && this.flashDim == this.at
     }
 
     func name(): String {
@@ -35,25 +52,25 @@ public class HomeHudDim {
     }
 
     func nameColor(): Int64 {
-        if (this.flash) { return Theme.white }
+        if (this.flash()) { return Theme.white }
         if (this.inDanger()) { return Theme.hudWarnName }
         return Theme.onNight
     }
 
     func fillColor(): Int64 {
-        if (this.flash) { return Theme.zhu600 }
+        if (this.flash()) { return Theme.zhu600 }
         if (this.inDanger()) { return Theme.zhu600 }
         return Theme.onNight
     }
 
     /* 闪朱时维名与数值那一行反转成朱底白字（SPEC §2.1 归零/满 闪朱）。 */
     func topBg(): Int64 {
-        if (this.flash) { return Theme.zhu600 }
+        if (this.flash()) { return Theme.zhu600 }
         return Theme.night900
     }
 
     func valueColor(): Int64 {
-        if (this.flash) { return Theme.white }
+        if (this.flash()) { return Theme.white }
         return Theme.onNight2
     }
 
@@ -129,10 +146,14 @@ public class HomeHudDim {
 }
 
 /* 四列等分：列间距 8，左右边距 16（SPEC §2.1）。
-   flashDim = 正在闪朱的那一维（-1 = 没有），flashOn = 这一下亮不亮。 */
+   flashDim = 正在闪朱的那一维（-1 = 没有），flashOn = 这一下亮不亮。
+   dim0..dim3 是原始值（R1：dims 数组不当 @Prop 传，逐维一个 Int64）。 */
 @Component
 public class HomeHud {
-    @Prop var dims: Array<Int64>
+    @Prop var dim0: Int64
+    @Prop var dim1: Int64
+    @Prop var dim2: Int64
+    @Prop var dim3: Int64
     @Prop var flashDim: Int64
     @Prop var flashOn: Bool
 
@@ -146,14 +167,18 @@ public class HomeHud {
         return out
     }
 
-    func flashAt(i: Int64): Bool {
-        return this.flashOn && this.flashDim == i
-    }
-
     func build() {
         Row(space: 8) {
             ForEach(this.indexes(), itemGeneratorFunc: {i: Int64, at: Int64 =>
-                HomeHudDim(dims: this.dims, at: i, flash: this.flashAt(i))
+                HomeHudDim(
+                    dim0: this.dim0,
+                    dim1: this.dim1,
+                    dim2: this.dim2,
+                    dim3: this.dim3,
+                    at: i,
+                    flashDim: this.flashDim,
+                    flashOn: this.flashOn
+                )
             })
         }
         .width(100.percent)
