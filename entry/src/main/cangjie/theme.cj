@@ -67,13 +67,26 @@ public class Theme {
     public static let bonePipW: Int64 = 16
     public static let bonePipH: Int64 = 20
     public static let bonePipGap: Int64 = 6
-    /* 事件卡 296×384、圆角 16；立绘区 184；卡文 Serif 16 / 行高 26、内边距 18。 */
+    /* 事件卡 296×384、圆角 16；立绘区 184；卡文 Serif 16 / 行高 26、内边距 18。
+       卡高改成跟可用高度走（lay_b0.json：主界事件卡那一块只有 ~357vp，
+       写死 384 会把卡片和垫底那张一起压到下方「先种粟 / 先献祭」按钮上）。
+       cardUnderDrop 是「下一张」露在下面那一条的高度；cardMinH 是卡面内容
+       的实占高度（立绘区 + 卡文 3 行 + 内边距 + 落字条 + 卡底边距），
+       可用高度不够时按 home_mirror.cj 的 cardFitsLuozi 判，box_check 有断言。 */
     public static let cardW: Int64 = 296
     public static let cardH: Int64 = 384
     public static let cardArtH: Int64 = 184
     public static let cardBodyFs: Int64 = 16
     public static let cardBodyLh: Int64 = 26
     public static let cardBodyPad: Int64 = 18
+    /* 事件卡「下一张」露在下面那一条：8vp（原来 margin(top: 8) 的同一个值）。 */
+    public static let cardUnderDrop: Int64 = 8
+    /* 卡面内容实占高度：立绘区 184 + 卡文内边距 18 + 卡文 3 行（26×3 = 78）
+       + 落字条 48 + 落字条下边距 12 = 340。384 的卡高装得下，窄一档的
+       主界（357 − 8 = 349）也装得下。 */
+    public static let cardMinH: Int64 = 340
+    /* 点选退路（「先种粟 / 先献祭」）上边距：12vp（原来写死在 HomeOptBtns 里）。 */
+    public static let homeOptGapTop: Int64 = 12
     /* 事件卡人物胶囊 24 高 / 季节序号 11（SPEC §2.3）。 */
     public static let whoCapsuleH: Int64 = 24
     public static let whoFs: Int64 = 12

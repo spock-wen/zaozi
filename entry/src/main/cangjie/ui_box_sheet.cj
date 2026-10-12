@@ -234,10 +234,14 @@ public class BoxSheet {
                 .padding(left: 20, right: 20, top: 10, bottom: 20)
                 .backgroundColor(Theme.paper50)
                 .borderRadius(topLeft: Theme.sheetRadius, topRight: Theme.sheetRadius)
+                /* 同 R-P3-2c：弹层本体吞掉点击（空 onClick），点弹层内容不关。 */
+                .onClick({event => })
             }
             .width(100.percent)
             .height(100.percent)
             .justifyContent(FlexAlign.End)
+            /* 同 R-P3-2c：满高 Column 盖住遮罩 → 关层挂在这层上。 */
+            .onClick({event => this.onClose()})
         }
         .width(100.percent)
         .height(100.percent)

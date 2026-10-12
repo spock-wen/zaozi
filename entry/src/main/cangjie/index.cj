@@ -85,8 +85,9 @@ class EntryView {
     @State var endingShown: Bool = false
     /* 闪朱动画代次：换局 / 退出结局时 +1，让还挂着的 onFinish 直接失效。 */
     @State var flashGen: Int64 = 0
-    /* 「看家谱」按钮的提示（家谱独立页不在本切片）：非空时页面底部露一行小字。 */
-    @State var stubText: String = ""
+    /* 家谱面板开着没有（结局卡 / 代末结算页的「看家谱」；ui_genealogy.cj）。
+       盖在最上层，所以 onBackPress 要先关它。 */
+    @State var genealogyOpen: Bool = false
 
     /* —— 存档状态的「原始值镜子」（R1 烟测的修复核心）——
        ArkUI-Cangjie 这一版的 @Prop 只认原始值变化：class 类型 @State 的字段
@@ -154,10 +155,12 @@ class EntryView {
 
     /* 挑字落定：挑的字进字匣、phase 进主界，随即存档（杀掉再进回主界）。
        复制一份新状态赋回 @State —— class 类型的 @State 认的是引用变化，
-       只改内部字段不保证触发重绘。 */
+       只改内部字段不保证触发重绘。
+       走 runAfterPickGen：第 2 代起上一代真传下事签时，字匣第 0 格是事签
+       （本里程碑不传事签，所以现在就是普通的 runAfterPick）。 */
     func confirmPick(picked: Array<String>): Unit {
-        this.commitRun(runAfterPick(this.run, picked))
-        this.stubText = ""
+        this.commitRun(runAfterPickGen(this.run, picked))
+        this.genealogyOpen = false
         this.flashOn = false
         this.flashDim = -1
         this.endingShown = false
@@ -270,13 +273,18 @@ class EntryView {
         this.flashDim = -1
         this.endingShown = true
         this.selectedSlot = BOX_SLOT_NONE
+        this.genealogyOpen = false
         this.commitRun(next)
-        this.stubText = ""
     }
 
-    /* 「看家谱」：家谱独立页（设计稿 G）不在本切片，点了只落一句提示。 */
-    func genealogyStub(): Unit {
-        this.stubText = SETTLE_GENEALOGY_STUB
+    /* 「看家谱」：弹家谱面板（ui_genealogy.cj）。完整家谱页（进度卡、
+       主线段数）下一版做，面板里那行小字说明这件事。 */
+    func openGenealogy(): Unit {
+        this.genealogyOpen = true
+    }
+
+    func closeGenealogy(): Unit {
+        this.genealogyOpen = false
     }
 
     func openSub(i: Int64): Unit {
@@ -321,9 +329,13 @@ class EntryView {
         this.sub = 3
     }
 
-    /* 系统 Back：先关字匣详情弹层，再关二级界面；结局卡 / 代末结算页上
-       一律拦下来返回 true（一代没传完，不能直接退回桌面）。 */
+    /* 系统 Back：先关家谱面板，再关字匣详情弹层，再关二级界面；结局卡 /
+       代末结算页上一律拦下来返回 true（一代没传完，不能直接退回桌面）。 */
     protected override func onBackPress(): Bool {
+        if (this.genealogyOpen) {
+            this.closeGenealogy()
+            return true
+        }
         if (this.boxSheetOpen) {
             this.closeBoxSheet()
             return true
@@ -372,6 +384,7 @@ class EntryView {
             } else if (this.run.phase == RUN_PHASE_PICK) {
                 PickScreen(
                     generation: this.run.generation,
+                    carried: pickShiqianCarried(this.run),
                     onConfirm: {picked => this.confirmPick(picked)}
                 )
             } else if (this.run.phase == RUN_PHASE_SETTLE) {
@@ -382,7 +395,7 @@ class EntryView {
                     good: this.endingGood(),
                     rows: this.genealogyRows(),
                     keepChars: this.keepGlyphs(),
-                    onGenealogy: { => this.genealogyStub() },
+                    onGenealogy: { => this.openGenealogy() },
                     onNext: { => this.settleNext() }
                 )
             } else {
@@ -441,14 +454,20 @@ class EntryView {
                     kind: this.run.endingKind,
                     good: this.endingGood(),
                     chars: this.keepGlyphs(),
-                    onGenealogy: { => this.genealogyStub() },
+                    onGenealogy: { => this.openGenealogy() },
                     onNext: { => this.settleNext() }
                 )
             }
 
-            /* 「看家谱」的提示（家谱独立页不在本切片）：非空时页面底部露一行小字。 */
-            if (this.stubText.size > 0) {
-                StubHint(text: this.stubText, onClose: { => this.stubText = "" })
+            /* 家谱面板：盖在最上层（结局卡 phase 2 / 代末结算页 phase 3 上都能开）。
+               在 if 里新建 → rows 这个数组只在组件新建时用一次，可以当 @Prop 传
+               （同 SettleScreen 的 rows）。点遮罩 / 「回去」/ 系统 Back 都能关。 */
+            if (this.genealogyOpen) {
+                GenealogyPanel(
+                    rows: this.genealogyRows(),
+                    thisGen: this.run.generation,
+                    onClose: { => this.closeGenealogy() }
+                )
             }
         }
         .width(100.percent)

@@ -206,8 +206,9 @@ public class EndingChars {
     }
 }
 
-/* 卡底两个按钮：「看家谱」描边（on-night 字 + on-night-2 描边，卡是压暗的主界上
-   浮起来的）、「往下传」朱底白字 → 代末结算（SPEC §2.7）。 */
+/* 卡底两个按钮：「看家谱」纸面描边（ink-900 字 + 1 描边，卡是 paper-50，
+   以前用 on-night 白字画在纸面上，看着灰、像没法点；现在跟代末页 SettleBtns
+   左边那颗一个画法）、「往下传」朱底白字 → 代末结算（SPEC §2.7）。 */
 @Component
 public class EndingBtns {
     @Prop var onGenealogy: () -> Unit
@@ -219,10 +220,10 @@ public class EndingBtns {
                 .fontSize(Theme.fsButton)
                 .fontFamily(Theme.sans)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(Theme.onNight)
+                .fontColor(Theme.ink900)
                 .height(Theme.buttonH)
                 .borderRadius(22)
-                .border(width: 1, color: Theme.onNight2)
+                .border(width: 1, color: Theme.ink600)
                 .layoutWeight(1)
                 .textAlign(TextAlign.Center)
                 .onClick({event => this.onGenealogy()})

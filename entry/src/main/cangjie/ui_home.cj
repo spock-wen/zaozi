@@ -162,7 +162,7 @@ public class HomeOptBtns {
                 .onClick({event => this.onPick(RUN_SIDE_RIGHT)})
         }
         .width(100.percent)
-        .margin(top: 12)
+        .margin(top: Theme.homeOptGapTop)
         .padding(left: Theme.insetNight, right: Theme.insetNight)
     }
 }
@@ -250,7 +250,9 @@ public class HomeCardTip {
    单独拆一层是为了让 HomeScreen 的 build() 保持小块（@Component 宏展开
    撑不住大 build()）。
    R1/R3 之后这里只做「原始值转发」：牌面按 cardIndex 在 EventCardView 里现算，
-   落字条按字匣原始值在 CardLuoziBar 里现算 —— 中间层不算文案、不算状态。 */
+   落字条按字匣原始值在 CardLuoziBar 里现算 —— 中间层不算文案、不算状态。
+   根 Column 要 .height(100.percent)：卡片现在跟这一块的可用高度走
+   （lay_b0.json：只有 ~357vp，写死 Theme.cardH 会溢出到选项按钮上）。 */
 @Component
 public class HomeCardStage {
     @Prop var cardIndex: Int64
@@ -286,6 +288,7 @@ public class HomeCardStage {
             )
         }
         .width(100.percent)
+        .height(100.percent)
     }
 }
 

@@ -193,7 +193,7 @@ PY
 
 ```bash
 source /home/box/.cangjie-sdk/6.1/cangjie/envsetup.sh
-cd tools/box_check && ./sync.sh && cjpm build && cjpm run   # 2850 条断言
+cd tools/box_check && ./sync.sh && cjpm build && cjpm run   # 2931 条断言
 bash tools/box_check/parse_check.sh                        # 逐文件 parser + 整包类型检查
 ```
 
