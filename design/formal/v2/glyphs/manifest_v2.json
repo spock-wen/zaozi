@@ -1,0 +1,66 @@
+[
+ {
+  "file": "glyphs/mu_oracle.svg",
+  "display": "glyphs/norm/mu_oracle.svg",
+  "from": "/workspace/next-game-principles/glyph/img/norm/mu_oracle.svg",
+  "sha1_copy": "031aa81e58b202b70e35c97ca656838baae5d066",
+  "sha1_display": "19c81e95657684885daa7a796177017f5f491c23",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/mu_seal.svg",
+  "display": "glyphs/norm/mu_seal.svg",
+  "from": "/workspace/next-game-principles/glyph/img/norm/mu_seal.svg",
+  "sha1_copy": "41af26a2168a1b72d63591ba4bfa438ab918547a",
+  "sha1_display": "56fe8fc6acef1dcce3bfec8a96005380386ca7ed",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/ren_oracle.svg",
+  "display": "glyphs/norm/ren_oracle.svg",
+  "from": "/workspace/next-game-principles/glyph/img/norm/ren_oracle.svg",
+  "sha1_copy": "eafb3ab011127ab74e58a0008bc67740e03167a4",
+  "sha1_display": "3b9fe1d1f1fcddba10b08ebf64b72c2967ea3c01",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/ren_seal.svg",
+  "display": "glyphs/norm/ren_seal.svg",
+  "from": "/workspace/next-game-principles/glyph/img/norm/ren_seal.svg",
+  "sha1_copy": "c386c121a8b11f2c787585e251f135c444cbee9b",
+  "sha1_display": "b8fe73d932a2ab610bfb604e2a6e78156ab35329",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/ri_oracle.svg",
+  "display": "glyphs/norm/ri_oracle.svg",
+  "from": "/workspace/next-game-principles/glyph/img/norm/ri_oracle.svg",
+  "sha1_copy": "18847b2dd100a925cc217c27b413531cc7ae563e",
+  "sha1_display": "e93d40c156dccae5b2e41c692401eab0d580ebc9",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/ri_seal.svg",
+  "display": "glyphs/norm/ri_seal.svg",
+  "from": "/workspace/next-game-principles/glyph/img/norm/ri_seal.svg",
+  "sha1_copy": "708e652b9f002fbe1414cb3bfa0b9695b01a9f42",
+  "sha1_display": "4d5ef78691fb9aaea56ba5b39d14e5e8676f79cb",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/tian_oracle.svg",
+  "display": "glyphs/norm/tian_oracle.svg",
+  "from": "/workspace/next-game-principles/glyph/img/commons/tian_oracle.svg",
+  "sha1_copy": "bd9d42baeb037590f01c725a6c7b4d6bacbca720",
+  "sha1_display": "20d111d55c021f2f1274e04fd674a434da6f58ec",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ },
+ {
+  "file": "glyphs/tian_seal.svg",
+  "display": "glyphs/norm/tian_seal.svg",
+  "from": "/workspace/next-game-principles/glyph/img/commons/tian_seal.svg",
+  "sha1_copy": "4f2192f3dc82e08a8aa2a39e09d65c094251fbb9",
+  "sha1_display": "9f0ebba0e60736882c7b6e7f94c8548f861a692f",
+  "note": "GLYPH_PACK_V1 收录文件原样复制；显示版只改 SVG 根标签 viewBox/width/height（v1 glyphs/norm.py）"
+ }
+]
