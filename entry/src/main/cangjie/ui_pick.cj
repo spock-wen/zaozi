@@ -9,12 +9,17 @@ import std.collection.ArrayList
    撑不住大 build()，见 ui_zilu.cj 顶上的说明）：
      PickStatLine  顶行「第 N 代 · 开局」+「第 N 代记事人」
      PickBigSlot   三个大格之一（64×64，空 = 虚线；满 = 字 + 朱序号）
+     PickShiqianSlot 第 2 代起第 1 格：上一代传下的事签（骨片形，不可换）
+     PickSlotCol / PickShiqianCol  大格 + 下面一行说明（拆小 build）
      PickBigSlots  大格行（paper-50 卡）
      PickCellView  网格单格（60×60，选中加朱边 + 朱序号 18）
      PickGrid      网格（同字录：60×60、间距 9、一行 5 格）
      PickFootBtn   底部主按钮（灰「还差 N 个字」/ 朱「就带这些开局」）
      PickScreen    组装 + 自己的 @State（picked）
-   挑字规则（挑/收回/上限 3/不足 3 个字）与落定都在 run_state.cj，这里只摆版式。
+   挑字规则（挑/收回/上限 cap/不足 cap 个字）与落定都在 run_state.cj，这里只摆版式。
+   第 2 代起三个大格的第 1 格是「上一代传下的事签」（不可换），玩家只挑 2 个字
+   （pickShiqianReserved / pickCapFor / pickToggleCap / pickButtonTextCap）；
+   刻事签 / 传事签不在本里程碑，所以那一格实际永远显示「上一代没传事签」。
    O1（e4c8def 烟测观察项：挑了字，上方三个大格还是「＋ / 第 n 格」）之后，
    三个大格各收一个原始 String（字 id），格子内部自己换字形、算序号 ——
    原来收 picked 数组当 @Prop 再用不带 key 的 ForEach 摆，数组 @Prop 没验过，
@@ -107,19 +112,125 @@ public class PickBigSlot {
     }
 }
 
+/* 第 2 代起挑字页第 1 格：上一代传下的事签（骨片形，不可换）。
+   设计稿 ziku_pick_v1 D 屏 .big3 .slot.sq：64×64、骨片形圆角 14、carve 字
+   12 Bold 两行（「事签 / 传下」）；上一代没传事签时这一格空着 —— paper-200
+   底、ink-400 字、1 虚线 paper-line（刻事签 / 传事签不在本里程碑，所以实际
+   永远是这个状态）。点了不动：既不能挑、也不能收回。 */
+@Component
+public class PickShiqianSlot {
+    /* 上一代真传下了事签没有（pickShiqianCarried；本里程碑恒 false）。 */
+    @Prop var carried: Bool
+
+    func text(): String {
+        if (this.carried) { return PICK_SHIQIAN_CARRIED }
+        return PICK_SHIQIAN_NONE
+    }
+
+    func bg(): Int64 {
+        if (this.carried) { return Theme.bone200 }
+        return Theme.paper200
+    }
+
+    func fg(): Int64 {
+        if (this.carried) { return Theme.carve }
+        return Theme.ink400
+    }
+
+    /* 没传事签 → 空格那一路的虚线；传下来了 → 骨片实边。 */
+    func borderColor(): Int64 {
+        if (this.carried) { return Theme.boneCrack }
+        return Theme.paperLine
+    }
+
+    func borderStyle(): BorderStyle {
+        if (this.carried) { return BorderStyle.Solid }
+        return BorderStyle.Dashed
+    }
+
+    func build() {
+        Column {
+            Text(this.text())
+                .fontSize(12)
+                .fontFamily(Theme.sans)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.fg())
+                .textAlign(TextAlign.Center)
+        }
+        .width(64)
+        .height(64)
+        .borderRadius(14)
+        .backgroundColor(this.bg())
+        .border(width: 1, color: this.borderColor(), style: this.borderStyle())
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+    }
+}
+
+/* 一个大格 + 下面一行说明（从 PickBigSlots 拆出来，build() 保持小块）。
+   order 是这一格的位置序号（1..3）；格子空着时不画序号。 */
+@Component
+public class PickSlotCol {
+    @Prop var charId: String
+    @Prop var order: Int64
+    @Prop var caption: String
+    @Prop var onTap: () -> Unit
+
+    func build() {
+        Column {
+            PickBigSlot(
+                charId: this.charId,
+                order: if (this.charId.size > 0) { this.order } else { 0 },
+                onTap: { => this.onTap() }
+            )
+            Text(this.caption)
+                .fontSize(Theme.fsStageName)
+                .fontFamily(Theme.sans)
+                .fontColor(Theme.ink600)
+                .textAlign(TextAlign.Center)
+                .margin(top: 6)
+        }
+    }
+}
+
+/* 事签格 + 下面一行说明（第 2 代起第 1 格）。 */
+@Component
+public class PickShiqianCol {
+    @Prop var carried: Bool
+    @Prop var caption: String
+
+    func build() {
+        Column {
+            PickShiqianSlot(carried: this.carried)
+            Text(this.caption)
+                .fontSize(Theme.fsStageName)
+                .fontFamily(Theme.sans)
+                .fontColor(Theme.ink600)
+                .textAlign(TextAlign.Center)
+                .margin(top: 6)
+        }
+    }
+}
+
 /* 三个大格（64×64、间距 12），按挑选顺序从左到右排。
    O1（e4c8def 烟测观察项：挑了字，上方三格还是「＋ / 第 n 格」）：
    原来这里收 picked 数组当 @Prop、再用不带 key 的 ForEach 摆三格 —— 数组
    @Prop 没验过，ForEach 还会按下标复用子组件、不重跑 itemGeneratorFunc，
    于是挑了字格子不翻面（下面网格有 key 带序号，所以网格那侧是好的）。
    现在按 R1 的路子走：三个格子各收一个原始 String（字 id），格子内部自己
-   换字形、算序号；三个格子显式摆出来，不依赖 ForEach 复用。 */
+   换字形、算序号；三个格子显式摆出来，不依赖 ForEach 复用。
+   第 2 代起（reserved）第 1 格是事签（不可换），玩家只挑 2 个字：第 2/3 位
+   摆 slot0/slot1，序号 2/3（事签占了第 1 格，挑的第 1 个字排第 2 格）。 */
 @Component
 public class PickBigSlots {
-    /* 三格的字 id（空串 = 空格）。 */
+    /* 三格的字 id（空串 = 空格）。第 2 代起只用到 slot0/slot1。 */
     @Prop var slot0: String
     @Prop var slot1: String
     @Prop var slot2: String
+    /* 第 1 格留给事签没有（第 2 代起 = true）。 */
+    @Prop var reserved: Bool
+    /* 上一代真传下了事签没有（false → 这一格空着）。 */
+    @Prop var carried: Bool
     @Prop var onRemove: (String) -> Unit
 
     func caption(id: String, at: Int64): String {
@@ -127,43 +238,27 @@ public class PickBigSlots {
         return "点下方的字"
     }
 
+    /* 事签格下面那行说明（设计稿 D 屏 .cap2）。 */
+    func shiqianCaption(): String {
+        if (this.carried) { return PICK_SHIQIAN_CAP_CARRIED }
+        return PICK_SHIQIAN_CAP_NONE
+    }
+
     func build() {
         Row(space: 12) {
-            Column {
-                PickBigSlot(
-                    charId: this.slot0,
-                    order: if (this.slot0.size > 0) { 1 } else { 0 },
-                    onTap: { => this.onRemove(this.slot0) }
-                )
-                Text(this.caption(this.slot0, 0))
-                    .fontSize(Theme.fsStageName)
-                    .fontFamily(Theme.sans)
-                    .fontColor(Theme.ink600)
-                    .margin(top: 6)
-            }
-            Column {
-                PickBigSlot(
-                    charId: this.slot1,
-                    order: if (this.slot1.size > 0) { 2 } else { 0 },
-                    onTap: { => this.onRemove(this.slot1) }
-                )
-                Text(this.caption(this.slot1, 1))
-                    .fontSize(Theme.fsStageName)
-                    .fontFamily(Theme.sans)
-                    .fontColor(Theme.ink600)
-                    .margin(top: 6)
-            }
-            Column {
-                PickBigSlot(
-                    charId: this.slot2,
-                    order: if (this.slot2.size > 0) { 3 } else { 0 },
-                    onTap: { => this.onRemove(this.slot2) }
-                )
-                Text(this.caption(this.slot2, 2))
-                    .fontSize(Theme.fsStageName)
-                    .fontFamily(Theme.sans)
-                    .fontColor(Theme.ink600)
-                    .margin(top: 6)
+            if (this.reserved) {
+                PickShiqianCol(carried: this.carried, caption: this.shiqianCaption())
+                PickSlotCol(charId: this.slot0, order: 2, caption: this.caption(this.slot0, 1),
+                    onTap: { => this.onRemove(this.slot0) })
+                PickSlotCol(charId: this.slot1, order: 3, caption: this.caption(this.slot1, 2),
+                    onTap: { => this.onRemove(this.slot1) })
+            } else {
+                PickSlotCol(charId: this.slot0, order: 1, caption: this.caption(this.slot0, 0),
+                    onTap: { => this.onRemove(this.slot0) })
+                PickSlotCol(charId: this.slot1, order: 2, caption: this.caption(this.slot1, 1),
+                    onTap: { => this.onRemove(this.slot1) })
+                PickSlotCol(charId: this.slot2, order: 3, caption: this.caption(this.slot2, 2),
+                    onTap: { => this.onRemove(this.slot2) })
             }
         }
         .width(100.percent)
@@ -253,6 +348,9 @@ public class PickCellView {
 @Component
 public class PickGrid {
     @Prop var picked: Array<String>
+    /* 序号整体后移几位：第 2 代起事签占了第 1 格，挑的第 1 个字排第 2 格。
+       第 1 代传 0，行为不变。 */
+    @Prop var orderBase: Int64
     @Prop var onToggle: (String) -> Unit
 
     func rows(): ArrayList<UiGridRow> {
@@ -289,11 +387,11 @@ public class PickGrid {
                             glyph: c.glyph,
                             stateCode: ziluStateCode(c),
                             pickable: c.isMade(),
-                            order: pickOrderOf(this.picked, c.charId),
+                            order: pickOrderOfBase(this.picked, c.charId, this.orderBase),
                             onTap: { => this.tap(c) }
                         )
                     }, keyGeneratorFunc: {c: ZiluGridCell, j: Int64 =>
-                        "${c.charId}_${pickOrderOf(this.picked, c.charId)}_${j}"
+                        "${c.charId}_${pickOrderOfBase(this.picked, c.charId, this.orderBase)}_${j}"
                     })
                 }
             }, keyGeneratorFunc: {row: UiGridRow, i: Int64 => "${i}"})
@@ -304,11 +402,13 @@ public class PickGrid {
 }
 
 /* 底部主按钮：没挑满 → paper-200 底、字 ink-400、点不动；
-   挑满（或本来不足 3 个字）→ 朱底白字。
-   文案 / 能不能点都由 picked 在子组件里算（原始数组当 @Prop 传进来）。 */
+   挑满（或本来不足 cap 个字）→ 朱底白字。
+   文案 / 能不能点都由 picked 在子组件里算（原始数组当 @Prop 传进来）。
+   cap = 这一代最多能挑几个（第 1 代 3，第 2 代起事签占 1 格 → 2）。 */
 @Component
 public class PickFootBtn {
     @Prop var picked: Array<String>
+    @Prop var cap: Int64
     @Prop var onTap: () -> Unit
 
     /* 可挑的字 = 已造的字（zilu_model 的 ZILU_MADE_IDS）。 */
@@ -317,11 +417,11 @@ public class PickFootBtn {
     }
 
     func label(): String {
-        return pickButtonText(this.picked, this.available())
+        return pickButtonTextCap(this.picked, this.available(), this.cap)
     }
 
     func enabled(): Bool {
-        return pickCanConfirm(this.picked, this.available())
+        return pickCanConfirmCap(this.picked, this.available(), this.cap)
     }
 
     func build() {
@@ -344,11 +444,14 @@ public class PickFootBtn {
     }
 }
 
-/* 开局挑字页。picked 顺序 = 挑选顺序（大格从左到右、序号 1..3 都按它）。 */
+/* 开局挑字页。picked 顺序 = 挑选顺序（大格从左到右、序号都按它）。
+   第 2 代起第 1 格是上一代传下的事签（不可换），玩家只挑 cap = 2 个字。 */
 @Component
 public class PickScreen {
     /* 代次（EntryView 从存档带下来）。 */
     @Prop var generation: Int64
+    /* 上一代传下了事签没有（EntryView 用 pickShiqianCarried 算好传下来）。 */
+    @Prop var carried: Bool
     /* 挑好了：把挑的字（按顺序）交出去，EntryView 落定 + 存档 + 进主界。 */
     @Prop var onConfirm: (Array<String>) -> Unit
 
@@ -359,6 +462,21 @@ public class PickScreen {
     @State var slot1: String = ""
     @State var slot2: String = ""
 
+    /* 第 1 格留给事签没有（第 2 代起 = true；纯逻辑在 run_state.cj）。 */
+    func reserved(): Bool {
+        return pickShiqianReserved(this.generation) > 0
+    }
+
+    /* 这一代最多能挑几个（第 1 代 3，第 2 代起 2）。 */
+    func cap(): Int64 {
+        return pickCapFor(this.generation)
+    }
+
+    /* 网格朱序号的起点：事签占了第 1 格 → 后移 1。 */
+    func orderBase(): Int64 {
+        return pickShiqianReserved(this.generation)
+    }
+
     /* picked 变完就把三格镜子跟上（不跟着走，大格就停在旧值）。 */
     func syncSlots(): Unit {
         this.slot0 = if (this.picked.size > 0) { this.picked[0] } else { "" }
@@ -367,14 +485,14 @@ public class PickScreen {
     }
 
     func toggle(id: String): Unit {
-        this.picked = pickToggle(this.picked, id)
+        this.picked = pickToggleCap(this.picked, id, this.cap())
         this.syncSlots()
     }
 
     func remove(id: String): Unit {
         /* 空格（没有字）点了什么都不做。 */
         if (id.size == 0) { return }
-        this.picked = pickToggle(this.picked, id)
+        this.picked = pickToggleCap(this.picked, id, this.cap())
         this.syncSlots()
     }
 
@@ -407,11 +525,14 @@ public class PickScreen {
                         slot0: this.slot0,
                         slot1: this.slot1,
                         slot2: this.slot2,
+                        reserved: this.reserved(),
+                        carried: this.carried,
                         onRemove: {id => this.remove(id)}
                     )
 
                     PickGrid(
                         picked: this.picked,
+                        orderBase: this.orderBase(),
                         onToggle: {id => this.toggle(id)}
                     )
                 }
@@ -424,6 +545,7 @@ public class PickScreen {
             Column {
                 PickFootBtn(
                     picked: this.picked,
+                    cap: this.cap(),
                     onTap: { => this.confirm() }
                 )
             }

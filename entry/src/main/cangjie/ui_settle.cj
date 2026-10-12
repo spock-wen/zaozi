@@ -12,7 +12,9 @@ import ohos.arkui.state_macro_manage.*
      这一代留下：44×44 朱 2 描边（没有字 → 「未成字」）
      传事签块：事签是 stub（本 milestone 不传）→ 整块不显示
      底部「下一代」（朱）→ 回开局挑字（纯逻辑 settleAndNextGeneration）
-   家谱独立页（设计稿 G）不在本切片：「看家谱」按钮留着，点了只落一句提示。
+   「看家谱」弹家谱面板（ui_genealogy.cj 的 GenealogyPanel：遮罩 + 底部弹层，
+   复用本文件的 SettleGenealogyBlock 列家谱）；完整家谱页（进度卡、主线段数）
+   仍是 full version 的事。
    同样拆成小 @Component（@Component 宏展开撑不住大 build()）。 */
 
 /* 小标「代末」12 Bold 朱（设计稿 .st0 .k）。 */
@@ -319,7 +321,7 @@ public class SettleKeep {
     }
 }
 
-/* 底部两个按钮：「看家谱」描边（家谱独立页不在本切片，点了只落提示）、
+/* 底部两个按钮：「看家谱」描边（弹 ui_genealogy.cj 的家谱面板）、
    「下一代」朱底白字 → 回开局挑字（SPEC §2.6）。 */
 @Component
 public class SettleBtns {
@@ -496,29 +498,5 @@ public class SettleHead {
         }
         .width(100.percent)
         .padding(left: Theme.insetNight, right: Theme.insetNight, top: 16)
-    }
-}
-
-
-/* 「看家谱」的底部小提示（家谱独立页不在本切片）。从 index.cj 的 build() 拆出来，
-   让根 build() 保持小（@Component 宏展开对大 build() 敏感）。点一下关掉。 */
-@Component
-public class StubHint {
-    @Prop var text: String
-    @Prop var onClose: () -> Unit
-
-    func build() {
-        Text(this.text)
-            .fontSize(Theme.fsNote)
-            .fontFamily(Theme.sans)
-            .fontColor(Theme.onNight)
-            .backgroundColor(Theme.night800)
-            .height(32)
-            .padding(left: 12, right: 12)
-            .borderRadius(16)
-            .textAlign(TextAlign.Center)
-            .align(Alignment.Bottom)
-            .margin(bottom: 60)
-            .onClick({event => this.onClose()})
     }
 }

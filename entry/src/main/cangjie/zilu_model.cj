@@ -289,3 +289,41 @@ public func ziluUnknownCountOf(madeIds: Array<String>): Int64 {
 public func ziluUnknownCount(): Int64 {
     return ziluUnknownCountOf(ZILU_MADE_IDS)
 }
+
+/* —— 按已造列表现算的计数文案（原来 copy_text 里写死 8 / 27，种子开关一打开
+   标题与统计就对不上；现在一律按传进来的已造列表算，界面层用不带 Of 的版本）。
+   默认（ZILU_DEBUG_SEED_ZHISHI = false）算出来的与原来的常量一字不差。 —— */
+public func ziluNavCountOf(madeIds: Array<String>): String {
+    return "${madeIds.size} / ${ZILU_TOTAL}"
+}
+
+public func ziluNavCount(): String {
+    return ziluNavCountOf(ZILU_MADE_IDS)
+}
+
+/* 「已造 N · 手里有事签 1 · 有残片线索 1 · 未知 M」（27 格总览上面那一行）。 */
+public func ziluGridSummaryOf(madeIds: Array<String>): String {
+    return "已造 ${madeIds.size} · 手里有事签 1 · 有残片线索 1 · 未知 ${ziluUnknownCountOf(madeIds)}"
+}
+
+public func ziluGridSummary(): String {
+    return ziluGridSummaryOf(ZILU_MADE_IDS)
+}
+
+/* 造字卡状态栏右边那行「空骨片 2 · 字录 N / 27」。
+   播放中（settled = false）写的 N − 1：这一张演示的「休」还没成字，
+   进了字录才算一个（与原来的 CARD_BONE_PLAYING / CARD_BONE_SETTLED 一致）。 */
+public func cardBoneTextOf(madeIds: Array<String>, settled: Bool): String {
+    var shown = madeIds.size
+    if (!settled) {
+        shown = shown - 1
+    }
+    if (shown < 0) {
+        shown = 0
+    }
+    return "空骨片 2 · 字录 ${shown} / ${ZILU_TOTAL}"
+}
+
+public func cardBoneText(settled: Bool): String {
+    return cardBoneTextOf(ZILU_MADE_IDS, settled)
+}

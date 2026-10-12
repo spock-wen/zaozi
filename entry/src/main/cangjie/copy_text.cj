@@ -11,7 +11,11 @@ package ohos_app_cangjie_entry
 
 import std.collection.ArrayList
 
-/* —— 造字卡（card_zaozi_v1）—— */
+/* —— 造字卡（card_zaozi_v1）——
+   CARD_BONE_PLAYING / CARD_BONE_SETTLED 是设计稿写死的两行（7 / 8 / 27）。
+   界面现在走 zilu_model.cj 的 cardBoneText(settled) 按已造列表现算（种子开关
+   打开时计数跟着变）；这两个常量留着当基线，box_check 断言默认值算出来
+   跟它们一字不差。 */
 public let CARD_GEN_LINE: String = "第 4 代 · 第 1 年冬夜"
 public let CARD_BONE_PLAYING: String = "空骨片 2 · 字录 7 / 27"
 public let CARD_BONE_SETTLED: String = "空骨片 2 · 字录 8 / 27"
@@ -34,7 +38,10 @@ public let CARD_SHEET_META: String = "骨片随字入录 · 空骨片仍是 2"
 public let CARD_BTN_ZILU: String = "看字录"
 public let CARD_BTN_CONTINUE: String = "继续"
 
-/* —— 字录详情（zilu_detail_v1）—— */
+/* —— 字录详情（zilu_detail_v1）——
+   ZILU_NAV_COUNT / ZILU_GRID_SUMMARY 是设计稿写死的两行（8 / 27 / 未知 17）。
+   界面现在走 zilu_model.cj 的 ziluNavCount() / ziluGridSummary() 按已造列表
+   现算（种子开关打开时也跟着变）；常量留着当基线，box_check 有断言。 */
 public let ZILU_TITLE: String = "字录"
 public let ZILU_NAV_COUNT: String = "8 / 27"
 public let ZILU_BACK: String = "‹"
@@ -64,6 +71,12 @@ public let PICK_RECORDER: String = "第 N 代记事人"
 public let PICK_SLOT_EMPTY: String = "＋"
 public let PICK_BTN_NEED: String = "还差 N 个字"
 public let PICK_BTN_GO: String = "就带这些开局"
+/* 第 2 代起挑字页第 1 格的事签骨片格（设计稿 D 屏 .big3 .slot.sq / .cap2）。
+   事签本身是 stub：刻事签 / 传事签不在本里程碑，所以实际永远显示「未传」那一版。 */
+public let PICK_SHIQIAN_CARRIED: String = "事签\n传下"
+public let PICK_SHIQIAN_NONE: String = "事签\n未传"
+public let PICK_SHIQIAN_CAP_CARRIED: String = "上一代传下\n不可换"
+public let PICK_SHIQIAN_CAP_NONE: String = "上一代没传事签\n这格空着"
 
 /* —— 主界（home_slide_v1；M2 slice 1 只有占位内容）—— */
 public let HOME_GEN_LINE: String = "第 N 代 · 第 Y 年"
@@ -137,11 +150,16 @@ public let SETTLE_SEC_KEEP: String = "这一代留下"
 public let SETTLE_SEC_SHIQIAN: String = "传给下一代的事签（最多 1 张）"
 /* 「这一代留下」后面那行小字：刻成几个字。 */
 public let SETTLE_KEEP_META: String = "刻成 N 字"
-/* 代末页按钮：左描边（家谱独立页不在本切片，点了只是提示）、右朱回开局挑字。 */
+/* 代末页按钮：左描边（家谱面板，见 ui_genealogy.cj）、右朱回开局挑字。 */
 public let SETTLE_BTN_GENEALOGY: String = "看家谱"
 public let SETTLE_BTN_NEXT: String = "下一代"
-/* 家谱独立页（full version）不在本切片：「看家谱」按钮点了只落一句提示。 */
-public let SETTLE_GENEALOGY_STUB: String = "家谱独立页下一版做"
+/* 家谱面板（结局卡 / 代末结算页的「看家谱」；ui_genealogy.cj）：
+   小标 + 标题 + 一行小字 + 关闭按钮。完整家谱页（进度卡、主线段数、
+   超过一屏分页）仍是 full version 的事，见 GENEALOGY_PANEL_NOTE。 */
+public let GENEALOGY_PANEL_KEY: String = "家谱"
+public let GENEALOGY_PANEL_TITLE: String = "历代记事人"
+public let GENEALOGY_PANEL_NOTE: String = "完整家谱页（进度卡、主线段数）下一版做"
+public let GENEALOGY_PANEL_CLOSE: String = "回去"
 /* 调试按钮（M2_DEBUG_FORCE_END 打开才显示；见 game_rules.cj）。 */
 public let HOME_DEBUG_ZERO: String = "调试：粮归零"
 
@@ -189,6 +207,18 @@ public func settleTitleText(generation: Int64): String {
 /* 家谱行的名称「第 N 代记事人」（一律不起人名，SPEC §2.6）。 */
 public func familyRowName(generation: Int64): String {
     return "第 ${generation} 代记事人"
+}
+
+/* 家谱面板标题下面那行「第 X – Y 代」（最老一代到最新一代，最老在上）。
+   rows 是空的（不该发生）时退回 thisGen，界面不空、也不崩。 */
+public func genealogyPanelRange(rows: Array<FamilyEntry>, thisGen: Int64): String {
+    var first = thisGen
+    var last = thisGen
+    if (rows.size > 0) {
+        first = rows[0].generation
+        last = rows[rows.size - 1].generation
+    }
+    return "第 ${first} – ${last} 代"
 }
 
 /* 「这一代留下」那行小字：刻成几个字。 */

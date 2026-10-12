@@ -61,7 +61,7 @@ HarmonyOS 上的仓颉（Cangjie）+ ArkUI 二维「造字」小游戏，锁定�
 │   └── box_check/
 │       ├── cjpm.toml                  # 本机（无 ohos SDK）校验工程
 │       ├── sync.sh                    # 只同步纯逻辑 .cj 进校验工程
-│       ├── main.cj                    # 2850 条断言的驱动
+│       ├── main.cj                    # 2930 条断言的驱动
 │       └── parse_check.sh             # 逐文件 cjc parser + 整包类型检查
 ├── README.md
 └── docs/
@@ -93,7 +93,7 @@ python3 tools/unify_frame.py --help # 重新归一化（改画框规则时用）
 ## 在本机校验（不需要 ohos SDK）
 
 ```bash
-# 1. 纯逻辑：编译 + 2850 条断言
+# 1. 纯逻辑：编译 + 2930 条断言
 source /home/box/.cangjie-sdk/6.1/cangjie/envsetup.sh
 cd tools/box_check && ./sync.sh && cjpm build && cjpm run
 
@@ -103,8 +103,9 @@ bash tools/box_check/parse_check.sh
 
 第 1 项查的是：106 行 / 27 字、`本` `末` 只有 3 格且从金文起、`休` 5 格 M 档正好铺满 304、
 `从` 6 格 S 档正好 301、没有一格 asset 为空、阶段名白名单、时代行、字录 8/7/1/0 与 27 格
-四种状态、文案逐字比对、token 数值。第 2 项只能证明**语法正确**，详见
-`docs/SCAFFOLD_REPORT.md`。
+四种状态、文案逐字比对、token 数值、M2 一代闭环（挑字 / 选卡 / 字匣 / 落字 / 结算）、
+第 2 代起的事签格（只挑 2 个字）、事件卡高度放不放得下落字条、按已造列表现算的计数文案。
+第 2 项只能证明**语法正确**，详见 `docs/SCAFFOLD_REPORT.md`。
 
 ## 在 DevEco Studio（Mac）上编译
 

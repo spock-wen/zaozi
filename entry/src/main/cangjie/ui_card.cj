@@ -143,7 +143,8 @@ public class CardScreen {
                         .fontFamily(Theme.sans)
                         .fontColor(Theme.onNight)
                         .layoutWeight(1)
-                    Text(if (this.settled) { CARD_BONE_SETTLED } else { CARD_BONE_PLAYING })
+                    /* 字录计数按已造列表现算（原来是写死的 7 / 8 / 27）。 */
+                    Text(cardBoneText(this.settled))
                         .fontSize(Theme.fsStatus)
                         .fontFamily(Theme.sans)
                         .fontColor(Theme.onNight2)

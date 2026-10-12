@@ -380,6 +380,12 @@ func ziluShape(): Int64 {
     ck.that(frag == 1, "残片线索 1（got ${frag}）")
     ck.that(unk == 17, "未知 17（got ${unk}）")
     ck.that(sel == 1, "只有一格选中")
+    /* 计数文案按已造列表现算（原来是 copy_text 里写死的 8 / 27） */
+    ck.that(ziluNavCount() == ZILU_NAV_COUNT, "默认 计数 = 原常量「${ZILU_NAV_COUNT}」（got ${ziluNavCount()}）")
+    ck.that(ziluNavCountOf(ZILU_MADE_IDS) == "8 / 27", "计数 Of 版按传入列表算")
+    ck.that(ziluGridSummary() == ZILU_GRID_SUMMARY, "默认 网格摘要 = 原常量（got ${ziluGridSummary()}）")
+    ck.that(cardBoneText(false) == CARD_BONE_PLAYING, "默认 播放中骨片行 = 原常量（got ${cardBoneText(false)}）")
+    ck.that(cardBoneText(true) == CARD_BONE_SETTLED, "默认 落定骨片行 = 原常量（got ${cardBoneText(true)}）")
     ck.that(ziluIsMade("xiu"), "休 已造")
     ck.that(!ziluIsMade("ben"), "本 未造")
     ck.that(ziluIndexOf("shui") == 0, "水 在第一位")
@@ -510,6 +516,17 @@ func ziluSeedShape(): Int64 {
     /* 默认那侧的旧行为一格不动 */
     ck.that(ziluGridOf(ZILU_MADE_IDS).size == 27, "默认 27 格")
     ck.that(ziluUnknownCountOf(ZILU_MADE_IDS) == 17, "默认 未知 17")
+    /* 种子打开时标题 / 统计跟着变（原来是写死的 8 / 27） */
+    ck.that(ziluNavCountOf(on) == "9 / 27", "种子 计数 9 / 27（got ${ziluNavCountOf(on)}）")
+    ck.that(ziluGridSummaryOf(on) == "已造 9 · 手里有事签 1 · 有残片线索 1 · 未知 16",
+        "种子 网格摘要（got ${ziluGridSummaryOf(on)}）")
+    ck.that(cardBoneTextOf(on, true) == "空骨片 2 · 字录 9 / 27", "种子 落定骨片行（got ${cardBoneTextOf(on, true)}）")
+    ck.that(cardBoneTextOf(on, false) == "空骨片 2 · 字录 8 / 27", "种子 播放中骨片行（got ${cardBoneTextOf(on, false)}）")
+    /* 一个字都没造：不出负数 */
+    let noneIds: Array<String> = []
+    ck.that(cardBoneTextOf(noneIds, false) == "空骨片 2 · 字录 0 / 27",
+        "没造过字 → 字录 0（got ${cardBoneTextOf(noneIds, false)}）")
+    ck.that(ziluNavCountOf(noneIds) == "0 / 27", "没造过字 → 计数 0 / 27")
     ck.done("zilu-seed")
     return ck.failures.size
 }
@@ -822,6 +839,106 @@ func runStateShape(): Int64 {
     ck.that(selCells == 3, "只有挑中的 3 格带选中态（got ${selCells}）")
     ck.that(newBadges == 0, "挑字网格不显示「新」角标")
     ck.done("run-state")
+    return ck.failures.size
+}
+
+/* 第 2 代起挑字页第 1 格留给「上一代传下的事签」：玩家只挑 2 个字
+   （SPEC §2.4 / 设计稿 ziku_pick_v1 D 屏）。刻事签 / 传事签不在本里程碑，
+   所以 carried 恒 false —— 这一片把「等它落地时」的形状先定死。 */
+func pickShiqianShape(): Int64 {
+    println("== 事签格：第 2 代起只挑 2 个字（第 1 格不可换）==")
+    let ck = Check()
+
+    /* —— 预留格 / 上限 —— */
+    ck.that(pickShiqianReserved(1) == 0, "第 1 代不预留事签格（got ${pickShiqianReserved(1)}）")
+    ck.that(pickShiqianReserved(2) == 1, "第 2 代起预留 1 格")
+    ck.that(pickShiqianReserved(5) == 1, "第 5 代照样预留 1 格")
+    ck.that(pickShiqianReserved(0) == 0 && pickShiqianReserved(-3) == 0, "没有上一代就不预留")
+    ck.that(pickCapFor(1) == 3, "第 1 代 cap 3（got ${pickCapFor(1)}）")
+    ck.that(pickCapFor(2) == 2, "第 2 代 cap 2（got ${pickCapFor(2)}）")
+    ck.that(pickCapFor(5) == 2, "第 5 代 cap 2（got ${pickCapFor(5)}）")
+    ck.that(pickCapFor(2) == RUN_PICK_CAP - pickShiqianReserved(2), "cap = 3 − 预留格")
+
+    /* —— cap 2 的挑字 / 按钮 / 序号 —— */
+    let c1 = pickToggleCap([], "shui", 2)
+    let c2 = pickToggleCap(c1, "ri", 2)
+    ck.that(c2.size == 2 && c2[0] == "shui" && c2[1] == "ri", "cap 2 挑 2 个字")
+    let c3 = pickToggleCap(c2, "ren", 2)
+    ck.that(c3.size == 2 && c3[0] == "shui" && c3[1] == "ri", "cap 2 满之后第 3 个字点不进去")
+    ck.that(pickCanConfirmCap(c2, 8, 2), "cap 2 挑满 2 个能确认")
+    ck.that(!pickCanConfirmCap([], 8, 2) && !pickCanConfirmCap(c1, 8, 2), "没挑满 cap 不能确认")
+    ck.that(pickRemainingCap([], 8, 2) == 2, "一个字没挑、cap 2 → 还差 2（got ${pickRemainingCap([], 8, 2)}）")
+    ck.that(pickButtonTextCap([], 8, 2) == "还差 2 个字", "cap 2 空着 → 还差 2 个字（got ${pickButtonTextCap([], 8, 2)}）")
+    ck.that(pickButtonTextCap(c1, 8, 2) == "还差 1 个字", "挑了 1 个 → 还差 1 个字")
+    ck.that(pickButtonTextCap(c2, 8, 2) == PICK_BTN_GO, "挑满 cap → 就带这些开局")
+    /* 可挑的字不足 cap：只造了 1 个字，挑 1 个就够 */
+    ck.that(pickNeedCap(1, 2) == 1, "available 1、cap 2 → 只需要 1 个")
+    ck.that(pickRemainingCap([], 1, 2) == 1, "available 1、cap 2 → 还差 1")
+    ck.that(pickButtonTextCap(c1, 1, 2) == PICK_BTN_GO, "available 1 时挑 1 个就 就带这些开局")
+    ck.that(pickCanConfirmCap(c1, 1, 2), "available 1 时挑 1 个能确认")
+    ck.that(pickNeedCap(0, 2) == 0 && pickCanConfirmCap([], 0, 2), "一个字都没造 → 空着也能开局")
+    /* 序号后移：事签占了第 1 格，挑的第 1 个字排第 2 格 */
+    let p2: Array<String> = ["shui", "ri"]
+    ck.that(pickOrderOfBase(p2, "shui", 1) == 2, "第 2 代第 1 个字序号 2（got ${pickOrderOfBase(p2, "shui", 1)}）")
+    ck.that(pickOrderOfBase(p2, "ri", 1) == 3, "第 2 代第 2 个字序号 3")
+    ck.that(pickOrderOfBase(p2, "mu", 1) == 0, "没挑的字序号还是 0")
+    ck.that(pickOrderOfBase(p2, "shui", 0) == pickOrderOf(p2, "shui"), "orderBase 0 = 原来的序号")
+    /* 不带 cap 的版本就是 cap = RUN_PICK_CAP：第 1 代行为一格不变 */
+    let t1 = pickToggle([], "shui")
+    let t2 = pickToggle(t1, "ri")
+    let t3 = pickToggle(t2, "ren")
+    ck.that(t3.size == 3, "不带 cap 还是能挑 3 个")
+    ck.that(pickToggle(t3, "mu").size == 3, "不带 cap 满 3 个后第 4 个收不进来")
+    let d1 = pickToggle(t2, "ren")
+    let d2 = pickToggleCap(t2, "ren", RUN_PICK_CAP)
+    ck.that(d1.size == d2.size && d1[0] == d2[0] && d1[1] == d2[1], "pickToggle 委托 cap 版")
+    ck.that(pickNeed(8) == pickNeedCap(8, RUN_PICK_CAP), "pickNeed 委托 cap 版")
+    ck.that(pickRemaining(t2, 8) == pickRemainingCap(t2, 8, RUN_PICK_CAP), "pickRemaining 委托 cap 版")
+    ck.that(pickButtonText(t2, 8) == pickButtonTextCap(t2, 8, RUN_PICK_CAP), "pickButtonText 委托 cap 版")
+    ck.that(pickCanConfirm(t2, 8) == pickCanConfirmCap(t2, 8, RUN_PICK_CAP), "pickCanConfirm 委托 cap 版")
+    ck.that(PICK_SHIQIAN_CARRIED == "事签\n传下", "事签格文案 事签/传下（got ${PICK_SHIQIAN_CARRIED}）")
+    ck.that(PICK_SHIQIAN_NONE == "事签\n未传", "事签格文案 事签/未传（got ${PICK_SHIQIAN_NONE}）")
+    ck.that(PICK_SHIQIAN_CAP_CARRIED == "上一代传下\n不可换", "事签格说明 上一代传下/不可换")
+    ck.that(PICK_SHIQIAN_CAP_NONE == "上一代没传事签\n这格空着", "事签格说明 上一代没传事签/这格空着")
+
+    /* —— carried：现在没有任何代码传事签，恒 false —— */
+    let signPrev = newRunState()
+    signPrev.generation = 4
+    signPrev.boneShiqian = 1
+    let nextGen = startGeneration(signPrev)
+    ck.that(nextGen.generation == 5, "startGeneration 到第 5 代")
+    ck.that(nextGen.boneShiqian == 0, "startGeneration 把骨片清零")
+    ck.that(!pickShiqianCarried(nextGen), "startGeneration 之后没传下事签（got carried）")
+    ck.that(!pickShiqianCarried(newRunState()), "第 1 代没有上一代 → 不传")
+    let noSign = newRunState()
+    noSign.generation = 2
+    ck.that(!pickShiqianCarried(noSign), "第 2 代但没事签骨片 → 不传")
+
+    /* —— 手造一个「传下了事签」的第 2 代（等传事签落地时的形状）—— */
+    let carried = newRunState()
+    carried.generation = 2
+    carried.boneShiqian = 1
+    ck.that(pickShiqianCarried(carried), "第 2 代 + 事签骨片 → 传下了")
+    let after = runAfterPickGen(carried, ["shui", "ri"])
+    ck.that(after.generation == 2 && after.phase == RUN_PHASE_HOME, "runAfterPickGen 照常进主界")
+    ck.that(after.boxChars.size == 3 && after.boxChars[0] == BOX_SHIQIAN_ID &&
+        after.boxChars[1] == "shui" && after.boxChars[2] == "ri", "字匣 = [事签, 挑的字]（got ${after.boxChars.size}）")
+    ck.that(after.boxLanded.size == 3 && !after.boxLanded[0], "事签格也算一格、本代未落")
+    ck.that(boxSlotState(after, BOX_SLOT_NONE, 0) == BOX_SLOT_SHIQIAN, "字匣第 0 格是事签")
+    ck.that(landedChars(after).size == 0, "事签格不算「留下的字」")
+    after.boxLanded = [false, true, false]
+    ck.that(landedChars(after).size == 1 && landedChars(after)[0] == "shui", "事签旁边那格落了才算数")
+    /* 没传事签：字匣就是挑的那两个 */
+    let plain = runAfterPickGen(noSign, ["shui", "ri"])
+    ck.that(plain.boxChars.size == 2 && plain.boxChars[0] == "shui" && plain.boxChars[1] == "ri",
+        "没传事签 → 字匣就是挑的那两个")
+    /* 第 1 代：runAfterPickGen 与 runAfterPick 一模一样 */
+    let g1 = newRunState()
+    ck.that(runAfterPickGen(g1, ["shui", "ri", "ren"]).sameAs(runAfterPick(g1, ["shui", "ri", "ren"])),
+        "第 1 代 runAfterPickGen ≡ runAfterPick")
+    ck.that(runAfterPickGen(g1, []).sameAs(runAfterPick(g1, [])), "第 1 代一个字没挑也等价")
+    ck.that(carried.boxChars.size == 0 && carried.phase == RUN_PHASE_PICK, "runAfterPickGen 不改原状态")
+    ck.done("pick-shiqian")
     return ck.failures.size
 }
 
@@ -1500,6 +1617,17 @@ func settleShape(): Int64 {
     ck.that(END_BTN_NEXT == "往下传" && SETTLE_BTN_NEXT == "下一代", "两个出口按钮")
     ck.that(SETTLE_KEY == "代末", "代末页小标 代末")
     ck.that(HOME_DEBUG_ZERO == "调试：粮归零", "调试按钮文案（got ${HOME_DEBUG_ZERO}）")
+
+    /* —— 家谱面板（ui_genealogy.cj 的 GenealogyPanel）—— */
+    ck.that(GENEALOGY_PANEL_KEY == "家谱", "家谱面板小标（got ${GENEALOGY_PANEL_KEY}）")
+    ck.that(GENEALOGY_PANEL_TITLE == "历代记事人", "家谱面板标题（got ${GENEALOGY_PANEL_TITLE}）")
+    ck.that(GENEALOGY_PANEL_NOTE.size > 10, "家谱面板那行小字在")
+    ck.that(GENEALOGY_PANEL_CLOSE == "回去", "家谱面板关闭按钮（got ${GENEALOGY_PANEL_CLOSE}）")
+    ck.that(END_BTN_GENEALOGY == SETTLE_BTN_GENEALOGY, "两处「看家谱」文案一致")
+    ck.that(genealogyPanelRange(rows, 3) == "第 1 – 3 代",
+        "家谱面板代次行（got ${genealogyPanelRange(rows, 3)}）")
+    let noRows: Array<FamilyEntry> = []
+    ck.that(genealogyPanelRange(noRows, 7) == "第 7 – 7 代", "家谱空 → 代次行退回本代")
     ck.done("settle")
     return ck.failures.size
 }
@@ -1617,6 +1745,19 @@ func homeMirrorShape(): Int64 {
 
     /* 选卡刷新之后 old/new 两个镜子逐字段都该不一样（界面靠这个换引用） */
     ck.that(homeMirrorSame(homeMirrorOf(newRunState()), fresh), "新开局镜子可重复")
+
+    /* 事件卡高度跟可用高度走（lay_b0.json：357vp 那一档放不放得下落字条） */
+    ck.that(Theme.cardUnderDrop == 8, "垫底那一条 8vp（got ${Theme.cardUnderDrop}）")
+    ck.that(Theme.cardMinH == Theme.cardArtH + Theme.cardBodyPad + 3 * Theme.cardBodyLh +
+        Theme.luoziBarH + 12, "cardMinH = 立绘区 + 卡文 3 行 + 内边距 + 落字条 + 12")
+    ck.that(Theme.cardMinH == 340, "cardMinH 340（got ${Theme.cardMinH}）")
+    ck.that(Theme.cardMinH <= Theme.cardH, "384 的卡高装得下 cardMinH（got ${Theme.cardMinH}）")
+    ck.that(Theme.homeOptGapTop == 12 && Theme.homeOptGapTop > 0, "点选退路上边距 12 且为正")
+    ck.that(cardFitsLuozi(357), "可用 357vp 放得下落字条（lay_b0.json 实测那一档）")
+    ck.that(cardFitsLuozi(Theme.cardH + Theme.cardUnderDrop), "卡高 + 垫底那一条照样放得下")
+    ck.that(!cardFitsLuozi(Theme.cardMinH), "再少 1vp 就放不下（下沿是含等于的）")
+    ck.that(!cardFitsLuozi(Theme.cardMinH + Theme.cardUnderDrop - 1), "够不着 cardMinH → 放不下")
+    ck.that(cardFitsLuozi(Theme.cardMinH + Theme.cardUnderDrop), "正好 cardMinH + 垫底 → 放得下")
     ck.done("home-mirror")
     return ck.failures.size
 }
@@ -1718,7 +1859,8 @@ main(): Int64 {
     println("")
     let bad = catalogShape() + benAndMo() + xiuStrip() + congStrip() +
         sizeBuckets() + cardTier() + emptyRule() + ziluShape() + copyShape() + tokenShape() +
-        tabFilterShape() + ziluSeedShape() + runStateShape() + gameRulesShape() + boxRulesShape() +
+        tabFilterShape() + ziluSeedShape() + runStateShape() + pickShiqianShape() +
+        gameRulesShape() + boxRulesShape() +
         settleShape() + landedMaskShape() + homeMirrorShape() + dragShape() + luoziBarShape()
     println("")
     if (bad != 0) {

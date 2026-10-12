@@ -505,9 +505,34 @@ public func pickOrderOf(picked: Array<String>, id: String): Int64 {
     return at + 1
 }
 
-/* 点格子：挑了的收回，没挑的追加在最后；已满 3 个就不再收（SPEC §2.4）。
-   返回的数组顺序就是挑选顺序，大格从左到右按它排。 */
-public func pickToggle(picked: Array<String>, id: String): Array<String> {
+/* 挑字页「上一代传下的事签」占的那一格（SPEC §2.4 / 设计稿 ziku_pick_v1 D 屏）：
+   第 2 代起，三个大格里的第 1 格留给事签（骨片形，不可换），玩家只挑 2 个字。
+   第 1 代没有上一代 → 不占格，三个大格照旧全给挑字。 */
+public func pickShiqianReserved(generation: Int64): Int64 {
+    if (generation >= 2) { return 1 }
+    return 0
+}
+
+/* 这一代最多能挑几个 = 3 − 事签占格（第 1 代仍是 3）。 */
+public func pickCapFor(generation: Int64): Int64 {
+    let cap = RUN_PICK_CAP - pickShiqianReserved(generation)
+    if (cap < 0) { return 0 }
+    return cap
+}
+
+/* 这一代开局时字匣里有没有「上一代传下的事签」。
+   注意：刻事签 / 传事签不在本里程碑 —— startGeneration 现在把骨片清零，
+   所以这一条恒 false（挑字页第 1 格永远显示「上一代没传事签」）。等传事签
+   落地时只改这里（和 startGeneration）：runAfterPickGen 会照常把事签摆进
+   字匣第 0 格，界面层也已经按 carried 画好骨片格了。 */
+public func pickShiqianCarried(s: RunState): Bool {
+    return s.generation >= 2 && s.boneShiqian > 0
+}
+
+/* 点格子：挑了的收回，没挑的追加在最后；已满 cap 个就不再收。
+   cap 版给第 2 代起用（事签占 1 格 → cap 2）；不带 cap 的版本就是
+   cap = RUN_PICK_CAP，第 1 代行为一格不变。 */
+public func pickToggleCap(picked: Array<String>, id: String, cap: Int64): Array<String> {
     let out = ArrayList<String>()
     var removed = false
     var i: Int64 = 0
@@ -520,36 +545,80 @@ public func pickToggle(picked: Array<String>, id: String): Array<String> {
         i = i + 1
     }
     if (removed) { return out.toArray() }
-    if (out.size >= RUN_PICK_CAP) { return out.toArray() }
+    if (out.size >= cap) { return out.toArray() }
     out.add(id)
     return out.toArray()
 }
 
-/* 这一代最多能带几个：满 3 个字按 3；已造不足 3 个字时能带多少算多少
+public func pickToggle(picked: Array<String>, id: String): Array<String> {
+    return pickToggleCap(picked, id, RUN_PICK_CAP)
+}
+
+/* 这一代最多能带几个：满 cap 个按 cap；可挑的字不足 cap 个时能带多少算多少
    （SPEC §3「开局已造少于 3 字」）。 */
+public func pickNeedCap(available: Int64, cap: Int64): Int64 {
+    if (available < cap) { return available }
+    return cap
+}
+
 public func pickNeed(available: Int64): Int64 {
-    if (available < RUN_PICK_CAP) { return available }
-    return RUN_PICK_CAP
+    return pickNeedCap(available, RUN_PICK_CAP)
 }
 
 /* 还差几个字才满。 */
-public func pickRemaining(picked: Array<String>, available: Int64): Int64 {
-    let left = pickNeed(available) - picked.size
+public func pickRemainingCap(picked: Array<String>, available: Int64, cap: Int64): Int64 {
+    let left = pickNeedCap(available, cap) - picked.size
     if (left < 0) { return 0 }
     return left
 }
 
-/* 主按钮文案：没满「还差 N 个字」；满了（或本来就不足 3 个字可挑）
+public func pickRemaining(picked: Array<String>, available: Int64): Int64 {
+    return pickRemainingCap(picked, available, RUN_PICK_CAP)
+}
+
+/* 主按钮文案：没满「还差 N 个字」；满了（或本来就不足 cap 个字可挑）
    →「就带这些开局」（SPEC §3）。 */
-public func pickButtonText(picked: Array<String>, available: Int64): String {
-    let left = pickRemaining(picked, available)
+public func pickButtonTextCap(picked: Array<String>, available: Int64, cap: Int64): String {
+    let left = pickRemainingCap(picked, available, cap)
     if (left > 0) { return PICK_BTN_NEED.replace("N", "${left}") }
     return PICK_BTN_GO
 }
 
+public func pickButtonText(picked: Array<String>, available: Int64): String {
+    return pickButtonTextCap(picked, available, RUN_PICK_CAP)
+}
+
 /* 主按钮能不能点。 */
+public func pickCanConfirmCap(picked: Array<String>, available: Int64, cap: Int64): Bool {
+    return pickRemainingCap(picked, available, cap) == 0
+}
+
 public func pickCanConfirm(picked: Array<String>, available: Int64): Bool {
-    return pickRemaining(picked, available) == 0
+    return pickCanConfirmCap(picked, available, RUN_PICK_CAP)
+}
+
+/* 挑字页网格格子的朱序号：第 2 代起事签占了第 1 格，挑的第 1 个字排第 2 格，
+   所以序号整体后移 orderBase（第 1 代 orderBase = 0，行为不变）。没挑 → 0。 */
+public func pickOrderOfBase(picked: Array<String>, id: String, orderBase: Int64): Int64 {
+    let at = pickIndexOf(picked, id)
+    if (at < 0) { return 0 }
+    return at + 1 + orderBase
+}
+
+/* 挑字落定后的新状态（复制一份再改，见 cloneRunState 的说明）。
+   第 2 代起且上一代真传下了事签时，字匣第 0 格是事签、挑的字跟在后面
+   （事签格不能落，landedChars 也不把它算成「留下的字」）。 */
+public func runAfterPickGen(prev: RunState, picked: Array<String>): RunState {
+    let box = ArrayList<String>()
+    if (pickShiqianCarried(prev)) {
+        box.add(BOX_SHIQIAN_ID)
+    }
+    var i: Int64 = 0
+    while (i < picked.size) {
+        box.add(picked[i])
+        i = i + 1
+    }
+    return runAfterPick(prev, box.toArray())
 }
 
 /* 挑字页网格：就是字录那个 27 格总览（60×60、间距 9、一行 5 格），

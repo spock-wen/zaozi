@@ -222,3 +222,13 @@ public func homeMirrorBoxLanded(m: HomeMirror): Array<Bool> {
     }
     return out.toArray()
 }
+
+/* ————— 事件卡高度（lay_b0.json：卡和垫底那张溢出到选项按钮上）—————
+
+   主界事件卡那一块的高度由 layoutWeight 现算（lay_b0.json 上是 357vp），
+   卡片原来写死 Theme.cardH = 384，连垫底那张（margin top 8）一起溢出到
+   下方「先种粟 / 先献祭」按钮上。现在卡高跟可用高度走，这一条判「放得下
+   放不下」：可用高度减去垫底那一条，还要够 Theme.cardMinH。 */
+public func cardFitsLuozi(availH: Int64): Bool {
+    return availH - Theme.cardUnderDrop >= Theme.cardMinH
+}

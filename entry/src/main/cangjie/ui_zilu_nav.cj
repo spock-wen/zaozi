@@ -33,7 +33,8 @@ public class ZiluNavBar {
                 .fontColor(Theme.ink900)
                 .layoutWeight(1)
                 .margin(left: 8)
-            Text(ZILU_NAV_COUNT)
+            /* 计数按已造列表现算（种子开关打开时也跟着变；原来是写死的 "8 / 27"）。 */
+            Text(ziluNavCount())
                 .fontSize(14)
                 .fontFamily(Theme.sans)
                 .fontWeight(FontWeight.Bold)

@@ -181,7 +181,8 @@ public class ZiluGridOverview {
 
     func build() {
         Column {
-            Text(ZILU_GRID_SUMMARY)
+            /* 已造 / 未知数按已造列表现算（原来是写死的「已造 8 · … 未知 17」）。 */
+            Text(ziluGridSummary())
                 .fontSize(12)
                 .fontFamily(Theme.sans)
                 .fontColor(Theme.ink600)

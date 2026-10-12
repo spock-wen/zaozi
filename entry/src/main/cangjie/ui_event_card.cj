@@ -36,7 +36,11 @@ import std.collection.ArrayList
 
 /* 立绘区 184 高（SPEC §4 待确认 5：立绘风格另定，本版是骨色占位）。
    cardIndex 是原始值（R1：函数调用结果不当 @Prop 传），人物胶囊与
-   「季节 · 序号」都在本组件里按牌堆现算。 */
+   「季节 · 序号」都在本组件里按牌堆现算。
+   lay_b0.json 证实：Stack 里几个 Text 都排在正中叠在一起（.align() 只对齐
+   Text 自己内部的内容，不定位 Stack 的子组件）。所以版式改成一层 Column：
+   上面一行 Row（胶囊左 + Blank + 季节右）、中间 Blank 撑开、下面一行 Row
+   （Blank + 占位说明右）—— 三段各占一角，互不遮挡。 */
 @Component
 public class CardArt {
     @Prop var cardIndex: Int64
@@ -57,36 +61,44 @@ public class CardArt {
                 .height(100.percent)
                 .backgroundColor(Theme.bone200)
 
-            /* 人物胶囊 24 高（左上）。 */
-            Text(this.who())
-                .height(Theme.whoCapsuleH)
-                .padding(left: 10, right: 10)
-                .borderRadius(12)
-                .backgroundColor(Theme.paper50)
-                .border(width: 1, color: Theme.paperLine)
-                .fontSize(Theme.whoFs)
-                .fontFamily(Theme.sans)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Theme.ink900)
-                .textAlign(TextAlign.Center)
-                .align(Alignment.TopStart)
-                .margin(left: 12, top: 12)
+            Column {
+                /* 上排：人物胶囊（左上）+ 季节 · 序号（右上）。 */
+                Row {
+                    Text(this.who())
+                        .height(Theme.whoCapsuleH)
+                        .padding(left: 10, right: 10)
+                        .borderRadius(12)
+                        .backgroundColor(Theme.paper50)
+                        .border(width: 1, color: Theme.paperLine)
+                        .fontSize(Theme.whoFs)
+                        .fontFamily(Theme.sans)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(Theme.ink900)
+                        .textAlign(TextAlign.Center)
+                    Blank()
+                    Text(this.season())
+                        .fontSize(Theme.seasonFs)
+                        .fontFamily(Theme.sans)
+                        .fontColor(Theme.ink600)
+                }
+                .width(100.percent)
 
-            /* 季节 · 序号 11（右上）。 */
-            Text(this.season())
-                .fontSize(Theme.seasonFs)
-                .fontFamily(Theme.sans)
-                .fontColor(Theme.ink600)
-                .align(Alignment.TopEnd)
-                .margin(right: 12, top: 12)
+                /* 中间空着：立绘区留给以后的立绘。 */
+                Blank()
 
-            /* 立绘占位说明（右下角，跟设计稿一致）。 */
-            Text(HOME_ART_PLACEHOLDER)
-                .fontSize(Theme.fsEra)
-                .fontFamily(Theme.sans)
-                .fontColor(Theme.ink400)
-                .align(Alignment.BottomEnd)
-                .margin(right: 12, bottom: 10)
+                /* 下排：立绘占位说明（右下角，跟设计稿一致）。 */
+                Row {
+                    Blank()
+                    Text(HOME_ART_PLACEHOLDER)
+                        .fontSize(Theme.fsEra)
+                        .fontFamily(Theme.sans)
+                        .fontColor(Theme.ink400)
+                }
+                .width(100.percent)
+            }
+            .width(100.percent)
+            .height(100.percent)
+            .padding(left: 12, right: 12, top: 12, bottom: 10)
         }
         .width(100.percent)
         .height(Theme.cardArtH)
@@ -482,17 +494,21 @@ public class EventCardView {
 
     func build() {
         /* 外层容器：不位移，onTouch 挂在它上面（R2：位移会让局部坐标跑偏）。
-           里面那个 Stack 才是会跟着手指移动的卡片。 */
+           里面那个 Stack 才是会跟着手指移动的卡片。
+           高度跟可用高度走（lay_b0.json：主界这一块只有 ~357vp，写死
+           Theme.cardH = 384 会连垫底那张一起压到下方选项按钮上）。外层留出
+           Theme.cardUnderDrop 给垫底那张，垫底卡用 offset 下移同一个值 ——
+           它原来写 margin(top: 8)，那一笔会让整体高度多 8vp 溢出容器。 */
         Stack {
             /* 下一张垫在后面：55% 透明度（96% 缩放见文件头说明 2）。 */
             Text("")
-                .width(Theme.cardW)
-                .height(Theme.cardH)
+                .width(100.percent)
+                .height(100.percent)
                 .borderRadius(Theme.cardRadius)
                 .backgroundColor(Theme.paper50)
                 .border(width: 1, color: Theme.paperLine)
                 .opacity(Theme.cardUnderOpacity)
-                .margin(top: 8)
+                .offset(x: 0, y: Theme.cardUnderDrop)
 
             /* 这一张。 */
             Stack {
@@ -535,8 +551,8 @@ public class EventCardView {
                     .align(Alignment.Top)
                 }
             }
-            .width(Theme.cardW)
-            .height(Theme.cardH)
+            .width(100.percent)
+            .height(100.percent)
             .borderRadius(Theme.cardRadius)
             .backgroundColor(Theme.paper50)
             .border(width: this.holdBorderWidth(), color: this.holdBorderColor())
@@ -544,7 +560,8 @@ public class EventCardView {
             .offset(x: this.shiftX(), y: 0)
         }
         .width(Theme.cardW)
-        .height(Theme.cardH)
+        .height(100.percent)
+        .padding(bottom: Theme.cardUnderDrop)
         .onTouch({e: TouchEvent => this.onTouchEvent(e)})
     }
 }
