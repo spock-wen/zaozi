@@ -60,6 +60,9 @@ is_ignorable() {
     "'main' is missing"*) return 0 ;;       # 单文件编译没有入口
     "'main' function is missing"*) return 0 ;;
     "undeclared identifier"*) return 0 ;;   # 同包其它文件里的符号，单文件看不到
+    # 同上，但出现在类型名位置（如 run_state.cj 里用 zilu_model.cj 的 ZiluGridCell）。
+    # 这类真错误趟 B 照样抓得到（趟 B 把所有纯逻辑文件一起编）。
+    "undeclared type name"*) return 0 ;;
     *) return 1 ;;
   esac
 }
