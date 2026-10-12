@@ -407,7 +407,7 @@ public class PickGrid {
 /* 底部主按钮：没挑满 → paper-200 底、字 ink-400、点不动；
    挑满（或本来不足 cap 个字）→ 朱底白字。
    文案 / 能不能点都由 picked 在子组件里算（原始数组当 @Prop 传进来）。
-   cap = 这一代最多能挑几个（第 1 代 3，第 2 代起事签占 1 格 → 2）。 */
+   cap = 这一代最多能挑几个（事签未通前每代都是 3；事签落地后第 2 代起占 1 格 → 2）。 */
 @Component
 public class PickFootBtn {
     @Prop var picked: Array<String>

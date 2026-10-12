@@ -534,7 +534,7 @@ public func pickShiqianCarried(s: RunState): Bool {
 }
 
 /* 点格子：挑了的收回，没挑的追加在最后；已满 cap 个就不再收。
-   cap 版给第 2 代起用（事签占 1 格 → cap 2）；不带 cap 的版本就是
+   cap 版给第 2 代起用（事签落地后占 1 格 → cap 2；未通前 reserved 恒 0 → cap 3）；不带 cap 的版本就是
    cap = RUN_PICK_CAP，第 1 代行为一格不变。 */
 public func pickToggleCap(picked: Array<String>, id: String, cap: Int64): Array<String> {
     let out = ArrayList<String>()

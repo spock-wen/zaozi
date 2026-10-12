@@ -147,10 +147,16 @@ public class GenealogyPanel {
             .backgroundColor(Theme.paper100)
             .borderRadius(topLeft: Theme.sheetRadius, topRight: Theme.sheetRadius)
             .padding(left: Theme.insetNight, right: Theme.insetNight, top: 10, bottom: 20)
+            /* R-P3-2c：面板本体吞掉点击（空 onClick），点面板内容不关。
+               里面「回去」按钮自带 onClick，最深层先响应，不受影响。 */
+            .onClick({event => })
             }
             .width(100.percent)
             .height(100.percent)
             .justifyContent(FlexAlign.End)
+            /* R-P3-2c：这层满高 Column 叠在遮罩上，会挡住遮罩的点击 →
+               关面板挂在这层上（面板上方的空白 = 遮罩区，点一下关）。 */
+            .onClick({event => this.onClose()})
         }
         .width(100.percent)
         .height(100.percent)

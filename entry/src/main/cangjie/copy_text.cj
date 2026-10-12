@@ -65,7 +65,7 @@ public let ZILU_GRID_SUMMARY: String = "已造 8 · 手里有事签 1 · 有残�
    PICK_GEN_LINE / PICK_RECORDER / HOME_GEN_LINE 里的 N / Y 由界面替换。 */
 public let PICK_TITLE: String = "挑字入字匣"
 public let PICK_HINT: String =
-    "带进字匣的字，这一代能落在卡上；落过的字这一代冬夜不能当部件。上一代传下的事签占 1 格。"
+    "带进字匣的字，这一代能落在卡上；落过的字这一代冬夜不能当部件。每代挑 3 个字。"
 public let PICK_GEN_LINE: String = "第 N 代 · 开局"
 public let PICK_RECORDER: String = "第 N 代记事人"
 public let PICK_SLOT_EMPTY: String = "＋"
