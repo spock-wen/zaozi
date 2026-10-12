@@ -505,15 +505,19 @@ public func pickOrderOf(picked: Array<String>, id: String): Int64 {
     return at + 1
 }
 
-/* 挑字页「上一代传下的事签」占的那一格（SPEC §2.4 / 设计稿 ziku_pick_v1 D 屏）：
-   第 2 代起，三个大格里的第 1 格留给事签（骨片形，不可换），玩家只挑 2 个字。
-   第 1 代没有上一代 → 不占格，三个大格照旧全给挑字。 */
+/* 挑字页「上一代传下的事签」占的那一格（SPEC §2.4 / 设计稿 ziku_pick_v1 D 屏）。
+   PM/user 2026-10-12：刻事签 / 传事签还没落地（事签传不下来）之前，不预留事签格 ——
+   每一代（含第 2 代起）玩家都挑满 3 个字，所以这里恒返回 0（挑字页也就不画事签格）。
+   设计终态：第 2 代起三个大格里的第 1 格留给事签（骨片形，不可换），玩家只挑 2 个字。
+   等事签传递上线时，恢复为：
+       if (generation >= 2) { return 1 }
+       return 0
+   并同步改回 tools/box_check 的 pickShiqianShape 预留格 / cap 断言。 */
 public func pickShiqianReserved(generation: Int64): Int64 {
-    if (generation >= 2) { return 1 }
     return 0
 }
 
-/* 这一代最多能挑几个 = 3 − 事签占格（第 1 代仍是 3）。 */
+/* 这一代最多能挑几个 = 3 − 事签占格（事签未通前预留恒 0 → 每代都是 3）。 */
 public func pickCapFor(generation: Int64): Int64 {
     let cap = RUN_PICK_CAP - pickShiqianReserved(generation)
     if (cap < 0) { return 0 }

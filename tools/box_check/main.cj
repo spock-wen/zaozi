@@ -842,24 +842,30 @@ func runStateShape(): Int64 {
     return ck.failures.size
 }
 
-/* 第 2 代起挑字页第 1 格留给「上一代传下的事签」：玩家只挑 2 个字
-   （SPEC §2.4 / 设计稿 ziku_pick_v1 D 屏）。刻事签 / 传事签不在本里程碑，
+/* 事签格（SPEC §2.4 / 设计稿 ziku_pick_v1 D 屏）。PM/user 2026-10-12：事签未通前
+   pickShiqianReserved 恒 0，每代（含第 2 代）都挑满 3 个字；下面 cap 2 的帮手
+   函数形状仍保留断言（等事签传递上线、预留恢复为 1 时直接用上）。刻事签 / 传事签不在本里程碑，
    所以 carried 恒 false —— 这一片把「等它落地时」的形状先定死。 */
 func pickShiqianShape(): Int64 {
-    println("== 事签格：第 2 代起只挑 2 个字（第 1 格不可换）==")
+    println("== 事签格：事签未通前每代都挑满 3 个字（不预留）==")
     let ck = Check()
 
     /* —— 预留格 / 上限 —— */
     ck.that(pickShiqianReserved(1) == 0, "第 1 代不预留事签格（got ${pickShiqianReserved(1)}）")
-    ck.that(pickShiqianReserved(2) == 1, "第 2 代起预留 1 格")
-    ck.that(pickShiqianReserved(5) == 1, "第 5 代照样预留 1 格")
+    ck.that(pickShiqianReserved(2) == 0, "事签未通前第 2 代不预留（got ${pickShiqianReserved(2)}）")
+    ck.that(pickShiqianReserved(5) == 0, "事签未通前第 5 代也不预留")
     ck.that(pickShiqianReserved(0) == 0 && pickShiqianReserved(-3) == 0, "没有上一代就不预留")
     ck.that(pickCapFor(1) == 3, "第 1 代 cap 3（got ${pickCapFor(1)}）")
-    ck.that(pickCapFor(2) == 2, "第 2 代 cap 2（got ${pickCapFor(2)}）")
-    ck.that(pickCapFor(5) == 2, "第 5 代 cap 2（got ${pickCapFor(5)}）")
+    ck.that(pickCapFor(2) == 3, "事签未通前第 2 代 cap 3（got ${pickCapFor(2)}）")
+    ck.that(pickCapFor(5) == 3, "事签未通前第 5 代 cap 3（got ${pickCapFor(5)}）")
+    var allZero = true
+    for (g in 0..=20) {
+        if (pickShiqianReserved(g) != 0 || pickCapFor(g) != RUN_PICK_CAP) { allZero = false }
+    }
+    ck.that(allZero, "第 0..20 代预留恒 0、cap 恒 3")
     ck.that(pickCapFor(2) == RUN_PICK_CAP - pickShiqianReserved(2), "cap = 3 − 预留格")
 
-    /* —— cap 2 的挑字 / 按钮 / 序号 —— */
+    /* —— cap 2 的挑字 / 按钮 / 序号（帮手函数形状，事签上线后用）—— */
     let c1 = pickToggleCap([], "shui", 2)
     let c2 = pickToggleCap(c1, "ri", 2)
     ck.that(c2.size == 2 && c2[0] == "shui" && c2[1] == "ri", "cap 2 挑 2 个字")

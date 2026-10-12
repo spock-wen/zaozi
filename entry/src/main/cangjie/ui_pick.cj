@@ -17,9 +17,11 @@ import std.collection.ArrayList
      PickFootBtn   底部主按钮（灰「还差 N 个字」/ 朱「就带这些开局」）
      PickScreen    组装 + 自己的 @State（picked）
    挑字规则（挑/收回/上限 cap/不足 cap 个字）与落定都在 run_state.cj，这里只摆版式。
-   第 2 代起三个大格的第 1 格是「上一代传下的事签」（不可换），玩家只挑 2 个字
-   （pickShiqianReserved / pickCapFor / pickToggleCap / pickButtonTextCap）；
-   刻事签 / 传事签不在本里程碑，所以那一格实际永远显示「上一代没传事签」。
+   事签格（设计终态：第 2 代起第 1 格是「上一代传下的事签」、玩家只挑 2 个字）
+   由 pickShiqianReserved / pickCapFor / pickToggleCap / pickButtonTextCap 控制。
+   PM/user 2026-10-12：刻事签 / 传事签未落地前 pickShiqianReserved 恒 0 ——
+   每一代（含第 2 代）都挑满 3 个字，reserved = false，事签格 UI 不显示；
+   等 reserved > 0（事签传递上线）时下面的事签格分支才会走到。
    O1（e4c8def 烟测观察项：挑了字，上方三个大格还是「＋ / 第 n 格」）之后，
    三个大格各收一个原始 String（字 id），格子内部自己换字形、算序号 ——
    原来收 picked 数组当 @Prop 再用不带 key 的 ForEach 摆，数组 @Prop 没验过，
@@ -219,15 +221,16 @@ public class PickShiqianCol {
    于是挑了字格子不翻面（下面网格有 key 带序号，所以网格那侧是好的）。
    现在按 R1 的路子走：三个格子各收一个原始 String（字 id），格子内部自己
    换字形、算序号；三个格子显式摆出来，不依赖 ForEach 复用。
-   第 2 代起（reserved）第 1 格是事签（不可换），玩家只挑 2 个字：第 2/3 位
-   摆 slot0/slot1，序号 2/3（事签占了第 1 格，挑的第 1 个字排第 2 格）。 */
+   reserved = true 时第 1 格是事签（不可换），玩家只挑 2 个字：第 2/3 位
+   摆 slot0/slot1，序号 2/3（事签占了第 1 格，挑的第 1 个字排第 2 格）。
+   事签未通前 pickShiqianReserved 恒 0 → reserved 恒 false，每代三格全给挑字。 */
 @Component
 public class PickBigSlots {
-    /* 三格的字 id（空串 = 空格）。第 2 代起只用到 slot0/slot1。 */
+    /* 三格的字 id（空串 = 空格）。reserved 时只用到 slot0/slot1。 */
     @Prop var slot0: String
     @Prop var slot1: String
     @Prop var slot2: String
-    /* 第 1 格留给事签没有（第 2 代起 = true）。 */
+    /* 第 1 格留给事签没有（= pickShiqianReserved > 0；事签未通前恒 false）。 */
     @Prop var reserved: Bool
     /* 上一代真传下了事签没有（false → 这一格空着）。 */
     @Prop var carried: Bool
@@ -445,7 +448,7 @@ public class PickFootBtn {
 }
 
 /* 开局挑字页。picked 顺序 = 挑选顺序（大格从左到右、序号都按它）。
-   第 2 代起第 1 格是上一代传下的事签（不可换），玩家只挑 cap = 2 个字。 */
+   cap = pickCapFor(generation)；事签未通前预留恒 0 → 每代（含第 2 代）都挑 3 个字。 */
 @Component
 public class PickScreen {
     /* 代次（EntryView 从存档带下来）。 */
@@ -462,12 +465,12 @@ public class PickScreen {
     @State var slot1: String = ""
     @State var slot2: String = ""
 
-    /* 第 1 格留给事签没有（第 2 代起 = true；纯逻辑在 run_state.cj）。 */
+    /* 第 1 格留给事签没有（pickShiqianReserved > 0；事签未通前恒 false；纯逻辑在 run_state.cj）。 */
     func reserved(): Bool {
         return pickShiqianReserved(this.generation) > 0
     }
 
-    /* 这一代最多能挑几个（第 1 代 3，第 2 代起 2）。 */
+    /* 这一代最多能挑几个（事签未通前每代都是 3）。 */
     func cap(): Int64 {
         return pickCapFor(this.generation)
     }
