@@ -323,7 +323,7 @@ function renderCard() {
   const drops = $("card-drops");
   if (st.phase === "engrave") {
     drops.hidden = false;
-    drops.innerHTML = `卡上出现一道迹：${st.pendingTrace.text} <button class="act" data-do="skip" style="margin-left:8px">先不刻</button>`;
+    drops.innerHTML = `卡上出现一道迹：${st.pendingTrace.tally_text} <button class="act" data-do="skip" style="margin-left:8px">先不刻</button>`;
   } else if (c.drops && c.drops.length) {
     const d = c.drops.filter((x) => st.wordBox.includes(x.char))[0];
     drops.hidden = !d;
