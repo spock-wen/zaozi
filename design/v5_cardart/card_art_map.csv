@@ -1,0 +1,12 @@
+id,season,speaker,art,mobile_1x,mobile_2x,desktop_1x,desktop_2x,png_fallback,note
+C01,春,族长,elder,assets/elder_m@1x.webp,assets/elder_m@2x.webp,assets/elder_d@1x.webp,assets/elder_d@2x.webp,assets/elder_{m|d}@{1|2}x.png,
+C02,春,采集的妇人,gatherer,assets/gatherer_m@1x.webp,assets/gatherer_m@2x.webp,assets/gatherer_d@1x.webp,assets/gatherer_d@2x.webp,assets/gatherer_{m|d}@{1|2}x.png,
+C03,春,巫,shaman,assets/shaman_m@1x.webp,assets/shaman_m@2x.webp,assets/shaman_d@1x.webp,assets/shaman_d@2x.webp,assets/shaman_{m|d}@{1|2}x.png,
+C04,夏,东岸的使者,river,assets/river_m@1x.webp,assets/river_m@2x.webp,assets/river_d@1x.webp,assets/river_d@2x.webp,assets/river_{m|d}@{1|2}x.png,
+C05,夏,北山来的赶路者,north,assets/north_m@1x.webp,assets/north_m@2x.webp,assets/north_d@1x.webp,assets/north_d@2x.webp,assets/north_{m|d}@{1|2}x.png,
+C06,夏,守堤的老汉,river,assets/river_m@1x.webp,assets/river_m@2x.webp,assets/river_d@1x.webp,assets/river_d@2x.webp,assets/river_{m|d}@{1|2}x.png,
+C07,秋,族里最壮的汉子,strong,assets/strong_m@1x.webp,assets/strong_m@2x.webp,assets/strong_d@1x.webp,assets/strong_d@2x.webp,assets/strong_{m|d}@{1|2}x.png,
+C08,秋,北山的人,north,assets/north_m@1x.webp,assets/north_m@2x.webp,assets/north_d@1x.webp,assets/north_d@2x.webp,assets/north_{m|d}@{1|2}x.png,
+C09,冬,巫,shaman,assets/shaman_m@1x.webp,assets/shaman_m@2x.webp,assets/shaman_d@1x.webp,assets/shaman_d@2x.webp,assets/shaman_{m|d}@{1|2}x.png,
+C10,冬,族长,elder,assets/elder_m@1x.webp,assets/elder_m@2x.webp,assets/elder_d@1x.webp,assets/elder_d@2x.webp,assets/elder_{m|d}@{1|2}x.png,
+gf4-休,冬,冬夜 · 「休」入字录（设计稿 gf4 ③ 与电脑端）,strong,assets/strong_m@1x.webp,assets/strong_m@2x.webp,assets/strong_d@1x.webp,assets/strong_d@2x.webp,assets/strong_{m|d}@{1|2}x.png,借用 strong 图，画面与「人靠在木旁边」不符，待专画；不进正式版
