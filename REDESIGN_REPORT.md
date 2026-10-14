@@ -3,8 +3,8 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`f9f8a39eabcb`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
-- **构建 commit**：`39cd01cd2151e14542cfcbea7214892227d43aba`
+- **dist VERSION**：`0ef899e7d326`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
 
@@ -87,3 +87,11 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 ## 第五轮（PM 确认 G_ENGRAVE1 排除为缺陷，2026-10-14 UTC+8）
 - G_ENGRAVE1 只从第 1 代排除，第 2 代起可抽（8799d01）；回归单测（1d827bf）。goal_sweep 2000×4 重跑：抽到 15145、达成 2064。可复现：种子 0，第 2 代抽到，第 3 代达成（GOAL_REACHABILITY.md §四/§五）。
 - 构建 commit bddf816，VERSION f9f8a39eabcb；单测 26/26，e2e 73/73。
+
+## 第六轮（工程复审 2026-10-14 UTC+8：报告头 / 版权页介绍 / 挑字）
+- **报告头**（本文件顶部）去掉写死的旧构建 SHA（原 `39cd01c…`），改成「本分支 tip + VERSION」，不再写死 SHA。VERSION 更新为本次 dist 内容哈希 `0ef899e7d326`（本轮改了 `web/app.js`、`web/style.css`、`tools/credits_template.html`，故与上一版 `f9f8a39eabcb` 不同）。
+- **版权页介绍**（`tools/credits_template.html`）去掉内部路径 `glyph/glyph_pack_v1.csv` 与 `<code>`，只留公开措辞（字、阶段、来源、许可、署名、原始链接）。新增 `tests/credits_public.test.mjs`：用真实模板 + 真实 csv 渲染 `credits.html`，断言不含 `glyph_pack` / `glyph/` / `<code>` / `baseline`，并保留公开措辞与 Richard Sears 署名。
+- **挑字界面**（`web/app.js` + `web/style.css`）对齐 `design/v4_gamefeel/gf5_pick.html`：出发键两态「还差字」（未选满、灰、禁用）/「带这三个字出发」（选满、朱、可用）；提示按档位——桌面「点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发」，手机点选引导「点一个字看它能做什么；再点一次带上。」；按钮改全宽 48 高胶囊。挑字池仍为 14 字切片（`PICK_CHARS`）。
+- **e2e**：`flow.test.mjs`（390/1280/1440）断言 14 候选、桌面提示含 ← → 与 Space、按钮文案为 gf5 两态之一且选满切成「带这三个字出发」；`touch.test.mjs`（390 三引擎）断言手机点选引导与按钮两态。未新增用例节点，仍 73。
+- 本轮不动：空的开春展开（P2）、9d0b 坏 SW。
+- 构建 commit：本分支 tip，VERSION `0ef899e7d326`；单测 28/28，e2e 73/73。
