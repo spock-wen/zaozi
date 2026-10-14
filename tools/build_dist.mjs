@@ -42,6 +42,7 @@ copyFile(path.join(ROOT, "web/style.css"), path.join(DIST, "style.css"));
 copyFile(path.join(ROOT, "web/manifest.webmanifest"), path.join(DIST, "manifest.webmanifest"));
 copyTree(path.join(ROOT, "icons"), path.join(DIST, "icons"));
 copyTree(path.join(ROOT, "glyph/img"), path.join(DIST, "glyph/img"));
+copyTree(path.join(ROOT, "web/img"), path.join(DIST, "img"));
 
 // ---- 3. glyph CSV（公开版；源 csv 已是公开版，publicCsv 对它幂等）----
 const csvText = fs.readFileSync(path.join(ROOT, "glyph/glyph_pack_v1.csv"), "utf8");
@@ -50,7 +51,7 @@ writeFile(path.join(DIST, "glyph/glyph_pack_v1.csv"), publicCsv(csvText));
 // ---- 4. data/*.js：由 data/*.json 生成（一行注释 + export default + JSON 原文）----
 const DATA_HEADER = (name) =>
   `// 由 tools/build_dist.mjs 从 data/${name}.json 生成：浏览器直接吃 JS 模块，不用 import 属性（Safari 老版本不支持）。\n`;
-for (const name of ["chars_slice", "input_map", "rules", "year1_cards", "goals", "tutorial"]) {
+for (const name of ["chars_slice", "input_map", "rules", "year1_cards", "goals", "tutorial", "card_art"]) {
   const json = fs.readFileSync(path.join(ROOT, "data", name + ".json"), "utf8");
   writeFile(path.join(DIST, "data", name + ".js"), DATA_HEADER(name) + "export default " + json);
   writeFile(path.join(DIST, "data", name + ".json"), json);
@@ -76,7 +77,8 @@ writeFile(path.join(DIST, "app.js"), app);
 
 // ---- 7. credits.html：模板 + 由 csv 生成的表格行（__COUNT__/__ROWS__ 占位符）----
 const creditsTmpl = fs.readFileSync(path.join(ROOT, "tools/credits_template.html"), "utf8");
-writeFile(path.join(DIST, "credits.html"), renderCredits(csvText, creditsTmpl));
+const sourcesCsv = fs.readFileSync(path.join(ROOT, "data/glyph_sources.csv"), "utf8");
+writeFile(path.join(DIST, "credits.html"), renderCredits(csvText, creditsTmpl, sourcesCsv));
 
 // ---- 8. 文件清单 + 版本 + sw.js ----
 // 清单 = dist 内全部文件（除 sw.js 与 _headers），"./index.html" 记作 "./"，

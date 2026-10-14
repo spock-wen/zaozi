@@ -1,0 +1,17 @@
+{
+  "schema_version": "1",
+  "_说明": "卡面图映射（design/v5_cardart/card_art_map.json）。只登记标记上线的条目：C01–C10。设计稿 gf4-休 借用的 strong 图**不上线**，这里没有它。先人卡（代末）无卡面图。手机图 296×216，电脑图 400×292 比例（不裁切）。",
+  "base": "img/cardart/",
+  "cards": {
+    "C01": "elder",
+    "C02": "gatherer",
+    "C03": "shaman",
+    "C04": "river",
+    "C05": "north",
+    "C06": "river",
+    "C07": "strong",
+    "C08": "north",
+    "C09": "shaman",
+    "C10": "elder"
+  }
+}
