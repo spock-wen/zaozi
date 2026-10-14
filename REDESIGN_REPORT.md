@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`c381ec1d0116`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`177929f5b1ef`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -89,21 +89,21 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - 构建 commit bddf816，VERSION f9f8a39eabcb；单测 26/26，e2e 73/73。
 
 ## 第六轮（工程复审 2026-10-14 UTC+8：报告头 / 版权页介绍 / 挑字）
-- **报告头**（本文件顶部）去掉写死的旧构建 SHA（原 `39cd01c…`），改成「本分支 tip + VERSION」，不再写死 SHA。VERSION 更新为本次 dist 内容哈希 `c381ec1d0116`（本轮改了 `web/app.js`、`web/style.css`、`tools/credits_template.html`，故与上一版 `f9f8a39eabcb` 不同）。
+- **报告头**（本文件顶部）去掉写死的旧构建 SHA（原 `39cd01c…`），改成「本分支 tip + VERSION」，不再写死 SHA。VERSION 更新为本次 dist 内容哈希 `177929f5b1ef`（本轮改了 `web/app.js`、`web/style.css`、`tools/credits_template.html`，故与上一版 `f9f8a39eabcb` 不同）。
 - **版权页介绍**（`tools/credits_template.html`）去掉内部路径 `glyph/glyph_pack_v1.csv` 与 `<code>`，只留公开措辞（字、阶段、来源、许可、署名、原始链接）。新增 `tests/credits_public.test.mjs`：用真实模板 + 真实 csv 渲染 `credits.html`，断言不含 `glyph_pack` / `glyph/` / `<code>` / `baseline`，并保留公开措辞与 Richard Sears 署名。
 - **挑字界面**（`web/app.js` + `web/style.css`）对齐 `design/v4_gamefeel/gf5_pick.html`：出发键两态「还差字」（未选满、灰、禁用）/「带这三个字出发」（选满、朱、可用）；提示按档位——桌面「点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发」，手机点选引导「点一个字看它能做什么；再点一次带上。」；按钮改全宽 48 高胶囊。挑字池仍为 14 字切片（`PICK_CHARS`）。
 - **e2e**：`flow.test.mjs`（390/1280/1440）断言 14 候选、桌面提示含 ← → 与 Space、按钮文案为 gf5 两态之一且选满切成「带这三个字出发」；`touch.test.mjs`（390 三引擎）断言手机点选引导与按钮两态。未新增用例节点，仍 73。
 - 本轮不动：空的开春展开（P2）、9d0b 坏 SW。
-- 构建 commit：本分支 tip，VERSION `c381ec1d0116`；单测 28/28，e2e 73/73。
+- 构建 commit：本分支 tip，VERSION `177929f5b1ef`；单测 28/28，e2e 73/73。
 
 ## 第七轮（QA W5 挑字两步，2026-10-14 UTC+8）
 - 挑字改两步（c00e5ec）：点一下只开说明卡（落/部件/解锁），不入格；再点同一字变朱、入下一格；点已选字或格子放回。键盘 ← → / Space / Backspace / Enter 不变。390 触控 e2e 三引擎断言 tap1/tap2/tap3。
 - 768 断点核对：BREAKPOINTS.md 定义 600–1023 竖屏 = 平板竖屏「同手机结构」、触控为主，接了键盘（pointer:fine）才显键位行。768×1024 竖屏显示手机提示符合设计，未改。
-- QA 提交 f66ccdb 已并入。VERSION c381ec1d0116；单测 28/28，e2e 76/76。
+- QA 提交 f66ccdb 已并入。VERSION 177929f5b1ef；单测 28/28，e2e 76/76。
 
 ## 第八轮（QA W6，平板竖屏接键鼠，2026-10-14 UTC+8）
 - 按 BREAKPOINTS.md 第 8 行：600–1023 竖屏若 (hover:hover) and (pointer:fine)，显示 #keys 键位行、手势提示用键盘文案；触控平板/手机不变（ea70c3a）。e2e：768×1024 三引擎 pointer:fine vs hasTouch（e9a524c）。
-- QA 提交 ed0a564 已 cherry-pick（e80bbc5）。VERSION c381ec1d0116；单测 28/28，e2e 85/85。
+- QA 提交 ed0a564 已 cherry-pick（e80bbc5）。VERSION 177929f5b1ef；单测 28/28，e2e 85/85。
 
 ## 第九轮（工程审核 f04dfb8 DELTA，2026-10-14 UTC+8）
 - P1-1 挑字说明卡：无数据的行整行不画，不出「？」（5823fb9，pick_info e2e）。
@@ -112,14 +112,14 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - 保留：同字快速双击即选中（已接受）。
 - 截图：release_shots_v2/desktop_pick_1280.png、desktop_pick_1440.png（tools/shot_pick_desktop.mjs）。
 - 注：b10c53a 的提交说明写了「P1-2 测试失败」，那是两份 e2e 并行跑时的误报；单独跑和全量跑都通过。
-- VERSION c381ec1d0116；单测 28/28，e2e 95/95。
+- VERSION 177929f5b1ef；单测 28/28，e2e 95/95。
 
 ## 第十轮（QA d29439b 复测 + PM 改判挑字几何，2026-10-14 UTC+8）
 - 抖动结论：**产品竞态**。afterAction 的 650ms 重绘若落在按下与抬起之间，会用 innerHTML 重建挑字候选节点，浏览器就不合成 click，真实点击被吞。修法：HTML 没变就不重建（af86562）。回归 pick_race（967396f）：先按下、强制重绘、再抬起；不带修复三引擎全挂，带修复全过。firefox 1280 主流程连跑 20 次：20/20 通过。
 - 电脑端挑字几何按 gf5 §11（7ed0cdd）：1280 时左边距 96，标题 y96，挑字格 y160，字池 y256（宽 560），说明卡 x820 y160（宽 360），按钮 y640；1440 整块水平居中（x +80）。e2e pick_geometry 三引擎 ±4px（c39e682）。落/解锁无数据整行不画，保持。
 - 另两处全量跑偶发（测试时序，非产品缺陷）：转竖屏提示改为等 body 视图/朝向状态（1a4320c）；commit() 先等飞出动画结束再按键（动画中按的键会被提交后的状态重置吞掉）。为此新增调试只读属性 __zz.animating。
 - QA 提交 7551cc1 已 cherry-pick（d68f021）。截图 release_shots_v2/desktop_pick_1280/1440.png 已刷新。
-- VERSION c381ec1d0116；单测 28/28，e2e 104/104。
+- VERSION 177929f5b1ef；单测 28/28，e2e 104/104。
 
 ## 第十一轮（QA 40bf79b：W7 / W8，2026-10-14 UTC+8）
 - **W8 根因**（详见 ROOTCAUSE_W8.md）：挑字选择原来依赖浏览器合成 click，而 click 只在按下和抬起落在同一 DOM 节点时才合成。挑字 HTML 里写进了焦点（.focus）类；鼠标悬停只就地切类，没更新 HTML 缓存，缓存因此「变脏」。之后任何一次 render()（如 afterAction 的 650ms 重绘）都会判定 HTML 变了，整块替换候选节点。玩家按住期间节点被换，抬起落在新节点上，浏览器不合成 click，点击就被静默吞掉。按住越久越容易撞上，所以约 650ms 时最明显。上一轮「HTML 不变就不重建」只修了一半，没堵住缓存变脏这条路。
@@ -128,4 +128,19 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - **W7**（18e5bc4）：电脑端挑字在 ≥1024 的任何宽度都放得下。1280 严格按 PM 数值；≥1280 整块居中（1440 → x+80）；1024–1279 收窄说明卡和间距，整块进视口。手机/平板不变。e2e（216dc91）：1280/1440 位置 ±4px；1024/1100/1279 检查 #pick 所有子元素 getBoundingClientRect().right ≤ innerWidth、left ≥ 0，说明卡完整可见、不压字池。三引擎。
 - **已知小项**：卡片飞出动画期间按的键按设计丢弃。PM：缓冲按键会在玩家看到下一张卡之前就替他提交。
 - QA 提交 f5319d0 已 cherry-pick（8fcf9fd）。
-- VERSION c381ec1d0116；单测 28/28，e2e 119/119。
+- VERSION 177929f5b1ef；单测 28/28，e2e 119/119。
+
+## 第十二轮（工程审核 b12d7f1 + 设计师矮屏规则，2026-10-15 UTC+8）
+- **P1（触控放回一个却放回两个）**：根因见 ROOTCAUSE_P1_b12.md。修法（7250f3a）：挑字屏改为只建一次骨架、之后按 data-char / data-slot / data-do 就地补丁，按住期间不再换节点；pointerup 与合成 click 的去重改按「这一次按下」（pointerId + 每次按下的 token），不再比较字；「出发」键走同一路径。
+- **P2-1 多指**：按下按 pointerId 分别记录（Map），一指松开只处理它自己的那次按下，第二指不会取消或抢走第一指。
+- **测试**（8cdd2cd）：390 触控三引擎：填满三格后点第 1 格恰好少一个字；点已选候选恰好少一个；「出发」恰好触发一次。chromium 用 CDP 双指测试，其他引擎跳过并注明原因。去掉修复后这些用例全挂（点格子少两个）。
+- **矮屏（设计师 BREAKPOINTS.md「矮屏（高度 ≤ 760）」，sha 4ba0bfae）**：
+  - 601–760：卡高 vh−188（限 380–468），键位行一行 28px，字匣 60。
+  - ≤600：卡高 vh−172（限 320–428），键位提示收进顶栏「?」浮层（首次进入自动弹一次），字匣 56。
+  - 高度 <492：提示「放大窗口」。
+  - 换档不加过渡动画；挑字页固定 7×2、不滚动；「落」在矮屏压成一行，「解锁」无数据不显示。
+  - P2-4：教学气泡不压目标（70a2e02，根因：气泡按正在做过渡动画的卡定位）。1024×600 第 4 步字匣可点，按 1 能落字。
+  - P2-2：1280×720 键位行在视口内。
+  - WebKit 卡槽宽算错导致字匣不在卡下，已修（#cardwrap 用卡的宽高比）。
+- **测试**：short_screen / short_tutorial / short_bounds，三引擎 × 1280×720、1024×600、1366×768（另含 1280×633、1024×513、1024×488/492）：卡局和挑字页所有可见元素都在视口内，页面不滚动，教学全程走通。
+- VERSION 177929f5b1ef；单测 28/28，e2e 180/180。
