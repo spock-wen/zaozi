@@ -42,6 +42,18 @@ export async function toPick(page) {
   await page.locator("#pick").waitFor({ state: "visible" });
 }
 
+// 桌面/键鼠：从开局点到挑字阶段（pointer/键盘用 click，不用 tap）。
+export async function toPickDesktop(page) {
+  await clearTutorial(page);
+  await playToWinter(page);
+  await page.locator("#winter-end").click();
+  await page.locator("#endseq").waitFor({ state: "visible", timeout: 12000 });
+  await page.locator("#endseq [data-do=elder]").click();
+  await page.locator("#elder").waitFor({ state: "visible" });
+  await page.locator("#elder [data-do=heir]").click();
+  await page.locator("#pick").waitFor({ state: "visible" });
+}
+
 export async function dragCard(page) {
   const c = await page.locator("#card").boundingBox();
   const cx = c.x + c.width / 2, cy = c.y + c.height / 2;

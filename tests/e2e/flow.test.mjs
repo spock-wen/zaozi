@@ -137,18 +137,21 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.waitForTimeout(80);
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), [], "第一次点不应选中");
         assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "第一次点应出说明卡");
-        const infoRows = await page.locator("#pick-desc .pi-row b").allInnerTexts();
-        assert.deepEqual(infoRows, ["落", "部件", "解锁"], "说明卡应为落/部件/解锁 三行");
+        // P1-1：说明卡只画有数据的行。「水」在字池里没有部件/底字数据 → 不出任何说明行，也不出「？」。
+        assert.equal(await page.locator("#pick-desc .pi-row").count(), 0, "水 没有部件数据，说明卡不应有说明行");
+        assert.ok(!(await page.locator("#pick-desc").innerText()).includes("？"), "说明卡不应出现「？」占位");
         assert.equal(await page.locator("#pick .cand.sel").count(), 0, "第一次点不应有已选字");
         // gf5 ②：同一字再点一次才入格、变朱、带序号角标。
         await page.locator("#pick .cand[data-char='水']").click();
         await page.waitForTimeout(80);
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水"], "同一字再点一次才选中");
         assert.equal(await page.locator("#pick .cand.sel[data-char='水'] .badge").textContent(), "1", "选中字应带顺序角标 1");
-        // gf5 ①：部件行从数据里推（木 → 休、林、本）。
+        // gf5 ①：部件行从数据里推（木 → 休、林、本）。只有有数据时才出「部件」这一行。
         await page.locator("#pick .cand[data-char='木']").click();
-        const woodParts = (await page.locator("#pick-desc .pi-row").nth(1).innerText()).trim();
-        assert.ok(woodParts.includes("休") && woodParts.includes("本") && woodParts.includes("林"), `木 的部件应为 休/林/本，得到：${woodParts}`);
+        const woodRow = (await page.locator("#pick-desc .pi-row").first().innerText()).trim();
+        assert.ok(woodRow.includes("部件"), `木 应出「部件」行，得到：${woodRow}`);
+        assert.ok(woodRow.includes("休") && woodRow.includes("本") && woodRow.includes("林"), `木 的部件应为 休/林/本，得到：${woodRow}`);
+        assert.ok(!(await page.locator("#pick-desc").innerText()).includes("？"), "说明卡不应出现「？」占位");
         for (const ch of ["休", "木"]) {
           await page.locator(`#pick .cand[data-char='${ch}']`).click();
           await page.locator(`#pick .cand[data-char='${ch}']`).click();

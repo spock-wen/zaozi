@@ -105,12 +105,13 @@ for (const [engine] of Object.entries(ENGINES)) {
       await toPick(page);
       const picks = () => page.evaluate(() => window.__zz.st.picks);
 
-      // ① tap1：只出说明卡（落 / 部件 / 解锁 三行），不填格、不选中。
+      // ① tap1：只出说明卡（只画有数据的行；「水」无部件数据 → 无说明行、无「？」占位），不填格、不选中。
       await page.locator("#pick .cand[data-char='水']").tap();
       await page.waitForTimeout(80);
       assert.deepEqual(await picks(), [], "tap1 不应填格");
       assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "tap1 应出说明卡");
-      assert.deepEqual(await page.locator("#pick-desc .pi-row b").allInnerTexts(), ["落", "部件", "解锁"], "说明卡应为落/部件/解锁 三行");
+      assert.equal(await page.locator("#pick-desc .pi-row").count(), 0, "水 没有部件数据，说明卡不应有说明行");
+      assert.ok(!(await page.locator("#pick-desc").innerText()).includes("？"), "说明卡不应出现「？」占位");
       assert.equal(await page.locator("#pick .pickslot[data-char]").count(), 0, "tap1 不应填格");
       assert.equal(await page.locator("#pick .cand.sel").count(), 0, "tap1 不应选中");
 

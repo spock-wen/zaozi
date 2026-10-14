@@ -464,7 +464,9 @@ function renderPick() {
     `<div class="pickfoot"><button class="go${full ? " ready" : ""}" data-do="go" ${full ? "" : "disabled"}>${full ? "带这三个字出发" : "还差字"}</button></div>`;
   updatePickInfo();
 }
-// gf5 ①：说明卡（落 / 部件 / 解锁 三行；数据缺的写「？」）。部件 = 字池里用它当部件或底字的字。
+// gf5 ①：说明卡只画有数据的行——没数据的行整行不画，绝不写「？」占位。
+// 目前数据里只有「部件」一条：部件 = 字池里用它当部件或底字的字（木 → 休、林、本）。
+// 「落 / 解锁」的文案数据待补，先在数据到位前整行省略。
 function charParts(ch) {
   return PICK_CHARS.filter((p) => {
     if (p.char === ch) return false;
@@ -475,10 +477,10 @@ function charParts(ch) {
 function pickInfoHTML(ch) {
   const p = PICK_CHARS.find((x) => x.char === ch) || {};
   const parts = charParts(ch);
-  return `<div class="pickinfo"><div class="pi-h">${ch}${p.meaning ? ` <span>${p.meaning}</span>` : ""}</div>` +
-    `<div class="pi-row"><b>落</b><span>？</span></div>` +
-    `<div class="pi-row"><b>部件</b><span>${parts.length ? "能拼出：" + parts.join("、") : "？"}</span></div>` +
-    `<div class="pi-row"><b>解锁</b><span>？</span></div></div>`;
+  const rows = parts.length
+    ? `<div class="pi-row"><b>部件</b><span>能拼出：${parts.join("、")}</span></div>`
+    : "";
+  return `<div class="pickinfo"><div class="pi-h">${ch}${p.meaning ? ` <span>${p.meaning}</span>` : ""}</div>${rows}</div>`;
 }
 function updatePickInfo() {
   const el = $("pick"); if (!el) return;
