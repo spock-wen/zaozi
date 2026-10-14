@@ -157,7 +157,7 @@ function deferInteract(el, ms = 350) {         // 防「天亮了」穿透到下
   el.style.pointerEvents = "none";
   setTimeout(() => { el.style.pointerEvents = ""; }, ms);
 }
-function on(el, fn) { el.addEventListener("click", (e) => { e.preventDefault?.(); fn(e); }); }
+function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closest?.("a[href]")) e.preventDefault?.(); fn(e); }); }
 
 // ---------- 派发 / 存档 ----------
 function dispatch(a) {
