@@ -440,10 +440,14 @@ function winterCarve() {
   ui.winter = freshWinter(); render();
 }
 
+// 挑字候选的 HTML 缓存：内容没变时不再 el.innerHTML 重建（P1 竞态）。
+// afterAction 的 650ms render 若恰好落在某次 pointerdown 与 pointerup 之间，
+// 替换掉按下的节点会让浏览器不合成 click——真实玩家的点选被静默吞掉。
+let lastPickHTML = null;
 function renderPick() {
   const el = $("pick");
   el.hidden = st.phase !== "pick";
-  if (st.phase !== "pick") { ui.pickFocus = null; ui.pickTapped = null; return; }
+  if (st.phase !== "pick") { ui.pickFocus = null; ui.pickTapped = null; lastPickHTML = null; return; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
   const pool3 = PICK_CHARS;
@@ -451,7 +455,7 @@ function renderPick() {
   const hint = document.body.dataset.view === "desktop"
     ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
     : "点一个字看它能做什么；再点一次带上。";
-  el.innerHTML =
+  const html =
     `<h2>出发挑字 · 第 ${st.generation ?? 2} 代</h2>` +
     `<p class="season-note">${hint}</p>` +
     `<div class="pickslots">${[0, 1, 2].map((i) => picks[i]
@@ -463,6 +467,7 @@ function renderPick() {
     }).join("")}</div>` +
     `<div class="desc" id="pick-desc"></div>` +
     `<div class="pickfoot"><button class="go${full ? " ready" : ""}" data-do="go" ${full ? "" : "disabled"}>${full ? "带这三个字出发" : "还差字"}</button></div>`;
+  if (html !== lastPickHTML) { el.innerHTML = html; lastPickHTML = html; }
   updatePickInfo();
 }
 // gf5 ①：说明卡只画有数据的行——没数据的行整行不画，绝不写「？」占位。
@@ -762,7 +767,7 @@ window.__zz = {
   get st() { return st; }, get seed() { return seed; }, get actions() { return actions; },
   get view() { return document.body.dataset.view; },
   get debugGoal() { return DEBUG_GOAL; },
-  dispatch, newGame, restore, code: () => encodeSaveCode(seed, actions),
+  dispatch, newGame, restore, render, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
   setMuted(v) { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); renderMenu(); },
   isMuted: () => muted(),
