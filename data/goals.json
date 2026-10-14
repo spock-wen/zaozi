@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "_说明": "每代三个小目标（PM 决定 §5）。目标文案与达成横幅取 design/v4_gamefeel/GOALS_COPY.md v2.1：目标 ≤10 字、横幅 ≤12 字，数字用汉字写（校验 V6 拦英文字母与阿拉伯数字）。placeholder 一律 false，文案里不出现「（占位）」或内部术语。四维目标在本代最后一个冬夜结束时判定（不是中途到过就算）。",
+  "per_generation": 3,
+  "placeholder": false,
+  "banner_prefix": "达成　",
+  "pool": [
+    { "id": "G_ENGRAVE1", "kind": "engrave", "text": "用骨片刻下一件事", "banner": "达成　用骨片刻下一件事",
+      "note": "这一代里在卡上点骨片刻下至少 1 件事，马上达成；冬夜刻字和「不刻」都不算。" },
+    { "id": "G_DROP1", "kind": "drop", "text": "落一个字", "banner": "达成　落一个字",
+      "note": "这一代里往卡上落至少 1 个字，马上达成。" },
+    { "id": "G_MEM_70", "kind": "dim", "dim": "memory", "min": 70, "text": "代末「记」够七十", "banner": "达成　代末「记」够七十" },
+    { "id": "G_FAITH_65", "kind": "dim", "dim": "faith", "min": 65, "text": "代末「信」够六十五", "banner": "达成　代末「信」够六十五" },
+    { "id": "G_FOOD_65", "kind": "dim", "dim": "food", "min": 65, "text": "代末「粮」够六十五", "banner": "达成　代末「粮」够六十五" },
+    { "id": "G_OUT_65", "kind": "dim", "dim": "outsider", "min": 65, "text": "代末「外」够六十五", "banner": "达成　代末「外」够六十五" }
+  ],
+  "generation1_goals": ["G_DROP1", "G_MEM_70", "G_FAITH_65"],
+  "generation1_exclude": ["G_ENGRAVE1"],
+  "_selection": "第 1 代固定用 generation1_goals：教学已强制刻一次，所以从池里排除 G_ENGRAVE1（PM 决定 5）。第 2 代起在池里按 (种子, 代数) 定序挑 per_generation 个，结果确定可复现。",
+  "dim_goal_judged_at": "generation_end",
+  "_not_implemented": "gf4 的示意目标（刻成一个会意字 / 骨片攒到 5 片 / 一年里不落字）不实现（PM 决定 5）。"
+}

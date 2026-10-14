@@ -3,6 +3,22 @@
   "_说明": "切片 14 字（已定，CHAR_LIST_V1.md 第 6 节）。glyph_id 对应 glyph/glyph_pack_v1.csv 的 id 列。forbidden 是事签禁用词表（GAMEPLAY §2.5 第 3 条），只给一年里程碑会刻的 4 个目标字和它们的部件写全，其余待补。trace_points 的坐标是占位，接壳后按字形调。",
   "milestone_start_zilu": ["水", "日", "人", "木", "田", "火"],
   "milestone_word_box": ["水", "火", "日"],
+  "pick_chars": [
+    { "char": "水", "meaning": "河水" },
+    { "char": "日", "meaning": "太阳" },
+    { "char": "人", "meaning": "人" },
+    { "char": "木", "meaning": "树木" },
+    { "char": "田", "meaning": "田地" },
+    { "char": "火", "meaning": "火" },
+    { "char": "力", "meaning": "力气" },
+    { "char": "月", "meaning": "月亮" },
+    { "char": "休", "meaning": "歇息" },
+    { "char": "林", "meaning": "树林" },
+    { "char": "从", "meaning": "跟随" },
+    { "char": "男", "meaning": "男子" },
+    { "char": "明", "meaning": "光亮" },
+    { "char": "本", "meaning": "树根" }
+  ],
   "chars": {
     "水": { "method": "xiangxing", "glyph_id": "shui", "forbidden": ["水", "河水"] },
     "日": { "method": "xiangxing", "glyph_id": "ri",   "forbidden": ["日", "太阳", "日头"] },

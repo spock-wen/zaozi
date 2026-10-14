@@ -50,7 +50,7 @@ writeFile(path.join(DIST, "glyph/glyph_pack_v1.csv"), publicCsv(csvText));
 // ---- 4. data/*.js：由 data/*.json 生成（一行注释 + export default + JSON 原文）----
 const DATA_HEADER = (name) =>
   `// 由 tools/build_dist.mjs 从 data/${name}.json 生成：浏览器直接吃 JS 模块，不用 import 属性（Safari 老版本不支持）。\n`;
-for (const name of ["chars_slice", "input_map", "rules", "year1_cards"]) {
+for (const name of ["chars_slice", "input_map", "rules", "year1_cards", "goals", "tutorial"]) {
   const json = fs.readFileSync(path.join(ROOT, "data", name + ".json"), "utf8");
   writeFile(path.join(DIST, "data", name + ".js"), DATA_HEADER(name) + "export default " + json);
   writeFile(path.join(DIST, "data", name + ".json"), json);

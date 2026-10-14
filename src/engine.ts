@@ -1,15 +1,27 @@
 // 造字人一年里程碑的纯规则引擎：不碰界面，只吃动作、吐状态。
 // 渲染壳只需要：createGame() 建局，step(state, action) 推进，读 state 画界面。
+//
+// 重做新增（不改玩法数值）：每代三个小目标、开局挑字、教学开局（固定顺序 + 第 3 张锁左右拖）、
+// 多代流程（每代结束 → 先人 → 挑字 → 下一代）。数值仍全部来自 data/*.json。
 import rules from "../data/rules.js";
 import charsData from "../data/chars_slice.js";
 import cardsData from "../data/year1_cards.js";
+import goalsData from "../data/goals.js";
+import tutorialData from "../data/tutorial.js";
 import { mulberry32, shuffle } from "./rng.js";
 import type { Card, GameState, Action, Tally, Ending, Legacy, Trace, DropItem } from "./types.js";
 
 export const RULES = rules;
 export const CHARS = charsData.chars as Record<string, any>;
 export const CARDS = cardsData.cards as Card[];
+export const GOALS = goalsData;
+export const TUTORIAL = tutorialData;
+export const PICK_CHARS = charsData.pick_chars as any[];
+export const PICK_POOL = PICK_CHARS.map((x) => x.char);
 const DIM_KEYS = rules.dims.keys as Dim[];
+// 教学卡：只在第 1 代按 tutorial 号出现，不进普通牌堆
+const TUTORIAL_CARDS = (CARDS as any[]).filter((c) => c.only_tutorial).sort((a, b) => a.tutorial - b.tutorial).map((c) => c.id);
+const YEAR_CARDS = (CARDS as any[]).filter((c) => !c.only_tutorial);
 
 export type DimKey = string ;
 type Dim = any;
@@ -20,9 +32,18 @@ export interface GameStateInfo {            
 }
 
 function cardById(id: string, cards: Card[]): Card {
-  const c = cards.find((x) => x.id === id);
+  const c = (cards as any[]).find((x) => x.id === id);
   if (!c) throw new Error(`没有这张卡：${id}`);
-  return c;
+  return c as Card;
+}
+
+export function isTutorialCard(id: string | null): boolean {
+  return !!id && TUTORIAL_CARDS.includes(id);
+}
+export function tutorialStepOf(id: string | null): any {
+  if (!isTutorialCard(id)) return null;
+  const c = cardById(id as string, CARDS) as any;
+  return TUTORIAL.steps.find((s: any) => s.card === c.id) ?? null;
 }
 
 function buildYearDeck(seed: number, yearIndex: number, cards: Card[]): string[] {
@@ -35,12 +56,32 @@ function buildYearDeck(seed: number, yearIndex: number, cards: Card[]): string[]
   return out;
 }
 
+// ---- 每代目标：第 1 代固定（教学），第 2 代起按 (种子, 代数) 定序挑 3 个 ----
+export function goalIdsForGeneration(seed: number, generation: number): string[] {
+  if (generation <= 1) return goalsData.generation1_goals.slice();
+  const pool = goalsData.pool.map((g: any) => g.id).filter((id: string) => !goalsData.generation1_exclude.includes(id));
+  const rnd = mulberry32((seed ^ (generation * 0x85ebca6b)) >>> 0);
+  return shuffle(pool, rnd).slice(0, goalsData.per_generation);
+}
+function goalDef(id: string): any { return goalsData.pool.find((g: any) => g.id === id); }
+function makeGoals(seed: number, generation: number) {
+  return goalIdsForGeneration(seed, generation).map((id) => {
+    const d = goalDef(id);
+    return { id: d.id, kind: d.kind, dim: d.dim ?? null, min: d.min ?? null, text: d.text, banner: d.banner, achieved: false };
+  });
+}
+
 export function createGame(cfg: GameConfig): GameState {
   const cards = cfg.cards ?? CARDS;
+  const generation = cfg.generation ?? 1;
   const dims = Object.fromEntries(DIM_KEYS.map((k) => [k, rules.dims.start])) as Dims;
-  const deck = buildYearDeck(cfg.seed, 0, cards);
+  const deck = generation <= 1
+    ? TUTORIAL_CARDS.concat(buildYearDeck(cfg.seed, 0, YEAR_CARDS))
+    : buildYearDeck(cfg.seed, 0, YEAR_CARDS);
+  const wordBox = cfg.wordBox ?? (generation <= 1 ? ["水"] : charsData.milestone_word_box);
   const st: GameState = {
     seed: cfg.seed,
+    generation,
     phase: "card",
     dims,
     bones: rules.bones.start,
@@ -52,14 +93,19 @@ export function createGame(cfg: GameConfig): GameState {
     tallies: [],
     zilu: (cfg.startZilu ?? charsData.milestone_start_zilu).slice(),
     newThisGen: [],
-    wordBox: (cfg.wordBox ?? charsData.milestone_word_box).slice(0, rules.word_box.slots),
+    wordBox: wordBox.slice(0, rules.word_box.slots),
     dropped: [],
     clues: {},
     hiddenMarkers: {},
     ending: null,
     legacy: null,
-    log: [`开局：种子 ${cfg.seed}，第一张 ${deck[0]}`],
+    goals: makeGoals(cfg.seed, generation),
+    goalEvents: [],
+    engravedThisGen: 0,
+    tutorialDone: generation > 1,
+    log: [`开局：种子 ${cfg.seed}，第 ${generation} 代，第一张 ${deck[0]}`],
   };
+  enterCard(st);
   return st;
 }
 
@@ -92,6 +138,13 @@ function checkFail(st: GameState): boolean {
 
 function settleGeneration(st: GameState): GenerationCarryOver {
   // 代结算：字录（含这一代新造的）、隐藏线标记留下；最多传 1 张事签；四维、骨片重置
+  // 代末判四维目标（本代最后一个冬夜结束时）；达成事件排进 goalEvents
+  for (const g of st.goals as any[]) {
+    if (g.kind === "dim" && !g.achieved && st.dims[g.dim] >= g.min) {
+      g.achieved = true; st.goalEvents.push({ id: g.id, text: g.text });
+      st.log.push(`达成：${g.text}`);
+    }
+  }
   return {
     zilu: st.zilu.slice(),
     carriedTally: st.tallies.length > 0 && rules.generation.max_tally_carry > 0 ? st.tallies[0] : null,
@@ -116,12 +169,34 @@ function applyBones(st: GameState, n: number) {
   }
 }
 
+function achieveInstant(st: GameState, kind: string) {
+  for (const g of st.goals as any[]) {
+    if (g.kind === kind && !g.achieved) {
+      g.achieved = true; st.goalEvents.push({ id: g.id, text: g.text });
+      st.log.push(`达成：${g.text}`);
+    }
+  }
+}
+
+// 进入一张卡：教学第 3 张「带迹」且锁左右拖，一进来就进「刻」阶段
+function enterCard(st: GameState) {
+  const card = cardById(st.current as string, CARDS) as any;
+  st.phase = "card";
+  if (card.only_tutorial) {
+    const step = tutorialStepOf(card.id);
+    if (step && step.lock_drag && card.trace) {
+      st.pendingTrace = card.trace;
+      st.phase = "engrave";
+    }
+  }
+}
+
 function advance(st: GameState) {
   // 一张卡（含刻不刻）处理完之后：判结局，再翻下一张或进冬夜
   if (checkFail(st)) return;
   if (st.deck.length > 0) {
     st.current = st.deck.shift() ;
-    st.phase = "card";
+    enterCard(st);
   } else {
     st.current = null;
     st.phase = "winter";
@@ -165,23 +240,25 @@ function judge(st: GameState, target: string, ans: WinterAnswer): { ok: boolean;
 }
 
 export function step(prev: GameState, action: Action): GameState {
-  if (prev.phase === "ended") throw new Error("这一代已经结束");
+  if (prev.phase === "ended" && action.type !== "heir" && action.type !== "begin_generation" && action.type !== "restart") {
+    throw new Error("这一代已经结束");
+  }
   const st = clone(prev);
   switch (action.type) {
     case "choose": {
       if (st.phase !== "card" || !st.current) throw new Error("现在不是选卡的时候");
-      if (action.expectCard && action.expectCard !== st.current) throw new Error(`期望卡 ${action.expectCard}，实际是 ${st.current}`);
-      const card = cardById(st.current, CARDS);
+      const card = cardById(st.current, CARDS) as any;
       let opt: Option | null = null;
       if (action.side === "drop") {
         const ch = st.wordBox[action.slot];
         if (!ch) throw new Error(`字匣第 ${action.slot + 1} 格是空的`);
         if (st.dropped.includes(ch)) throw new Error(`${ch} 这一代已经落过`);
         if (!usableChar(st, ch)) throw new Error(`${ch} 这一代不能用`);
-        const d = card.drops.find((x) => x.char === ch);
+        const d = card.drops.find((x: any) => x.char === ch);
         if (!d) throw new Error(`这张卡不能落 ${ch}`);
         st.dropped.push(ch);
         applyDelta(st, d.delta);
+        achieveInstant(st, "drop");
         st.log.push(`${card.id} 落字 ${ch}`);
         advance(st);
         return st;
@@ -207,6 +284,8 @@ export function step(prev: GameState, action: Action): GameState {
       applyDelta(st, rules.engrave_tally.delta as Partial<Dims>);
       const t: Tally = { id: `T${st.tallies.length + 1}-${st.pendingTrace.target}`, target: st.pendingTrace.target, text: st.pendingTrace.tally_text, fromCard: st.current  };
       st.tallies.push(t);
+      st.engravedThisGen += 1;
+      achieveInstant(st, "engrave");
       st.log.push(`刻事签 ${t.id}`);
       st.pendingTrace = null;
       advance(st);
@@ -221,7 +300,7 @@ export function step(prev: GameState, action: Action): GameState {
     }
     case "winter_carve": {
       if (st.phase !== "winter") throw new Error("现在不是冬夜");
-      const idx = st.tallies.findIndex((t) => t.id === action.tally);
+      const idx = st.tallies.findIndex((t: Tally) => t.id === action.tally);
       if (idx < 0) throw new Error(`手里没有事签 ${action.tally}`);
       const t = st.tallies[idx];
       const r = judge(st, t.target, action.answer);
@@ -231,6 +310,7 @@ export function step(prev: GameState, action: Action): GameState {
         st.zilu.push(t.target);
         st.newThisGen.push(t.target);
         st.log.push(`冬夜刻成 ${t.target}`);
+        if (!st.tutorialDone && st.generation <= 1) st.tutorialDone = true;
       } else {
         applyDelta(st, rules.winter_night.wrong_delta as Partial<Dims>);
         st.log.push(`冬夜刻错 ${t.target}，骨片裂`);
@@ -240,7 +320,7 @@ export function step(prev: GameState, action: Action): GameState {
     }
     case "winter_defer": {
       if (st.phase !== "winter") throw new Error("现在不是冬夜");
-      if (!st.tallies.some((t) => t.id === action.tally)) throw new Error(`手里没有事签 ${action.tally}`);
+      if (!st.tallies.some((t: Tally) => t.id === action.tally)) throw new Error(`手里没有事签 ${action.tally}`);
       st.log.push(`事签 ${action.tally} 留到明年`);
       return st;
     }
@@ -255,12 +335,41 @@ export function step(prev: GameState, action: Action): GameState {
         st.log.push(`余年用完：${st.ending.name}`);
         return st;
       }
-      const deck = buildYearDeck(st.seed, 1, CARDS);
-      st.current = deck[0]; st.deck = deck.slice(1); st.phase = "card";
+      const deck = buildYearDeck(st.seed, 1, YEAR_CARDS);
+      st.current = deck[0]; st.deck = deck.slice(1); enterCard(st);
       st.log.push("新的一年");
       return st;
     }
+    case "pick_toggle": {
+      // 开局挑字：加/减一个字（最多 3 个）
+      if (st.phase !== "pick") throw new Error("现在不是挑字的时候");
+      const picks: string[] = (action.picks ?? st.picks ?? []).slice();
+      const ch = action.char;
+      const i = picks.indexOf(ch);
+      if (i >= 0) picks.splice(i, 1);
+      else if (picks.length < rules.word_box.slots) picks.push(ch);
+      st.picks = picks;
+      return st;
+    }
+    case "heir": {
+      if (st.phase !== "ended") throw new Error("这一代还没结束");
+      st.phase = "pick";
+      st.picks = [];
+      st.log.push("出发挑字");
+      return st;
+    }
+    case "begin_generation": {
+      if (st.phase !== "pick") throw new Error("现在不是挑字的时候");
+      const picks: string[] = action.picks ?? st.picks ?? [];
+      if (picks.length !== rules.word_box.slots) throw new Error("要挑三个字");
+      const legacy = st.legacy as GenerationCarryOver;
+      const seed = (st.seed + 0x9e3779b1) >>> 0;
+      const next = createGame({ seed, generation: (st.generation as number) + 1, startZilu: legacy.zilu, wordBox: picks });
+      next.tallies = legacy.carriedTally ? [legacy.carriedTally] : [];
+      return next;
+    }
   }
+  throw new Error(`不认识的 action：${(action as any).type}`);
 }
 
 export function run(cfg: GameConfig, actions: Action[]): GameState {
@@ -272,9 +381,11 @@ export function run(cfg: GameConfig, actions: Action[]): GameState {
 // 回归用的快照：只取验收关心的字段，日志也带上，方便对比出错位置
 export function snapshot(st: GameState) {
   return {
-    phase: st.phase, dims: st.dims, bones: st.bones, tallies: st.tallies.map((t) => t.id),
+    phase: st.phase, generation: st.generation, dims: st.dims, bones: st.bones, tallies: st.tallies.map((t: Tally) => t.id),
     zilu: st.zilu, newThisGen: st.newThisGen, dropped: st.dropped, clues: st.clues,
     hiddenMarkers: st.hiddenMarkers, ending: st.ending,
+    goals: (st.goals as any[]).map((g) => ({ id: g.id, achieved: g.achieved })),
+    goalEvents: (st.goalEvents as any[]).map((e) => e.id),
     legacy: st.legacy ? { zilu: st.legacy.zilu, carriedTally: st.legacy.carriedTally?.id ?? null } : null,
     log: st.log,
   };
