@@ -3,8 +3,8 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`d3d9cfc7782b`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
-- **构建 commit**：`61cfb2c307e8890efecdd02dc16b3618703d4418`
+- **dist VERSION**：`3232828264d4`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **构建 commit**：`39cd01cd2151e14542cfcbea7214892227d43aba`
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
 
@@ -71,3 +71,9 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - **baseline 逐字节一致测试**：本分支源码已改，dist 不再与 `baseline_dist/` 逐字节一致，原测试对本分支无意义，已替换为「构建完整 + strip 忠实 + VERSION=内容哈希」。`baseline_dist/` 与 `tools/qa/` 未改动。
 - **平板横屏用侧栏**：设计稿「待确认」项，未真机确认；横屏手机（<600 高）按决定显示转竖屏提示。
 - **桌面 1024 教学气泡**：与卡右上角有轻微视觉重叠（气泡 `pointer-events:none`，不影响骨片/拖卡点击）。
+
+## 第三轮（作家审核 GOALS_CHECK_c9a1886，2026-10-14 13:2x UTC+8）
+- P1：目标达成横幅改用 goals.json 的 banner（如「达成　落一个字」），引擎事件带 banner，壳显示 ev.banner（238c201）。单测 + e2e 断言横幅文本。
+- checkFail 提前结算行为保持不变（提前结束一代仍按代末判定）。
+- package.json engines node>=22；npm test / e2e 在 Node<22 时先报清楚的错误并退出（39cd01c，tools/check_node.mjs）。
+- 构建 commit 39cd01cd2151e14542cfcbea7214892227d43aba，VERSION 3232828264d4；单测 17/17，e2e 46/46。

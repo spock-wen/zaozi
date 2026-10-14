@@ -35,4 +35,5 @@
 - 16 主流程扩视口：`flow.test.mjs` 现按 390/1280/1440 三视口 × 三引擎跑（1440 侧栏默认展开时目标清单在侧栏验）。
 - 17 干净树 build：commit 61cfb2c 上构建 dist，VERSION=d3d9cfc7782b（内容哈希，184 文件）。重生成五档截图与已提交的 `release_shots_v2/` 逐字节一致（本改动只动 JS 交互，UI 未变，无需刷新）。
 - 18 复跑：`npm test` 16 全过；`npm run e2e` 46 全过（chromium 16 / firefox 13 / webkit 13 / 引擎无关 4）。REDESIGN_REPORT.md 更新（新 VERSION、build commit、测试数）。不部署。
-- DONE（v2.1）
+- 19 作家审核 P1：横幅用 goals.json banner；Node<22 先报错；VERSION=3232828264d4；单测 17、e2e 46 全过。
+- DONE（v2.2）
