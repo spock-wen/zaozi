@@ -766,6 +766,7 @@ document.addEventListener("click", closeMenuOutside);
 window.__zz = {
   get st() { return st; }, get seed() { return seed; }, get actions() { return actions; },
   get view() { return document.body.dataset.view; },
+  get animating() { return ui.animating; },
   get debugGoal() { return DEBUG_GOAL; },
   dispatch, newGame, restore, render, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },

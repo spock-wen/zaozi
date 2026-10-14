@@ -4,9 +4,12 @@ export const current = (page) => page.evaluate(() => window.__zz.st.current);
 
 export async function commit(page, dir) {
   const k = dir === "left" ? "ArrowLeft" : "ArrowRight";
+  // 等上一张的飞出动画结束再按（动画中按键会被重置吞掉），提交后等状态真的前进，不靠定时。
+  await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
+  const before = await page.evaluate(() => window.__zz.actions.length);
   await page.keyboard.press(k);
   await page.keyboard.press(k);
-  await page.waitForTimeout(520);
+  await page.waitForFunction((n) => window.__zz.actions.length > n && !window.__zz.animating, before, { timeout: 5000 });
 }
 
 export async function playToWinter(page) {
