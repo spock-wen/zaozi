@@ -66,14 +66,31 @@ test("regression: G_ENGRAVE1 excluded only from gen 1, eligible for the gen>=2 p
     assert.deepEqual(gen1, E.GOALS.generation1_goals, `第 1 代应是固定集（seed=${seed}）`);
     assert.ok(!gen1.includes("G_ENGRAVE1"), `第 1 代不该抽到 G_ENGRAVE1（seed=${seed}）`);
   }
-  // 第 2 代起它回到池里：跨种子必然会被抽到（每次 3/6 命中）
-  let hits = 0;
+  // 直接抽：第 2 代起它回到池里（每次 3/6 命中）
+  let directHits = 0;
   for (let seed = 0; seed < 200; seed++) {
     for (let gen = 2; gen <= 4; gen++) {
-      if (E.goalIdsForGeneration(seed, gen).includes("G_ENGRAVE1")) hits++;
+      if (E.goalIdsForGeneration(seed, gen).includes("G_ENGRAVE1")) directHits++;
     }
   }
-  assert.ok(hits > 0, "第 2 代起应能在池里抽到 G_ENGRAVE1");
+  assert.ok(directHits > 0, "第 2 代起应能在池里抽到 G_ENGRAVE1");
+  // 真实流程（begin_generation 会演化种子，所以不能只看 goalIdsForGeneration(seed, gen)）：
+  // 从 createGame 一路走到第 2/3 代，目标里必须能出现 G_ENGRAVE1。
+  const toPick = (s) => {
+    for (const ch of ["水", "日", "人"]) s = E.step(s, { type: "pick_toggle", char: ch });
+    return E.step(s, { type: "begin_generation", picks: s.picks });
+  };
+  let flowHits = 0;
+  for (let seed = 0; seed < 200; seed++) {
+    let st = playToEnd(E.createGame({ seed }));
+    st = toPick(E.step(st, { type: "heir" })); // 第 2 代
+    assert.ok(st.goals.length === 3);
+    if (st.goals.some((g) => g.id === "G_ENGRAVE1")) flowHits++;
+    st = playToEnd(st);
+    st = toPick(E.step(st, { type: "heir" })); // 第 3 代
+    if (st.goals.some((g) => g.id === "G_ENGRAVE1")) flowHits++;
+  }
+  assert.ok(flowHits > 0, "真实多代流程里第 2/3 代应能抽到 G_ENGRAVE1");
 });
 
 test("all goal copy is free of placeholder wording and arabic digits", () => {
