@@ -67,3 +67,4 @@
 37. Round 13: D1–D4 fixed + regression tests; VERSION 4cc4b2e4835c.
 38. D3 WebKit follow-up e51caf2; VERSION f243a91ccb14.
 39. Round 14: 刻 hit-test root cause + D3 two columns; VERSION b882984d66d7.
+40. Round 15: N-tier 字匣 64/52; VERSION 1d16af20f0f9.

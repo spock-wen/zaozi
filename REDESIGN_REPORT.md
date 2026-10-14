@@ -158,3 +158,6 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - QA commit 925d28e cherry-picked (0564def).
 - Card-corner 刻 intercepted by .card-head (Firefox flake). Root cause: `ui.engraved` was never initialised, so `classList.toggle("done", true && undefined)` became a plain toggle. The `done` class (pointer-events:none) flipped on every render during the engrave phase, so the corner sometimes ignored taps and the click fell through to .card-head. This was not a z-index problem. Fix: engraved is a boolean and resets when leaving engrave (59d39b8). Details: ROOTCAUSE_bonecorner.md. Regression test bonecorner_hit (elementFromPoint, 4 viewports × entry/after/tutorial): 30/30 on firefox.
 - D3: removed the height cap and scrolling. The B-tier popover is now a two-column grid, all 6 rows visible with no scroll and no overlap with the options at 1024×600/513/491 and 1280×491, auto-open and '?' (7b48404). The design was not edited.
+
+## Round 15 — N-tier 字匣 (VERSION 1d16af20f0f9)
+- PM decision: at 1366×768 (N tier) the 字匣 is 64 with 52px cells (was 83); hit areas ≥44, no overlap with the top bar or card, A/B tiers unchanged (9de8f08). Test: tray_n_tier, 3 engines.
