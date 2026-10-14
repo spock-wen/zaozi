@@ -297,7 +297,11 @@ body[data-view="tablet-portrait"] #cardwrap{width:min(calc(100vw - 64px),480px);
 /* ---------- 平板横屏（600–1023 横） ---------- */
 body[data-view="tablet-landscape"] #sidebar{display:block;}
 body[data-view="tablet-landscape"] #drawer{display:none;}
-body[data-view="tablet-landscape"] #cardwrap{height:min(560px,calc(100dvh - 240px));width:auto;}
+/* #cardwrap 与 .card 同比例：卡槽宽由卡高（已定）经 aspect-ratio 得出。
+   否则 WebKit 对 `height:100%` 的卡在「卡槽宽 auto」收缩时不认 aspect-ratio，
+   拿卡内文字 max-content 当槽宽（实测 377 vs 卡 328），卡被左贴、槽心 ≠ 卡心，
+   字匣（居中在网格列）就不在卡下了（也把 #cardwrap 卡槽右缘算错，气泡偏右）。 */
+body[data-view="tablet-landscape"] #cardwrap{height:min(560px,calc(100dvh - 240px));width:auto;aspect-ratio:328/468;}
 body[data-view="tablet-landscape"] .card{height:100%;width:auto;aspect-ratio:328/468;}
 body[data-view="tablet-landscape"] #wordbox-bar{border-radius:16px;margin:8px 16px;min-height:0;}
 body[data-view="tablet-landscape"] #stage{flex-wrap:nowrap;}
@@ -315,7 +319,9 @@ body[data-view="desktop"] #sidebar.collapsed,body[data-view="tablet-landscape"] 
 body[data-view="desktop"] #dims-desktop{display:flex;width:480px;max-width:100%;justify-content:space-between;margin-bottom:4px;}
 body[data-view="desktop"] #dims-desktop .dim{flex:0 0 auto;width:110px;}
 body[data-view="desktop"] #gesture-hint{color:var(--night-line);}
-body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;}
+/* 卡槽宽 = 卡高 × 328/468（同 tablet-landscape 注释）：让 #cardwrap 盒 = 卡盒，
+   卡在槽内居中、字匣（居中在网格列）正好在卡下，矮屏 A/B 也沿用此比例。 */
+body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;aspect-ratio:328/468;}
 body[data-view="desktop"] .card{height:100%;width:auto;aspect-ratio:328/468;}
 /* 桌面教学气泡沉到卡区底部右下：卡角「刻」在卡的右上，气泡在底部就不可能在
    任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
