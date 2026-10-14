@@ -347,8 +347,21 @@ body[data-short="A"] #topbar,
 body[data-short="B"] #topbar{min-height:48px;padding:2px 8px;}
 body[data-short="A"] #gen-line,
 body[data-short="B"] #gen-line{font-size:12px;}
+/* 矮屏「目标」点击区抬到 ≥44×44（BREAKPOINTS 硬规则），视觉不变：
+   按钮自身 44 高、透明无边框；可见胶囊改由 ::before 居中画出（高 = 44 − 6 − 6 = 32），
+   与原来 81×32 的胶囊逐像素一致。isolation 建层，让 z-index:-1 的胶囊落在文字之后、
+   顶栏背景之上。 */
 body[data-short="A"] #goals-slip,
-body[data-short="B"] #goals-slip{position:static;left:auto;top:auto;min-height:32px;padding:0 8px;font-size:12px;}
+body[data-short="B"] #goals-slip{
+  position:relative;isolation:isolate;left:auto;top:auto;
+  /* 去掉 1px 边框后左右各补 1px 内边距（0 8→0 9），盒宽与文字位置与原样一致 */
+  min-height:44px;padding:0 9px;font-size:12px;background:none;border:none;
+}
+body[data-short="A"] #goals-slip::before,
+body[data-short="B"] #goals-slip::before{
+  content:"";position:absolute;left:0;right:0;top:6px;bottom:6px;z-index:-1;
+  border-radius:10px;background:var(--night-700);border:1px solid var(--night-line);
+}
 body[data-short="A"] #topright,
 body[data-short="B"] #topright{gap:6px;font-size:12px;}
 body[data-short="A"] #menubtn,
