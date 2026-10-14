@@ -1,0 +1,40 @@
+✔ exp=0 rc=0 :: python3 verdict_gate.py all_pass.csv r_pass.md
+    格总数 2 分布 {'PASS': 2}
+    结论字段: PASS
+    OK
+✔ exp=1 rc=1 :: python3 verdict_gate.py partial.csv r_pass.md
+    格总数 3 分布 {'N/A': 1, 'PARTIAL': 1, 'PASS': 1}
+    结论字段: PASS
+    VIOLATION: 存在 1 个非 PASS 格（不计 N/A），结论不得为 PASS/过门
+    VIOLATION: 范围含 BLOCKED=0 N/A=1，不得写成整体过门
+✔ exp=0 rc=0 :: python3 verdict_gate.py partial.csv r_partial.md
+    格总数 3 分布 {'N/A': 1, 'PARTIAL': 1, 'PASS': 1}
+    结论字段: 部分验证
+    OK
+✔ exp=1 rc=1 :: python3 verdict_gate.py fail.csv r_partial.md
+    格总数 2 分布 {'FAIL': 1, 'PASS': 1}
+    结论字段: 部分验证
+    VIOLATION: 存在 1 个 FAIL 格，结论须为不过门/FAIL
+✔ exp=0 rc=0 :: python3 verdict_gate.py fail.csv r_fail.md
+    格总数 2 分布 {'FAIL': 1, 'PASS': 1}
+    结论字段: 不过门
+    OK
+✔ exp=1 rc=1 :: python3 verdict_gate.py blocked_noevid.csv r_partial.md
+    格总数 2 分布 {'BLOCKED': 1, 'PASS': 1}
+    结论字段: 部分验证
+    VIOLATION: 第3行 判定 BLOCKED 缺原因
+    VIOLATION: 第3行 判定 BLOCKED 缺证据路径
+✔ exp=1 rc=1 :: python3 verdict_gate.py pass_na.csv r_guomen.md
+    格总数 2 分布 {'N/A': 1, 'PASS': 1}
+    结论字段: 过门
+    VIOLATION: 范围含 BLOCKED=0 N/A=1，不得写成整体过门
+✔ exp=1 rc=1 :: python3 verdict_gate.py all_pass.csv r_none.md
+    格总数 2 分布 {'PASS': 2}
+    结论字段: (未找到)
+    VIOLATION: 报告中找不到总结论行（形如「总结论: ...」）
+✔ exp=1 rc=1 :: python3 sticky_blocked.py s_bad.md
+    VIOLATION: B-FERRY6-HOS（驿路鸿蒙渡口六关设备验证）第2行被写成 PASS/过门，但无 `UNBLOCK:B-FERRY6-HOS <paths>` 行: - B-FERRY6-HOS 渡口六关：PASS
+✔ exp=0 rc=0 :: python3 sticky_blocked.py s_unblock.md
+    sticky_blocked: 3 项在账, OK
+✔ exp=0 rc=0 :: python3 sticky_blocked.py s_ok.md
+    sticky_blocked: 3 项在账, OK
