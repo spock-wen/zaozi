@@ -9,8 +9,8 @@
 - [x] 4. 手感：拖卡倾角/回弹/飞出、预览圆点、飘字、卡角骨片四态（翻牌/演变条见已知缺口）
 - [x] 5. 音效（WebAudio）+ 菜单静音开关（localStorage）
 - [x] 6. 目标 UI（小签/清单/达成横幅）+ 教学气泡 + 挑字界面（开春展开见已知缺口）
-- [ ] 7. 卡面图进 web/img/cardart + <picture> + 预缓存；build_dist 拷贝
-- [ ] 8. 字源：水 3 字形进字形包 + SOURCES.csv 行 + credits 生成
+- [x] 7. 卡面图进 web/img/cardart + <picture> + 预缓存；build_dist 拷贝
+- [x] 8. 字源：水 3 字形进字形包 + SOURCES.csv 行 + credits 生成
 - [x] 9. VERSION 内容哈希；baseline 测试改造
 - [ ] 10. 单测（node --test）
 - [ ] 11. Playwright e2e（3 引擎 × 5 视口）
