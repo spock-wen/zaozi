@@ -326,6 +326,131 @@ body[data-view="desktop"] .optbtn{width:192px;flex:0 0 auto;}
 /* 手机横屏：提示转竖屏（由 JS 显示 #rotate-hint） */
 body[data-view="mobile"] #drawer-body{max-height:68dvh;}
 
+/* ---------- 矮屏分档（design/v3_mobile/BREAKPOINTS.md §矮屏（高度 ≤ 760）） ----------
+   按视口高（innerHeight）分档，只用于 desktop / tablet-landscape（JS 设 body[data-short]，
+   手机与平板竖屏恒为 N）。切换档位直接换尺寸，不加过渡（避免拖动中抖）。
+   档：N >760（原样）· A 601–760 · B ≤600 · 视口高 <492 另出「放大窗口」提示。
+   竖向预算（BREAKPOINTS 表）：
+     A = 顶栏48 + 卡上12 + 卡 + 卡下12 + 字匣60 + 键位(8+28) + 底20 = 188
+     B = 顶栏48 + 卡上16 + 卡 + 卡下16 + 字匣56 + 键位0 + 底36 = 172
+   A/B 把四维资源条并入 48 顶栏（JS 把 #dimrow / #dims-desktop 移进顶栏），
+   卡高因此取「视口高 − 188 / − 172」，卡宽由 .card 的 aspect-ratio 328/468（≈0.7）自动得。 */
+
+/* 顶栏 48：生成行、目标、四维、骨片/季节、☰ 同一行 */
+body[data-short="A"] #topbar,
+body[data-short="B"] #topbar{min-height:48px;padding:2px 8px;}
+body[data-short="A"] #gen-line,
+body[data-short="B"] #gen-line{font-size:12px;}
+body[data-short="A"] #goals-slip,
+body[data-short="B"] #goals-slip{position:static;left:auto;top:auto;min-height:32px;padding:0 8px;font-size:12px;}
+body[data-short="A"] #topright,
+body[data-short="B"] #topright{gap:6px;font-size:12px;}
+body[data-short="A"] #menubtn,
+body[data-short="B"] #menubtn{width:44px;height:44px;min-width:44px;font-size:22px;}
+/* 资源条并入顶栏后的紧凑样式（desktop 用 #dims-desktop，平板横屏用 #dimrow 里的 .dims） */
+body[data-short="A"] #topbar #dimrow,
+body[data-short="B"] #topbar #dimrow{padding:0;margin:0;flex:1 1 auto;min-width:0;}
+body[data-short="A"] #topbar .dims,
+body[data-short="B"] #topbar .dims{flex:1 1 auto;min-width:0;max-width:340px;gap:8px;margin:0;align-items:center;}
+body[data-short="A"] #topbar .dim,
+body[data-short="B"] #topbar .dim{font-size:10px;}
+body[data-short="A"] #topbar .dim .bar,
+body[data-short="B"] #topbar .dim .bar{height:4px;margin-top:1px;}
+/* 飘字/预览圆点原本画在资源条上方，顶栏里改成画在下方，避免出屏 */
+body[data-short="A"] #topbar .dim .dots,
+body[data-short="B"] #topbar .dim .dots{top:auto;bottom:-9px;height:8px;}
+body[data-short="A"] #topbar .float,
+body[data-short="B"] #topbar .float{top:calc(100% + 2px);}
+
+/* 卡高（宽由 aspect-ratio 得）；#stage 内边距与左右选项宽度按档收窄 */
+body[data-short="A"] #cardwrap{height:clamp(380px,calc(100dvh - 188px),468px);}
+body[data-short="B"] #cardwrap{height:clamp(320px,calc(100dvh - 172px),428px);}
+body[data-short="A"] #stage,
+body[data-short="B"] #stage{padding:4px 12px;gap:8px;}
+body[data-short="A"] #stage .optbtn{width:160px;}
+body[data-short="B"] #stage .optbtn{width:140px;}
+body[data-short="A"] #gesture-hint,
+body[data-short="B"] #gesture-hint{min-height:0;}
+
+/* 字匣：A 60（格 48）/ B 56（格 48） */
+body[data-short="A"] #wordbox-bar,
+body[data-short="B"] #wordbox-bar{margin:0 16px;}
+body[data-short="A"] #wordbox-bar{padding:6px 8px;min-height:60px;}
+body[data-short="B"] #wordbox-bar{padding:4px 8px;min-height:56px;}
+body[data-short="A"] .slot,
+body[data-short="B"] .slot{width:48px;height:48px;}
+body[data-short="A"] .slot img,
+body[data-short="B"] .slot img{width:28px;height:28px;}
+
+/* 键位行：A 缩成一行 28；B 收进顶栏「?」浮层（JS 隐藏 #keys） */
+body[data-short="A"] #keys{height:28px;margin-top:8px;padding:0 16px;font-size:12px;line-height:28px;}
+body[data-short="B"] #app{padding-bottom:36px;}   /* 底边留白：飘字 / 达成条 */
+
+/* 顶栏「?」键位浮层（B 档；键盘模式才显示） */
+#keyhelp-btn{
+  width:44px;height:44px;min-width:44px;display:none;align-items:center;justify-content:center;
+  font-size:18px;font-weight:700;border-radius:8px;color:var(--paper-50);
+  border:1px solid var(--night-line);background:var(--night-700);margin-right:-4px;
+}
+#keyhelp-btn[data-show="1"]{display:flex;}
+#keyhelp-btn:active{background:var(--night-line);}
+#keyhelp-pop{
+  position:absolute;top:calc(48px + 4px);right:16px;width:248px;z-index:61;
+  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 14px;
+  font-size:13px;line-height:22px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+#keyhelp-pop .kh-row{display:flex;gap:8px;}
+#keyhelp-pop .kh-row b{flex:0 0 104px;color:var(--zhu-600);}
+
+/* 视口高 <492：顶栏下出一行提示（桌面/平板横屏；点不到东西之前先说清） */
+#too-short{
+  position:fixed;left:50%;top:calc(48px + 4px);transform:translateX(-50%);z-index:58;max-width:90vw;
+  background:var(--paper-100);color:var(--ink);border-radius:10px;padding:6px 14px;font-size:13px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;
+}
+
+/* 甲/B 档的面板与浮层贴住 48 顶栏 */
+body[data-short="A"] #menu-pop,
+body[data-short="B"] #menu-pop{top:calc(48px + 4px);}
+body[data-short="A"] #goals-panel,
+body[data-short="B"] #goals-panel{top:calc(48px + 40px);}
+body[data-short="A"] #sprout,
+body[data-short="B"] #sprout{top:calc(48px + 8px);}
+body[data-short="A"] #banner,
+body[data-short="B"] #banner{top:calc(48px + 8px);}
+
+/* 矮屏挑字：固定 7×2、不滚动（说明卡在网格右侧，不盖格子）。
+   N 档仍是 gf5 §11 的绝对定位稿（见上），A/B 换成网格流式布局并按档收窄。 */
+body[data-view="desktop"][data-short="A"] #pick,
+body[data-view="desktop"][data-short="B"] #pick{
+  display:grid;padding:24px 16px;overflow:hidden;
+  grid-template-areas:"h2 desc" "note desc" "slots desc" "pool desc" "foot desc";
+  align-content:start;justify-content:center;gap:8px 24px;
+}
+body[data-view="desktop"][data-short="A"] #pick{grid-template-columns:496px 280px;}
+body[data-view="desktop"][data-short="B"] #pick{grid-template-columns:440px 260px;padding:16px;}
+body[data-short="A"] #pick h2,
+body[data-short="B"] #pick h2{grid-area:h2;position:static;left:auto;top:auto;margin:0;font-size:16px;}
+body[data-short="A"] #pick .season-note,
+body[data-short="B"] #pick .season-note{grid-area:note;position:static;left:auto;top:auto;margin:0;font-size:13px;}
+body[data-short="A"] #pick .pickslots,
+body[data-short="B"] #pick .pickslots{grid-area:slots;position:static;left:auto;top:auto;margin:0;min-height:0;}
+body[data-short="A"] #pick .pool,
+body[data-short="B"] #pick .pool{grid-area:pool;position:static;left:auto;top:auto;margin:0;width:100%;grid-template-columns:repeat(7,1fr);gap:8px;}
+body[data-short="A"] #pick-desc,
+body[data-short="B"] #pick-desc{grid-area:desc;position:static;left:auto;top:auto;margin:0;align-self:start;}
+body[data-short="A"] #pick .pickfoot,
+body[data-short="B"] #pick .pickfoot{grid-area:foot;position:static;left:auto;top:auto;margin:0;padding:0;}
+body[data-short="A"] #pick .pickinfo{max-width:280px;}
+body[data-short="B"] #pick .pickinfo{max-width:260px;}
+/* 格子按档收窄：A 64×76、B 56×64；字 26/22，释义 12/11 */
+body[data-short="A"] #pick .cand{height:76px;font-size:26px;}
+body[data-short="B"] #pick .cand{height:64px;font-size:22px;}
+body[data-short="A"] #pick .pickslot{width:64px;height:62px;font-size:26px;}
+body[data-short="B"] #pick .pickslot{width:56px;height:56px;font-size:22px;}
+body[data-short="A"] #pick .cand .mng{font-size:12px;}
+body[data-short="B"] #pick .cand .mng{font-size:11px;}
+
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:1ms !important;transition-duration:120ms !important;}
 }
