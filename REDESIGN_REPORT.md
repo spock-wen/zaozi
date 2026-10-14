@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`37a6d803c885`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`f9f8a39eabcb`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：`39cd01cd2151e14542cfcbea7214892227d43aba`
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -76,10 +76,14 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - P1：目标达成横幅改用 goals.json 的 banner（如「达成　落一个字」），引擎事件带 banner，壳显示 ev.banner（238c201）。单测 + e2e 断言横幅文本。
 - checkFail 提前结算行为保持不变（提前结束一代仍按代末判定）。
 - package.json engines node>=22；npm test / e2e 在 Node<22 时先报清楚的错误并退出（39cd01c，tools/check_node.mjs）。
-- 构建 commit 39cd01cd2151e14542cfcbea7214892227d43aba，VERSION 37a6d803c885；单测 17/17，e2e 46/46。
+- 构建 commit 39cd01cd2151e14542cfcbea7214892227d43aba，VERSION f9f8a39eabcb；单测 17/17，e2e 46/46。
 
 ## 第四轮（QA 721f03a 复测 W1–W4 + 目标可达性，2026-10-14 UTC+8）
 - W1 菜单「字源与版权」可跳转（d7e1ac2，credits_link e2e）。W4 干净 checkout 一次构建即正确，VERSION 在所有文件写完后算（0a98b53，build_clean 测试）。W3 T03 迹文案改读正确字段（71e020f）。W2 教学气泡不压「刻」，5 视口×3 引擎断言（1a74793）。
 - 目标可达性：GOAL_REACHABILITY.md；tools/goal_sweep.mjs；?debug=1&debug_goal=<ID>（bb3a302）。G_FOOD_65/G_OUT_65 可达（点名打 100%），稀有是因为不在第 1 代固定集 + 随机打漂移。发现 G_ENGRAVE1 在当前规则下永远抽不到（未改设计，待 PM）。
 - QA 提交 3d0f362（tools/qa/web/）已在分支上。
-- 构建 commit 3e54792，VERSION 37a6d803c885；单测 25/25，e2e 73/73。
+- 构建 commit 3e54792，VERSION f9f8a39eabcb；单测 25/25，e2e 73/73。
+
+## 第五轮（PM 确认 G_ENGRAVE1 排除为缺陷，2026-10-14 UTC+8）
+- G_ENGRAVE1 只从第 1 代排除，第 2 代起可抽（8799d01）；回归单测（1d827bf）。goal_sweep 2000×4 重跑：抽到 15145、达成 2064。可复现：种子 0，第 2 代抽到，第 3 代达成（GOAL_REACHABILITY.md §四/§五）。
+- 构建 commit bddf816，VERSION f9f8a39eabcb；单测 26/26，e2e 73/73。
