@@ -14,9 +14,9 @@
 - [x] 9. VERSION 内容哈希；baseline 测试改造
 - [x] 10. 单测（node --test）
 - [x] 11. Playwright e2e（3 引擎 × 5 视口）
-- [ ] 12. 干净树 build dist
-- [ ] 13. release_shots_v2 截图
-- [ ] 14. REDESIGN_REPORT.md + DONE
+- [x] 12. 干净树 build dist
+- [x] 13. release_shots_v2 截图
+- [x] 14. REDESIGN_REPORT.md + DONE
 
 ## 当前进度
 - 1/2/7/8/9 已提交（882f9f1、be47a83）：data/goals.json、data/tutorial.json、year1_cards 教学卡与 title、chars_slice.pick_chars；engine.ts 每代目标/开局挑字/教学顺序/多代流程；解钉 baseline_version.txt；卡面图进 web/img/cardart、data/card_art.json；glyph_sources.csv + credits_table 署名。
@@ -28,4 +28,6 @@
 - 修：字形首屏不出图——重写把 loadGlyphs 的 onload 重绘限制成只在 pick/winter，导致 card 阶段字匣/字录停在文字兜底。恢复基线行为（每次字形加载都 render），e2e viewports 加断言锁死。
 - 修 2：桌面教学气泡压在四维行上、且 1280 挡住卡角骨片。按 gf3 电脑稿把桌面气泡降到卡顶（#stage+48）、并设 pointer-events:none（纯提示不可交互）；同时修收起侧栏在桌面/平板横仍占 336 宽（BREAKPOINTS 说收起只留 44 标签，改回 width:0）。e2e flow 加 B3 断言（气泡不压四维行、距侧栏 ≥16）。
 - 28 e2e + 16 单测全过。VERSION（干净树）= 见报告。
-- 下一步：12 干净树 build dist，13 release_shots_v2 截图，14 REDESIGN_REPORT.md + DONE。
+- 12/13 完成（51267ac）：干净树构建 dist，VERSION=7ec28f7d7403；release_shots_v2/ 五档全页截图提交。
+- 14 完成：REDESIGN_REPORT.md（改动清单、各引擎测试数、VERSION、commit sha、已知缺口）。16 单测 + 28 e2e 全过，60fps（4× 节流）。不部署。
+- DONE
