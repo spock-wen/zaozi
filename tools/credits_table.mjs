@@ -11,6 +11,7 @@ const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, 
 
 // 极简 CSV 行解析：支持双引号包裹（SOURCES.csv 的 credit 列里带逗号）。
 function splitCsvLine(line) {
+  line = line.replace(/\r$/, "");
   const out = [];
   let cell = "", q = false;
   for (let i = 0; i < line.length; i++) {
