@@ -411,15 +411,25 @@ function placeCoach(step) {
   col.style.left = left + "px"; col.style.right = "auto"; col.style.width = width + "px";
   const sel = step.teach === "drop" ? "#wordbox-bar" : step.teach === "engrave" ? "#bonecorner" : null;
   const tb = sel ? document.querySelector(sel)?.getBoundingClientRect() : null;
-  if (step.teach === "drop" && tb) {    // 对字匣的提示：气泡底边 = 字匣底边
-    col.style.top = "auto";
-    col.style.bottom = (sb.bottom - tb.bottom) + "px";
-  } else {
-    const ref = tb || cb, h = el.getBoundingClientRect().height;
-    let top = (ref.top + ref.height / 2) - sb.top - h / 2;
-    top = Math.max(GAP, Math.min(Math.max(GAP, sb.height - h - GAP), top));
-    col.style.top = top + "px"; col.style.bottom = "auto";
-  }
+  const ref = tb || cb, h = el.getBoundingClientRect().height;
+  let top = step.teach === "drop" && tb ? tb.bottom - h : ref.top + ref.height / 2 - h / 2;
+  // 气泡在卡外侧（横向）会与同侧选项按钮重叠——「左右拖卡做选择」这些步的目标就落在选项上，
+  // 竖向错开它们（先滑到下方、再试上方），保证气泡不盖住任何目标。
+  top = slideClearOfTargets(top, h, sb.left + left, width);
+  top = Math.max(sb.top + GAP, Math.min(Math.max(sb.top + GAP, sb.bottom - h - GAP), top));
+  col.style.top = (top - sb.top) + "px"; col.style.bottom = "auto";
+}
+// 竖向位置若与目标（卡、左右选项、字匣、卡上落字框、卡角刻）相交，就滑到最近的空白处。
+// 只考虑横向会撞的那些目标；找不到空位就保持原位（由外层夹到舞台内）。
+function slideClearOfTargets(top, h, vx, w) {
+  const rects = [$("opt-left"), $("opt-right"), $("wordbox-bar"), $("card-drops"), $("bonecorner"), $("card")]
+    .filter((e) => e && !e.hidden && getComputedStyle(e).display !== "none")
+    .map((e) => e.getBoundingClientRect())
+    .filter((r) => Math.min(vx + w, r.right) - Math.max(vx, r.left) > 0);
+  const hits = (t) => rects.some((r) => Math.min(t + h, r.bottom) - Math.max(t, r.top) > 0);
+  if (!hits(top)) return top;
+  for (const r of rects) for (const cand of [r.bottom + 8, r.top - 8 - h]) if (!hits(cand)) return cand;
+  return top;
 }
 function renderWordbox() {
   $("wordbox").innerHTML = st.wordBox.map((ch, i) => {
