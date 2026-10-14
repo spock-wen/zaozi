@@ -147,3 +147,38 @@ for (const engine of Object.keys(ENGINES)) {
     });
   }
 }
+
+// ---------- 3. 视口高 <492：卡到 320 下限不再缩，顶栏下出「窗口太矮…」提示，侧栏强制收起 ----------
+for (const engine of Object.keys(ENGINES)) {
+  test(`${engine} 视口高 488: 出「窗口太矮」提示 + 侧栏强制收起（492 不出）`, async () => {
+    const short = await open(engine, { width: 1024, height: 488 });
+    try {
+      const s = await short.page.evaluate(() => {
+        const el = document.querySelector("#too-short");
+        const r = el.getBoundingClientRect();
+        return {
+          hidden: el.hidden, text: el.textContent.trim(),
+          y: r.y, bottom: r.bottom, vh: innerHeight,
+          cardH: document.querySelector("#card").getBoundingClientRect().height,
+          sideCollapsed: document.body.classList.contains("side-collapsed"),
+        };
+      });
+      assert.equal(s.hidden, false, "视口高 <492 应显示「窗口太矮」提示");
+      assert.ok(s.text.includes("窗口太矮"), `提示文案应为「窗口太矮…」，实际：${s.text}`);
+      assert.ok(s.y >= 0 && s.bottom <= s.vh + 1, "提示应在视口内");
+      assert.equal(Math.round(s.cardH), 320, "视口高 <492 卡到 320 下限，不再缩");
+      assert.equal(s.sideCollapsed, true, "视口高 <492 侧栏强制收起");
+      assert.deepEqual(short.errs, [], "页面不应有报错：" + short.errs.join(" | "));
+    } finally {
+      await short.ctx.close();
+    }
+
+    const just = await open(engine, { width: 1024, height: 492 });
+    try {
+      assert.equal(await just.page.locator("#too-short").isHidden(), true, "视口高 492 不应出提示（<492 才出）");
+      assert.deepEqual(just.errs, [], "页面不应有报错：" + just.errs.join(" | "));
+    } finally {
+      await just.ctx.close();
+    }
+  });
+}
