@@ -300,3 +300,50 @@ for (const engine of Object.keys(ENGINES)) {
     });
   }
 }
+
+// ---------- 6. 跳档不加过渡：切档瞬间过渡被禁用，同档 resize 不动 ----------
+// BREAKPOINTS §矮屏「跳档直接换尺寸、不加过渡（避免拖动中抖）」：切档时 body 挂 no-anim，
+// 期间 #card 等 transition 为 none；同档 resize 不挂。切完恢复原过渡。
+for (const engine of Object.keys(ENGINES)) {
+  test(`${engine} 跳档禁用过渡：N→A 切档瞬间 #card transition=none，同档 resize 不触发，之后恢复`, async () => {
+    const { ctx, page, errs } = await open(engine, { width: 1280, height: 800 });
+    try {
+      assert.equal(await page.evaluate(() => document.body.dataset.short || ""), "", "1280×800 应为常规 N 档");
+      // 记录每次 body 出现 no-anim 时的 #card 过渡状态
+      await page.evaluate(() => {
+        window.__tier = { events: [] };
+        new MutationObserver(() => {
+          if (!document.body.classList.contains("no-anim")) return;
+          const cs = getComputedStyle(document.querySelector("#card"));
+          window.__tier.events.push({ dur: cs.transitionDuration, prop: cs.transitionProperty });
+        }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+      });
+
+      // 同档 resize（800 → 780，都 N）：不应挂 no-anim
+      await page.setViewportSize({ width: 1280, height: 780 });
+      await page.waitForTimeout(320);
+      assert.equal(await page.evaluate(() => window.__tier.events.length), 0, "同档 resize 不应挂 no-anim");
+
+      // 切档 resize（N → A）
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.waitForFunction(() => document.body.dataset.short === "A", null, { timeout: 5000 });
+      await page.waitForTimeout(120);
+      const ev = await page.evaluate(() => window.__tier.events);
+      assert.ok(ev.length >= 1, "切档时应临时给 body 挂 no-anim");
+      assert.ok(ev.every((e) => e.prop === "none"), `切档期间 transition-property 应为 none，实际 ${JSON.stringify(ev)}`);
+      assert.ok(ev.every((e) => !/0\.16|0\.12|0\.4|120ms/.test(e.dur)), `切档期间过渡应被禁用，实际 ${JSON.stringify(ev)}`);
+
+      // 收尾后 #card 过渡恢复原样（transform/opacity 各 0.16s）
+      const after = await page.evaluate(() => {
+        const cs = getComputedStyle(document.querySelector("#card"));
+        return { prop: cs.transitionProperty, dur: cs.transitionDuration };
+      });
+      assert.ok(after.prop.includes("transform") && after.prop.includes("opacity"), `跳档后过渡应恢复，实际 ${JSON.stringify(after)}`);
+      assert.ok(after.dur.includes("0.16s"), `跳档后过渡时长应恢复 0.16s，实际 ${after.dur}`);
+
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
+}

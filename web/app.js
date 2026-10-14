@@ -103,6 +103,12 @@ function setShortTier(tier) {
   if (tier) { if (dimsD.parentElement !== bar) bar.insertBefore(dimsD, $("topright")); }
   else if (dimsD.parentElement !== cardcol) cardcol.insertBefore(dimsD, $("cardwrap"));
 }
+// 跳档（视口高变化导致 N/A/B 切换）时给 body 挂 no-anim 两帧：这期间所有过渡被禁用，
+// 卡/字匣/键位行等直接换尺寸，不逐帧补间（BREAKPOINTS §矮屏「跳档不加过渡」）。
+function suppressTierTransition() {
+  document.body.classList.add("no-anim");
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove("no-anim")));
+}
 function computeLayout() {
   const w = innerWidth, h = innerHeight;
   let view;
@@ -113,7 +119,9 @@ function computeLayout() {
   const tier = shortTier(view);
   const key = view + ":" + orient + ":" + tier + ":" + (h < 492 ? "s" : "");
   if (key === lastLayout) return;
+  const prevTier = document.body.dataset.short || "";
   lastLayout = key;
+  if (tier !== prevTier) suppressTierTransition();   // 跳档直接换尺寸，不加过渡（避免拖动中抖）
   document.body.dataset.view = view;
   document.body.dataset.orient = orient;
   setShortTier(tier);

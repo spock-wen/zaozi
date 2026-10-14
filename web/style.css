@@ -435,6 +435,11 @@ body[data-short="B"] #sprout{top:calc(48px + 8px);}
 body[data-short="A"] #banner,
 body[data-short="B"] #banner{top:calc(48px + 8px);}
 
+/* 跳档（视口高变化导致 N/A/B 切换）时不加过渡：body 上挂 no-anim 两帧（JS 加/摘），
+   这期间所有过渡禁用，卡/字匣/键位行直接换尺寸，不逐帧补间（避免拖动中抖）。
+   比 prefers-reduced-motion 的 `*{transition-duration:120ms!important}` 具体度高，故能压过它。 */
+body.no-anim, body.no-anim *, body.no-anim *::before, body.no-anim *::after{transition:none !important;}
+
 /* 矮屏挑字：固定 7×2、不滚动（说明卡在网格右侧，不盖格子）。
    N 档仍是 gf5 §11 的绝对定位稿（见上），A/B 换成网格流式布局并按档收窄。 */
 body[data-view="desktop"][data-short="A"] #pick,
