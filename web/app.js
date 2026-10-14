@@ -41,6 +41,7 @@ const ui = {
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false,
   pickFocus: null, pickTapped: null,
+  pickPtr: null, pickHandled: null,   // 挑字：pointerdown 捕获的候选 / pointerup 已处理的候选（吞掉随后的合成 click）
   lastDims: null,
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
@@ -214,7 +215,7 @@ function restore() {
 function newGame(s) {
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
-  ui.pickFocus = null; ui.pickTapped = null;
+  ui.pickFocus = null; ui.pickTapped = null; ui.pickPtr = null; ui.pickHandled = null;
   ui.lastDims = null; saveNow(); render();
 }
 // ---------- 存档码 ----------
@@ -447,7 +448,7 @@ let lastPickHTML = null;
 function renderPick() {
   const el = $("pick");
   el.hidden = st.phase !== "pick";
-  if (st.phase !== "pick") { ui.pickFocus = null; ui.pickTapped = null; lastPickHTML = null; return; }
+  if (st.phase !== "pick") { ui.pickFocus = null; ui.pickTapped = null; ui.pickPtr = null; ui.pickHandled = null; lastPickHTML = null; return; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
   const pool3 = PICK_CHARS;
@@ -736,9 +737,27 @@ on($("winter"), (e) => {
 });
 on($("pick"), (e) => {
   const c = e.target.closest("[data-char],[data-do]"); if (!c) return;
+  // pointerup 已处理过同一候选时吞掉这次合成 click，避免与 pointerup 双触发。
+  const handled = ui.pickHandled; ui.pickHandled = null;
+  if (c.dataset.char && c.dataset.char === handled) return;
   if (c.dataset.do === "go") { const p = st.picks || []; if (p.length === RULES.word_box.slots) { sfx.ready(); dispatch({ type: "begin_generation", picks: p }); } return; }
   if (c.dataset.char) pickClick(c.dataset.char);
 });
+// 候选点在 pointerdown 与 pointerup 之间被 renderPick 的 innerHTML 重建替换掉时，浏览器不会合成
+// click（按下与抬起的不是同一个节点），真实点选被静默吞掉。改为按下时记候选字、抬起时若仍在同一
+// 候选上就直接选中，不再依赖合成 click。
+$("pick").addEventListener("pointerdown", (e) => {
+  const b = e.target.closest?.("[data-char]");
+  ui.pickPtr = b ? b.dataset.char : null;
+  ui.pickHandled = null;               // 新的按下作废旧 swallow
+});
+addEventListener("pointerup", (e) => {
+  if (ui.pickPtr == null) return;
+  const ch = ui.pickPtr; ui.pickPtr = null;
+  const b = e.target.closest?.("[data-char]");
+  if (b && b.dataset.char === ch) { ui.pickHandled = ch; pickClick(ch); }
+});
+addEventListener("pointercancel", () => { ui.pickPtr = null; });
 // gf5 电脑：悬停即显示右侧说明（不选中）。触控设备无 fine pointer，不走这里。
 $("pick").addEventListener("pointerover", (e) => {
   if (!hasFinePointer()) return;
