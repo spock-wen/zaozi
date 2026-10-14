@@ -422,12 +422,13 @@ body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
 body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
 
 /* 顶栏「?」键位浮层（B 档；键盘模式才显示）。
-   选项按钮竖向跟着卡中线：选项顶边 = 32 + 卡高/2（顶栏 48 + 舞台上下留 16，
-   选项高 64 居中）。故浮层顶边 52 起、向下最多长到「选项顶边 − 4」即不压选项：
-   max-height = 卡高/2 − 24，与 #cardwrap 的卡高同一 clamp，卡高规则变它也自动跟。
-   （不能靠宽度避开：WebKit 对 #cardwrap 的 auto 宽不认 aspect-ratio，回落 max-content
-   把卡槽撑到 ~377，选项右缘被推到 848.5；Chromium 卡槽贴卡、选项右缘 810。按高度封顶对
-   两种引擎都成立。） */
+   6 条键位排成两列网格（3 行 × 2 列），高度由内容撑开、不封顶不滚动。
+   选项按钮竖向跟卡中线：选项顶边 = 32 + 卡高/2。矮屏最紧的 491（卡到 320 下限）时
+   选项顶边 = 191.5，浮层顶边固定 52，可用高度 = 139.5。浮层用 12 号字（与 A 档键位行同号）、
+   两列各 3 行，自然高约 100（长句最多两行），492–600 全程 6 行全见、scrollHeight = clientHeight，
+   底边不触选项顶边。宽度 344 贴右：1024 时左缘 = 1024 − 8 − 344 = 672 > 最宽卡右缘 662，不压卡。
+   （不靠宽度避开选项：WebKit 对 #cardwrap 的 auto 宽不认 aspect-ratio，回落 max-content
+   把卡槽撑到 ~377、选项右缘推到 848.5；Chromium 选项右缘 810。靠「两列压高度」两引擎都成立。） */
 #keyhelp-btn{
   width:44px;height:44px;min-width:44px;display:none;align-items:center;justify-content:center;
   font-size:18px;font-weight:700;border-radius:8px;color:var(--paper-50);
@@ -436,15 +437,13 @@ body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;
 #keyhelp-btn[data-show="1"]{display:flex;}
 #keyhelp-btn:active{background:var(--night-line);}
 #keyhelp-pop{
-  position:absolute;top:calc(48px + 4px);right:8px;width:200px;
-  max-height:calc(clamp(320px,100dvh - 172px,428px)/2 - 24px);
-  overflow:auto;z-index:61;
-  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 12px;
-  font-size:13px;line-height:20px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+  position:absolute;top:calc(48px + 4px);right:8px;width:344px;z-index:61;
+  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:8px 12px;
+  font-size:12px;line-height:16px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+  display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
 }
 #keyhelp-pop .kh-row{display:flex;gap:8px;}
-#keyhelp-pop .kh-row + .kh-row{margin-top:3px;}
-#keyhelp-pop .kh-row b{flex:0 0 64px;color:var(--zhu-600);}
+#keyhelp-pop .kh-row b{flex:0 0 52px;color:var(--zhu-600);}
 
 /* 视口高 <492：顶栏下出一行提示（桌面/平板横屏；点不到东西之前先说清）。
    左对齐贴住舞台左缘：卡在 320 下限时恒为 224 宽、水平居中，1024 起卡左缘 = (vw−224)/2 ≥ 400，
