@@ -153,3 +153,8 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - D4: the goals-slip hit area is ≥44×44 in tiers A/B with no visual change. Test: goals_hit.
 - Note: at 1366×768 the 字匣 measures 83, while BREAKPOINTS sets N tier to 64 (cells 52), so this deviates from the design. Not changed this round; waiting on the user's decision.
 - D3 follow-up (e51caf2): WebKit popover capped in height so it clears the options in WebKit too.
+
+## Round 14 — 99a75d7 retest follow-ups (VERSION b882984d66d7)
+- QA commit 925d28e cherry-picked (0564def).
+- Card-corner 刻 intercepted by .card-head (Firefox flake). Root cause: `ui.engraved` was never initialised, so `classList.toggle("done", true && undefined)` became a plain toggle. The `done` class (pointer-events:none) flipped on every render during the engrave phase, so the corner sometimes ignored taps and the click fell through to .card-head. This was not a z-index problem. Fix: engraved is a boolean and resets when leaving engrave (59d39b8). Details: ROOTCAUSE_bonecorner.md. Regression test bonecorner_hit (elementFromPoint, 4 viewports × entry/after/tutorial): 30/30 on firefox.
+- D3: removed the height cap and scrolling. The B-tier popover is now a two-column grid, all 6 rows visible with no scroll and no overlap with the options at 1024×600/513/491 and 1280×491, auto-open and '?' (7b48404). The design was not edited.

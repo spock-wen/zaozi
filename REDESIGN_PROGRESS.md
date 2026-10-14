@@ -66,3 +66,4 @@
 - 38 QA 复测 D3（`web/style.css`）：B 档键位浮层 `#keyhelp-pop` 原 `right:16px;width:248px`，1024 下左缘 760；而左右选项紧贴卡（卡右缘 = 卡心 + 卡高×0.7/2，选项右缘 = 卡右缘 + 8 + 140），1024 最宽卡（卡高 428）时右选项右缘到 810 → 浮层压住右选项（491 下 12×57、513 下 19×46、600 下擦边 50×2，与 QA 量级一致）。改贴右上、`right:8px;width:200px`（左缘 ≥ 816），并加 `max-height:calc(100dvh−60px);overflow:auto` 兜底；行间距/键位列同步收窄（`b` 64、`line-height:20`）。`tests/e2e/short_overlap.test.mjs` 新增 D3 节（chromium × 1024×600/513/491，`#keyhelp-pop` 与 `#opt-right`/`#opt-left` 无包围盒交集、且在视口内；覆盖首进自动弹与点「?」手动开两条路径）；反修复该套件 5/5 全挂。此套件按指示只跑 `E2E_ENGINES=chromium`。
 37. Round 13: D1–D4 fixed + regression tests; VERSION 4cc4b2e4835c.
 38. D3 WebKit follow-up e51caf2; VERSION f243a91ccb14.
+39. Round 14: 刻 hit-test root cause + D3 two columns; VERSION b882984d66d7.
