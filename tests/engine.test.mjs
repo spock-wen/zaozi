@@ -100,6 +100,25 @@ test("instant goals fire on drop; the dim goals are judged at generation end", (
   }
 });
 
+test("goal events carry the goals.json banner (含「达成　」前缀)，不是目标正文", () => {
+  const bannerOf = (id) => E.GOALS.pool.find((g) => g.id === id).banner;
+  let st = E.createGame({ seed: SEED });
+  st = E.step(st, { type: "choose", side: "left" });
+  st = E.step(st, { type: "choose", side: "right" });
+  st = E.step(st, { type: "engrave", trace: "休" });
+  st = E.step(st, { type: "choose", side: "drop", slot: 0 }); // T04 落 水 → G_DROP1
+  const dropEv = st.goalEvents.find((e) => e.id === "G_DROP1");
+  assert.ok(dropEv, "落字应触发 G_DROP1 达成事件");
+  assert.equal(dropEv.banner, bannerOf("G_DROP1"), "即时目标事件横幅应等于 goals.json 的 banner");
+  assert.notEqual(dropEv.banner, dropEv.text, "横幅必须带「达成　」前缀，不能只是 text");
+  // 代末四维目标同理：每个达成事件的 banner 都要与 goals.json 一致
+  const end = playToEnd(st);
+  assert.ok(end.goalEvents.length > 0, "整代结束应有达成事件");
+  for (const ev of end.goalEvents) {
+    assert.equal(ev.banner, bannerOf(ev.id), `${ev.id} 事件横幅应等于 goals.json 的 banner`);
+  }
+});
+
 test("multi-generation flow: ended -> heir -> pick -> begin_generation carries zilu and takes 3 picks", () => {
   const end = playToEnd(E.createGame({ seed: SEED }));
   assert.equal(end.phase, "ended");

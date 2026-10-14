@@ -293,7 +293,7 @@ function pumpBanner() {
   if (Object.keys(ui.floats).length) return;          // 等飘字结束再出（A12）
   const ev = ui.bannerQueue.shift();
   ui.bannerOn = true; sfx.goal();
-  const b = $("banner"); b.textContent = ev.text; b.hidden = false;
+  const b = $("banner"); b.textContent = ev.banner ?? ev.text; b.hidden = false;
   setTimeout(() => { b.hidden = true; ui.bannerOn = false; pumpBanner(); render(); }, 1800);
 }
 function renderSprout() { /* 开春展开：每代第一张卡显示三件事，随后收起 */ }

@@ -141,7 +141,7 @@ function settleGeneration(st: GameState): GenerationCarryOver {
   // 代末判四维目标（本代最后一个冬夜结束时）；达成事件排进 goalEvents
   for (const g of st.goals as any[]) {
     if (g.kind === "dim" && !g.achieved && st.dims[g.dim] >= g.min) {
-      g.achieved = true; st.goalEvents.push({ id: g.id, text: g.text });
+      g.achieved = true; st.goalEvents.push({ id: g.id, text: g.text, banner: g.banner });
       st.log.push(`达成：${g.text}`);
     }
   }
@@ -172,7 +172,7 @@ function applyBones(st: GameState, n: number) {
 function achieveInstant(st: GameState, kind: string) {
   for (const g of st.goals as any[]) {
     if (g.kind === kind && !g.achieved) {
-      g.achieved = true; st.goalEvents.push({ id: g.id, text: g.text });
+      g.achieved = true; st.goalEvents.push({ id: g.id, text: g.text, banner: g.banner });
       st.log.push(`达成：${g.text}`);
     }
   }

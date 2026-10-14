@@ -3,10 +3,16 @@
 // 另含 D1/D2 双触发回归与「天亮了」不穿透（B7）。三引擎各跑 390 / 1280 / 1440。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { ENGINES, SEED, buildDist, startServer, collectErrors, firePointerThenClick } from "./helpers/env.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { ENGINES, SEED, ROOT, buildDist, startServer, collectErrors, firePointerThenClick } from "./helpers/env.mjs";
 import { phase, current, commit, playToWinter, dragCard } from "./helpers/flow.mjs";
 
 buildDist();
+
+// 期望的达成横幅直接取自 goals.json，避免把文案抄死在测试里（P1：横幅必须是 banner）。
+const GOALS = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "goals.json"), "utf8"));
+const BANNER_DROP1 = GOALS.pool.find((g) => g.id === "G_DROP1").banner;
 
 let server, browsers = {};
 before(async () => {
@@ -57,6 +63,13 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#wordbox .slot.ok").first().click(); // 落「水」→ T05
         await page.waitForTimeout(300);
         assert.equal(await current(page), "T05");
+        // P1：落字达成 G_DROP1，屏幕上的横幅必须是 goals.json 的 banner（「达成　落一个字」），不是目标正文。
+        await page.locator("#banner").waitFor({ state: "visible", timeout: 3000 });
+        assert.equal(
+          (await page.locator("#banner").textContent()).trim(),
+          BANNER_DROP1,
+          `达成横幅应显示 banner：「${BANNER_DROP1}」`,
+        );
         await commit(page, "left");               // → 第一张普通卡
 
         // 卡面图：<picture> + webp（手机/桌面各选对应源）
