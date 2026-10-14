@@ -62,9 +62,11 @@ function buildYearDeck(seed: number, yearIndex: number, cards: Card[]): string[]
 export function goalIdsForGeneration(seed: number, generation: number, debugGoal?: string | null): string[] {
   let ids: string[];
   if (generation <= 1) {
+    // 第 1 代固定集；generation1_exclude（G_ENGRAVE1）只在这里生效——它不在 generation1_goals 里。
     ids = goalsData.generation1_goals.slice();
   } else {
-    const pool = goalsData.pool.map((g: any) => g.id).filter((id: string) => !goalsData.generation1_exclude.includes(id));
+    // 第 2 代起：全池可抽，G_ENGRAVE1 也回到池里（不再被 generation1_exclude 排除）。
+    const pool = goalsData.pool.map((g: any) => g.id);
     const rnd = mulberry32((seed ^ (generation * 0x85ebca6b)) >>> 0);
     ids = shuffle(pool, rnd).slice(0, goalsData.per_generation);
   }

@@ -59,6 +59,23 @@ test("goal set: gen 1 excludes G_ENGRAVE1; later generations pick 3 deterministi
   assert.ok(a.every((id) => E.GOALS.pool.some((g) => g.id === id)));
 });
 
+test("regression: G_ENGRAVE1 excluded only from gen 1, eligible for the gen>=2 pool", () => {
+  // 第 1 代固定集永远不含 G_ENGRAVE1（教学已强制刻一次），且恒等于 goals.json 的 generation1_goals
+  for (let seed = 0; seed < 200; seed++) {
+    const gen1 = E.goalIdsForGeneration(seed, 1);
+    assert.deepEqual(gen1, E.GOALS.generation1_goals, `第 1 代应是固定集（seed=${seed}）`);
+    assert.ok(!gen1.includes("G_ENGRAVE1"), `第 1 代不该抽到 G_ENGRAVE1（seed=${seed}）`);
+  }
+  // 第 2 代起它回到池里：跨种子必然会被抽到（每次 3/6 命中）
+  let hits = 0;
+  for (let seed = 0; seed < 200; seed++) {
+    for (let gen = 2; gen <= 4; gen++) {
+      if (E.goalIdsForGeneration(seed, gen).includes("G_ENGRAVE1")) hits++;
+    }
+  }
+  assert.ok(hits > 0, "第 2 代起应能在池里抽到 G_ENGRAVE1");
+});
+
 test("all goal copy is free of placeholder wording and arabic digits", () => {
   for (const g of E.GOALS.pool) {
     assert.ok(!g.text.includes("占位"), `${g.id} 文案含占位`);
