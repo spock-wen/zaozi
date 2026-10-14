@@ -1,0 +1,14 @@
+{
+  "name": "zaozi-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "造字人 · 一年里程碑 — PC 网页壳 + 规则引擎（重建源码树，构建产物与 baseline_dist 字节一致）",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node tools/build_dist.mjs",
+    "test": "node --test tests/"
+  }
+}
