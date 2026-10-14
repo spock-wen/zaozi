@@ -4,7 +4,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { commit } from "./helpers/flow.mjs";
+import { commit, toPickDesktop } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -257,6 +257,42 @@ for (const engine of Object.keys(ENGINES)) {
         assert.equal(await page.evaluate(() => window.__zz.st.current), "T05", "按 1 应落字进入 T05");
         assert.equal(await page.evaluate(() => window.__zz.st.phase), "card");
 
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}
+
+// ---------- 5. 挑字页固定 7×2、不滚动（A 1280×720 · B 1024×600 · N 1366×768） ----------
+// BREAKPOINTS §矮屏「挑字页」：14 字 7 列 × 2 行，三档都不滚动（示意页 mock 逐档核过）。
+const PICK_VPS = [{ w: 1280, h: 720 }, { w: 1024, h: 600 }, { w: 1366, h: 768 }];
+for (const engine of Object.keys(ENGINES)) {
+  for (const vp of PICK_VPS) {
+    test(`${engine} 挑字 ${vp.w}×${vp.h}: 7 列 × 2 行 14 字，页面与 #pick 均不滚动`, async () => {
+      const { ctx, page, errs } = await open(engine, { width: vp.w, height: vp.h });
+      try {
+        await toPickDesktop(page);
+        const g = await page.evaluate(() => {
+          const el = document.querySelector("#pick");
+          const cands = [...el.querySelectorAll(".cand")].map((c) => c.getBoundingClientRect());
+          const cols = new Set(cands.map((r) => Math.round(r.x))).size;
+          const rows = new Set(cands.map((r) => Math.round(r.y))).size;
+          const tracks = getComputedStyle(el.querySelector(".pool")).gridTemplateColumns.split(" ").filter(Boolean).length;
+          const se = document.scrollingElement;
+          return {
+            count: cands.length, cols, rows, tracks,
+            pickScroll: { h: el.scrollHeight - el.clientHeight, w: el.scrollWidth - el.clientWidth },
+            docScroll: { h: se.scrollHeight - se.clientHeight, w: se.scrollWidth - se.clientWidth },
+          };
+        });
+        assert.equal(g.count, 14, "字池应为 14 字");
+        assert.equal(g.tracks, 7, "字池应为 7 列网格");
+        assert.equal(g.cols, 7, "候选应排成 7 列");
+        assert.equal(g.rows, 2, "候选应排成 2 行");
+        assert.ok(g.pickScroll.h <= 0 && g.pickScroll.w <= 0, `#pick 不应滚动，实际 ${JSON.stringify(g.pickScroll)}`);
+        assert.ok(g.docScroll.h <= 0 && g.docScroll.w <= 0, `页面不应滚动，实际 ${JSON.stringify(g.docScroll)}`);
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {
         await ctx.close();
