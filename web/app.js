@@ -132,7 +132,7 @@ function loadGlyphs() {
     for (const r of rows.slice(1)) if (r[I("order")] === "1") GLYPH[r[I("id")]] = GLYPH_BASE + r[I("path")];
     for (const [ch, def] of Object.entries(CHARS)) {
       const url = GLYPH[def.glyph_id]; if (!url) continue;
-      const im = new Image(); im.onload = () => { if (st.phase === "pick" || st.phase === "winter") render(); }; im.src = url; IMG[ch] = im;
+      const im = new Image(); im.onload = () => render(); im.src = url; IMG[ch] = im;
     }
   }).catch((e) => toast("字形包没加载上：" + e.message));
 }

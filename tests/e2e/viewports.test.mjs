@@ -30,6 +30,10 @@ for (const [engine, type] of Object.entries(ENGINES)) {
         assert.equal(await page.evaluate(() => window.__zz.st.phase), "card", "开局应在 card 阶段");
         assert.equal(await page.evaluate(() => document.body.dataset.view), vp.view, "布局档位");
 
+        // 字形包要驱动首屏重绘：字匣里的字应显示为字形 <img>，不能停在文字兜底
+        await page.waitForFunction(() => document.querySelectorAll("#wordbox img").length > 0, null, { timeout: 5000 });
+        assert.ok(await page.locator("#wordbox img").first().isVisible(), "字匣字形应显示图片");
+
         // 菜单按钮必须可见、点击区 ≥44×44（B1）
         const mb = page.locator("#menubtn");
         assert.ok(await mb.isVisible(), "☰ 菜单必须可见");
