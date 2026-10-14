@@ -9,7 +9,9 @@
   },
   "scripts": {
     "build": "node tools/build_dist.mjs",
+    "pretest": "node tools/check_node.mjs",
     "test": "node --test --test-concurrency=1 \"tests/*.test.mjs\"",
+    "pree2e": "node tools/check_node.mjs",
     "e2e": "node --test --test-concurrency=1 \"tests/e2e/*.test.mjs\""
   },
   "devDependencies": {
