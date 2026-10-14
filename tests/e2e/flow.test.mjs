@@ -223,8 +223,9 @@ test("chromium 568×320: phone landscape shows rotate-to-portrait hint", { skip:
   try {
     await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
     await page.waitForFunction(() => !!window.__zz);
-    assert.equal(await page.evaluate(() => document.body.dataset.view), "mobile");
-    assert.equal(await page.evaluate(() => document.body.dataset.orient), "landscape");
+    // 等真实状态（视图/朝向写进 body 后提示可见），不用定时等待；全量跑时偶发早读到未就绪的状态。
+    await page.waitForFunction(() => document.body.dataset.view === "mobile" && document.body.dataset.orient === "landscape", null, { timeout: 5000 });
+    await page.locator("#rotate-hint").waitFor({ state: "visible", timeout: 5000 });
     assert.ok(await page.locator("#rotate-hint").isVisible(), "手机横屏应显示转竖屏提示");
   } finally {
     await ctx.close();
