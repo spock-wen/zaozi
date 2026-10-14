@@ -275,8 +275,9 @@ body[data-view="desktop"] #dims-desktop .dim{flex:0 0 auto;width:110px;}
 body[data-view="desktop"] #gesture-hint{color:var(--night-line);}
 body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;}
 body[data-view="desktop"] .card{height:100%;width:auto;aspect-ratio:328/468;}
-body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;top:48px;width:320px;z-index:30;}
-body[data-view="desktop"].side-collapsed #coachcol{right:60px;}
+/* 桌面教学气泡沉到卡区底部右下：卡角「刻」在卡的右上，气泡在底部就不可能在
+   任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
+body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}
 body[data-view="desktop"] #wordbox{min-height:0;}
 body[data-view="desktop"] .optbtn{width:192px;flex:0 0 auto;}
 
