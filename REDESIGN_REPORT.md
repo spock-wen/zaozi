@@ -144,3 +144,11 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
   - WebKit 卡槽宽算错导致字匣不在卡下，已修（#cardwrap 用卡的宽高比）。
 - **测试**：short_screen / short_tutorial / short_bounds，三引擎 × 1280×720、1024×600、1366×768（另含 1280×633、1024×513、1024×488/492）：卡局和挑字页所有可见元素都在视口内，页面不滚动，教学全程走通。
 - VERSION 177929f5b1ef；单测 28/28，e2e 180/180。
+
+## Round 13 — 92cf10a QA retest fixes (VERSION 4cc4b2e4835c)
+- QA commit ab6a626 cherry-picked (cc21503).
+- D1: on two-finger put-back the character is recorded at pointerdown, not by the slot index at pointerup; 水日人, two fingers on slots 1+3 → only 日 left. Test: pick_touch_putback.
+- D2: the <492 'window too short' prompt no longer overlaps the card header (1024/1280×491). Test: short_overlap.
+- D3: the B-tier key-hint popover is narrower and pinned right, so it no longer overlaps the option buttons (1024×600/513/491, auto-open and '?'). Test: short_overlap.
+- D4: the goals-slip hit area is ≥44×44 in tiers A/B with no visual change. Test: goals_hit.
+- Note: at 1366×768 the 字匣 measures 83, while BREAKPOINTS sets N tier to 64 (cells 52), so this deviates from the design. Not changed this round; waiting on the user's decision.
