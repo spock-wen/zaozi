@@ -39,4 +39,5 @@
 - 20 QA 复测 W1（P1）：菜单「字源与版权」进不去。根因 `app.js` 的 `on()` 对每次 click 都 `preventDefault`，把 `<a href>` 的默认跳转也拦了。改成带 `href` 的真链接不拦（照常导航），其余点击行为不变。新增 `tests/e2e/credits_link.test.mjs`（三引擎 × 390 tap / 1280 click：开菜单→点链接→落 `/credits` 且版权表 >50 行带 Richard Sears）；反修复时该测试超时失败，证明确实锁死。e2e 52、单测 17 全过。
 - 21 QA 复测 W4（P1·发布）：干净树 `npm ci && npm run build` 崩 ENOENT、且第一次 VERSION=e3b0c44298fc。根因 `build_dist.mjs` 在 rmrf/mkdirp 重建 dist 之前就 `resolveVersion` 去扫 dist。改成：dist 用 rm -rf + mkdir -p 从零重建；VERSION 移到「所有发布文件写完之后、生成 sw.js 之前」再算（sw.js 除外，它嵌 VERSION）。`rm -rf dist && npm run build` 一次成功，VERSION=cec268a33090（=内容哈希，第二次相同；W1 改动使哈希随内容变，故与 3232828264d4 不同）。新增 `tests/build_clean.test.mjs`：`git archive HEAD` 到临时目录、一次构建，断言 VERSION≠空哈希、等于内容哈希、且（工作树干净时）等于仓库里一次构建的 VERSION。单测 18 全过。
 - 22 第四轮：W1–W4 + 目标可达性；VERSION=37a6d803c885；单测 25、e2e 73。
+- 23 修 G_ENGRAVE1 只应从第 1 代排除：`goalIdsForGeneration` 第 2 代起误把 `generation1_exclude` 也套到池上（引擎一行 filter），改回全 6 目标可抽；加回归单测（gen1 永不含 + 直接抽/真实多代流程 gen≥2 必中）。重跑 `node tools/goal_sweep.mjs --seeds 2000 --gens 4`（40000 代）：G_ENGRAVE1 抽到 15145、达成 2064（13.6%）。GOAL_REACHABILITY.md 换新表、§5 改「已修复」、新增可复现达成（种子 0，第 2 代进池、第 3 代达成，含存档码/走法）。单测 26 全过。
 - DONE（v2.3）
