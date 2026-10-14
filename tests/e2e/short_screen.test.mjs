@@ -93,3 +93,57 @@ for (const engine of Object.keys(ENGINES)) {
     });
   }
 }
+
+// ---------- 2. 很矮 B 档（≤600）：卡高 clamp(320,vh−172,428)、字匣 56、键位收进顶栏「?」（首进自动弹一次） ----------
+const B_VPS = [{ w: 1024, h: 600 }, { w: 1024, h: 513 }];
+for (const engine of Object.keys(ENGINES)) {
+  for (const vp of B_VPS) {
+    test(`${engine} B 档 ${vp.w}×${vp.h}: 卡高/字匣 56/键位收进「?」（自动弹一次）`, async () => {
+      const { ctx, page, errs } = await open(engine, { width: vp.w, height: vp.h });
+      try {
+        const g = await box(page);
+        assert.equal(g.view, "desktop");
+        assert.equal(g.short, "B", "≤600 应落 B 档");
+
+        const expH = clamp(320, g.vh - 172, 428);
+        assert.ok(Math.abs(g.card.h - expH) <= 1, `卡高应 ≈${expH}，实际 ${g.card.h}`);
+        assert.equal(Math.round(g.wb.h), 56, "字匣应为 56（格 48 + 上下内边距 8）");
+        assert.ok(g.wb.bottom <= g.vh + 1, "字匣应在视口内");
+        assert.ok(!intersect(g.card, g.wb), "卡与字匣不交叠");
+        assert.equal(g.keysDisplay, "none", "B 档不显示键位行");
+        assert.equal(g.hintDisplay, "none", "矮屏不显旧手势行");
+        assert.ok(g.scroll <= 1, `矮屏不应滚动，溢出 ${g.scroll}`);
+
+        // 顶栏「?」：44×44，点击区在屏内
+        const btn = await page.locator("#keyhelp-btn");
+        assert.ok(await btn.isVisible(), "B 档应显示顶栏「?」按钮");
+        const b = await btn.boundingBox();
+        assert.ok(b.width >= 44 && b.height >= 44, `「?」点击区应 ≥44×44，实际 ${b.width}×${b.height}`);
+        assert.ok(b.y >= 0 && b.y + b.height <= g.vh + 1, "「?」按钮应在视口内");
+
+        // 每个存档首次进入自动弹一次：本次 context 是空的 → 进来就该开着
+        const pop = page.locator("#keyhelp-pop");
+        assert.ok(await pop.isVisible(), "首次进入应自动弹出键位浮层");
+        const pb = await pop.boundingBox();
+        assert.ok(pb.y >= 0 && pb.y + pb.height <= g.vh + 1, "键位浮层应在视口内");
+        const rows = await pop.locator(".kh-row").count();
+        assert.ok(rows >= 5, `浮层应列出全部键位，实际 ${rows} 行`);
+
+        // 同一存档再进入不再自动弹（只弹一次）
+        await page.reload({ waitUntil: "load" });
+        await page.waitForFunction(() => !!window.__zz);
+        assert.ok(!(await pop.isVisible()), "同一存档再次进入不应自动弹（只弹一次）");
+
+        // 点「?」手动开，点外面关
+        await page.locator("#keyhelp-btn").click();
+        assert.ok(await pop.isVisible(), "点「?」应打开键位浮层");
+        await page.mouse.click(10, g.vh / 2);
+        assert.ok(!(await pop.isVisible()), "点浮层外应收起");
+
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}
