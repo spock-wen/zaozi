@@ -215,8 +215,9 @@ body[data-view="desktop"] #banner{top:calc(56px + 8px);}
 #pick h2{font-size:18px;color:var(--gold-400);margin:8px 0;}
 #pick .season-note{font-size:14px;color:var(--paper-200);}
 #pick .pickslots{display:flex;gap:10px;margin:12px 0;min-height:88px;}
-#pick .pickslot{width:72px;height:88px;border-radius:12px;border:1px dashed var(--night-line);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);}
-#pick .pickslot img{width:48px;height:48px;background:var(--paper-100);border-radius:6px;}
+#pick .pickslot{width:72px;height:88px;border-radius:12px;border:1px dashed var(--night-line);display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;font-size:12px;color:var(--muted);}
+#pick .pickslot img{width:40px;height:40px;background:var(--paper-100);border-radius:6px;}
+#pick .pickslot span{font-size:11px;line-height:1;white-space:nowrap;}
 #pick .pool{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
 #pick .cand{width:72px;height:88px;border-radius:12px;background:var(--night-700);border:1px solid var(--night-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--paper-200);}
 #pick .cand img{width:40px;height:40px;background:var(--paper-100);border-radius:6px;}
@@ -234,6 +235,25 @@ body[data-view="desktop"] #banner{top:calc(56px + 8px);}
 #pick .pickinfo .pi-h span{font-weight:400;font-size:12px;color:var(--bone-crack);margin-left:6px;}
 #pick .pickinfo .pi-row{display:flex;gap:8px;font-size:13px;line-height:22px;}
 #pick .pickinfo .pi-row b{flex:0 0 40px;color:var(--zhu-600);}
+
+/* 挑字 · 电脑端（design/v4_gamefeel/gf5_pick.html §11）：左挑右看，
+   说明卡放在网格右侧（不是网格下方）。 */
+body[data-view="desktop"] #pick{
+  display:grid;
+  grid-template-columns:minmax(0,560px) 360px;
+  grid-template-rows:auto auto auto auto 1fr auto;
+  column-gap:48px;
+  align-content:start;
+  padding:24px 40px;
+}
+body[data-view="desktop"] #pick h2{grid-column:1;grid-row:1;margin:0 0 4px;}
+body[data-view="desktop"] #pick .pickslots{grid-column:1;grid-row:2;margin:8px 0;}
+body[data-view="desktop"] #pick .pool{grid-column:1;grid-row:3;grid-template-columns:repeat(7,1fr);gap:8px;}
+body[data-view="desktop"] #pick .cand{width:auto;}
+body[data-view="desktop"] #pick .pickfoot{grid-column:1;grid-row:4;margin-top:14px;padding-top:0;}
+body[data-view="desktop"] #pick .go{width:320px;}
+body[data-view="desktop"] #pick .desc{grid-column:2;grid-row:1/7;align-self:start;margin-top:0;}
+body[data-view="desktop"] #pick .season-note{grid-column:1;grid-row:6;}
 
 /* ---------- 先人 / 结局 / 冬夜 ---------- */
 #elder,#endseq,#winter,#pick{text-align:left;}

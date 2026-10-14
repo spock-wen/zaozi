@@ -32,13 +32,14 @@ const reducedPref = () => (localStorage.getItem(MOTION_KEY) === "1") || matchMed
 // ---------- 状态 ----------
 let seed = Number(params.get("seed") || 20261012);
 let actions = [];
+let lastHover = { x: NaN, y: NaN };   // 上一次鼠标位置：区分「真的移动」和重绘后对静止指针重发的 pointerover
 let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
   preview: false, kbDir: null, animating: false, floats: {},
   winter: freshWinter(),
   goalShown: 0, bannerQueue: [], bannerOn: false,
-  panelOpen: false, menuOpen: false, elderShown: false, pickCursor: 0,
+  panelOpen: false, menuOpen: false, elderShown: false,
   pickFocus: null, pickTapped: null,
   lastDims: null,
 };
@@ -212,7 +213,7 @@ function restore() {
 }
 function newGame(s) {
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
-  ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false; ui.pickCursor = 0;
+  ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
   ui.pickFocus = null; ui.pickTapped = null;
   ui.lastDims = null; saveNow(); render();
 }
@@ -622,9 +623,22 @@ addEventListener("keydown", (e) => {
   if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }
   if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; render(); return; }
   if (st.phase === "pick") {
-    if (e.key === "ArrowRight") { ui.pickCursor = (ui.pickCursor + 1) % PICK_CHARS.length; e.preventDefault(); }
-    else if (e.key === "ArrowLeft") { ui.pickCursor = (ui.pickCursor - 1 + PICK_CHARS.length) % PICK_CHARS.length; e.preventDefault(); }
-    else if (e.code === "Space") { pickToggle(PICK_CHARS[ui.pickCursor].char); e.preventDefault(); }
+    // 键盘光标、金色焦点框和鼠标悬停是同一个状态 ui.pickFocus（P1-2）：
+    // 移动光标时同步重绘焦点框和说明卡；Space 选中的就是框里的字。
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const cur = PICK_CHARS.findIndex((p) => p.char === ui.pickFocus);
+      const i = cur < 0 ? (dir > 0 ? 0 : PICK_CHARS.length - 1) : (cur + dir + PICK_CHARS.length) % PICK_CHARS.length;
+      ui.pickFocus = PICK_CHARS[i].char; ui.pickTapped = null;
+      updatePickInfo();
+    }
+    else if (e.code === "Space") {
+      e.preventDefault();
+      const ch = ui.pickFocus || PICK_CHARS[0].char;
+      ui.pickFocus = ch; ui.pickTapped = null;
+      pickToggle(ch);
+    }
     else if (e.key === "Backspace") { const last = (st.picks || []).slice(-1)[0]; if (last) dispatch({ type: "pick_toggle", char: last }); }
     else if (e.key === "Enter") { const p = st.picks || []; if (p.length === RULES.word_box.slots) { sfx.ready(); dispatch({ type: "begin_generation", picks: p }); } }
     return;
@@ -723,6 +737,10 @@ on($("pick"), (e) => {
 // gf5 电脑：悬停即显示右侧说明（不选中）。触控设备无 fine pointer，不走这里。
 $("pick").addEventListener("pointerover", (e) => {
   if (!hasFinePointer()) return;
+  // 重绘（innerHTML 重建候选）后浏览器会对静止的指针重发 pointerover，
+  // 若照单全收，键盘刚移动的光标会被鼠标位置抢回（P1-2）。只在指针真的动了时才更新。
+  if (e.clientX === lastHover.x && e.clientY === lastHover.y) return;
+  lastHover = { x: e.clientX, y: e.clientY };
   const b = e.target.closest?.(".cand[data-char]"); if (!b) return;
   if (ui.pickFocus === b.dataset.char) return;
   ui.pickFocus = b.dataset.char; updatePickInfo();
