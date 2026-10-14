@@ -24,12 +24,15 @@ const BACKUP_KEY = SAVE_KEY + ".bak";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
+// ?debug=1&debug_goal=G_FOOD_65：把某个目标硬塞进每一代的目标里，方便在网页上反复验它。
+const DEBUG = params.get("debug") === "1";
+const DEBUG_GOAL = DEBUG ? (params.get("debug_goal") || null) : null;
 const reducedPref = () => (localStorage.getItem(MOTION_KEY) === "1") || matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ---------- 状态 ----------
 let seed = Number(params.get("seed") || 20261012);
 let actions = [];
-let st = createGame({ seed });
+let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
   preview: false, kbDir: null, animating: false, floats: {},
@@ -207,7 +210,7 @@ function restore() {
   }
 }
 function newGame(s) {
-  seed = s >>> 0; actions = []; st = createGame({ seed }); ui.winter = freshWinter();
+  seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false; ui.pickCursor = 0;
   ui.lastDims = null; saveNow(); render();
 }
@@ -691,6 +694,7 @@ document.addEventListener("click", closeMenuOutside);
 window.__zz = {
   get st() { return st; }, get seed() { return seed; }, get actions() { return actions; },
   get view() { return document.body.dataset.view; },
+  get debugGoal() { return DEBUG_GOAL; },
   dispatch, newGame, restore, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
   setMuted(v) { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); renderMenu(); },
@@ -699,7 +703,7 @@ window.__zz = {
 };
 
 // ---------- 启动 ----------
-restore();
+if (!DEBUG_GOAL) restore();          // 调试图标（debug_goal）时不读旧存档，保证这一局就是目标被塞进去的局
 computeLayout();
 render();
 loadGlyphs();

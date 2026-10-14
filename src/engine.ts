@@ -57,15 +57,25 @@ function buildYearDeck(seed: number, yearIndex: number, cards: Card[]): string[]
 }
 
 // ---- 每代目标：第 1 代固定（教学），第 2 代起按 (种子, 代数) 定序挑 3 个 ----
-export function goalIdsForGeneration(seed: number, generation: number): string[] {
-  if (generation <= 1) return goalsData.generation1_goals.slice();
-  const pool = goalsData.pool.map((g: any) => g.id).filter((id: string) => !goalsData.generation1_exclude.includes(id));
-  const rnd = mulberry32((seed ^ (generation * 0x85ebca6b)) >>> 0);
-  return shuffle(pool, rnd).slice(0, goalsData.per_generation);
+// debugGoal（?debug=1&debug_goal=…）：把一个目标硬塞进这一代，方便在网页上反复验它——
+// 哪怕它本来被 generation1_exclude 排除、或这一代没抽到。正常玩法不传，结果与以前一样。
+export function goalIdsForGeneration(seed: number, generation: number, debugGoal?: string | null): string[] {
+  let ids: string[];
+  if (generation <= 1) {
+    ids = goalsData.generation1_goals.slice();
+  } else {
+    const pool = goalsData.pool.map((g: any) => g.id).filter((id: string) => !goalsData.generation1_exclude.includes(id));
+    const rnd = mulberry32((seed ^ (generation * 0x85ebca6b)) >>> 0);
+    ids = shuffle(pool, rnd).slice(0, goalsData.per_generation);
+  }
+  if (debugGoal && goalsData.pool.some((g: any) => g.id === debugGoal) && !ids.includes(debugGoal)) {
+    ids[ids.length - 1] = debugGoal;
+  }
+  return ids;
 }
 function goalDef(id: string): any { return goalsData.pool.find((g: any) => g.id === id); }
-function makeGoals(seed: number, generation: number) {
-  return goalIdsForGeneration(seed, generation).map((id) => {
+function makeGoals(seed: number, generation: number, debugGoal?: string | null) {
+  return goalIdsForGeneration(seed, generation, debugGoal).map((id) => {
     const d = goalDef(id);
     return { id: d.id, kind: d.kind, dim: d.dim ?? null, min: d.min ?? null, text: d.text, banner: d.banner, achieved: false };
   });
@@ -82,6 +92,7 @@ export function createGame(cfg: GameConfig): GameState {
   const st: GameState = {
     seed: cfg.seed,
     generation,
+    debugGoal: cfg.debugGoal ?? null,
     phase: "card",
     dims,
     bones: rules.bones.start,
@@ -99,7 +110,7 @@ export function createGame(cfg: GameConfig): GameState {
     hiddenMarkers: {},
     ending: null,
     legacy: null,
-    goals: makeGoals(cfg.seed, generation),
+    goals: makeGoals(cfg.seed, generation, cfg.debugGoal),
     goalEvents: [],
     engravedThisGen: 0,
     tutorialDone: generation > 1,
@@ -364,7 +375,7 @@ export function step(prev: GameState, action: Action): GameState {
       if (picks.length !== rules.word_box.slots) throw new Error("要挑三个字");
       const legacy = st.legacy as GenerationCarryOver;
       const seed = (st.seed + 0x9e3779b1) >>> 0;
-      const next = createGame({ seed, generation: (st.generation as number) + 1, startZilu: legacy.zilu, wordBox: picks });
+      const next = createGame({ seed, generation: (st.generation as number) + 1, startZilu: legacy.zilu, wordBox: picks, debugGoal: st.debugGoal });
       next.tallies = legacy.carriedTally ? [legacy.carriedTally] : [];
       return next;
     }
