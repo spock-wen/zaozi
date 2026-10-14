@@ -14,6 +14,13 @@ buildDist();
 const GOALS = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "goals.json"), "utf8"));
 const BANNER_DROP1 = GOALS.pool.find((g) => g.id === "G_DROP1").banner;
 
+// 等挑字状态到期望值：不再用固定 waitForTimeout 赌「点击已生效」的时刻。
+const picksAre = (page, expected) =>
+  page.waitForFunction((exp) => JSON.stringify(window.__zz.st.picks || []) === JSON.stringify(exp), expected);
+// 等说明卡标题落在某个字上（第一次点/悬停后的真实 DOM 状态）。
+const infoIs = (page, ch) =>
+  page.waitForFunction((c) => (document.querySelector("#pick-desc .pi-h")?.textContent || "").trim().startsWith(c), ch);
+
 let server, browsers = {};
 before(async () => {
   server = await startServer();
@@ -134,7 +141,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         // gf5 ①：第一次点只看说明（出说明卡、落/部件/解锁 三行），不填格；
         // 含 pointerdown+click 双触发回归（只当一次点击）。
         await firePointerThenClick(page, "#pick .cand[data-char='水']");
-        await page.waitForTimeout(80);
+        await infoIs(page, "水");
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), [], "第一次点不应选中");
         assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "第一次点应出说明卡");
         // P1-1：说明卡只画有数据的行。「水」在字池里没有部件/底字数据 → 不出任何说明行，也不出「？」。
@@ -143,11 +150,12 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.equal(await page.locator("#pick .cand.sel").count(), 0, "第一次点不应有已选字");
         // gf5 ②：同一字再点一次才入格、变朱、带序号角标。
         await page.locator("#pick .cand[data-char='水']").click();
-        await page.waitForTimeout(80);
+        await picksAre(page, ["水"]);
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水"], "同一字再点一次才选中");
         assert.equal(await page.locator("#pick .cand.sel[data-char='水'] .badge").textContent(), "1", "选中字应带顺序角标 1");
         // gf5 ①：部件行从数据里推（木 → 休、林、本）。只有有数据时才出「部件」这一行。
         await page.locator("#pick .cand[data-char='木']").click();
+        await infoIs(page, "木");
         const woodRow = (await page.locator("#pick-desc .pi-row").first().innerText()).trim();
         assert.ok(woodRow.includes("部件"), `木 应出「部件」行，得到：${woodRow}`);
         assert.ok(woodRow.includes("休") && woodRow.includes("本") && woodRow.includes("林"), `木 的部件应为 休/林/本，得到：${woodRow}`);
@@ -156,26 +164,27 @@ for (const [engine] of Object.entries(ENGINES)) {
           await page.locator(`#pick .cand[data-char='${ch}']`).click();
           await page.locator(`#pick .cand[data-char='${ch}']`).click();
         }
-        await page.waitForTimeout(80);
+        await picksAre(page, ["水", "休", "木"]);
         assert.ok(await page.locator("#pick .go").isEnabled(), "选满三个后出发键可用");
         assert.equal((await page.locator("#pick .go").textContent()).trim(), "带这三个字出发", "选满三个后按钮应为「带这三个字出发」");
         // 满了再点第 4 个：第一次看说明、第二次提示「先放回一个」，已选不动。
         await firePointerThenClick(page, "#pick .cand[data-char='日']");
+        await infoIs(page, "日");
         await page.locator("#pick .cand[data-char='日']").click();
-        await page.waitForTimeout(80);
+        await page.waitForFunction(() => (document.querySelector("#toast")?.textContent || "").includes("先放回一个"));
         assert.equal((await page.evaluate(() => window.__zz.st.picks)).length, 3, "选满后不能再加");
 
         // gf5 ③：点已选字（或格内字）放回，后面的字补位；放回后再走一次两步可重选。
         await page.locator("#pick .cand.sel[data-char='木']").click();
-        await page.waitForTimeout(80);
+        await picksAre(page, ["水", "休"]);
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水", "休"], "点已选字应放回");
         await page.locator("#pick .cand[data-char='木']").click();
         await page.locator("#pick .cand[data-char='木']").click();
-        await page.waitForTimeout(80);
+        await picksAre(page, ["水", "休", "木"]);
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水", "休", "木"], "放回后可再选");
 
         await page.locator("#pick .go").click();
-        await page.waitForTimeout(400);
+        await page.waitForFunction(() => window.__zz.st.generation === 2);
         assert.equal(await page.evaluate(() => window.__zz.st.generation), 2);
         assert.equal(await phase(page), "card");
         assert.deepEqual(await page.evaluate(() => window.__zz.st.wordBox), ["水", "休", "木"]);
@@ -190,7 +199,7 @@ for (const [engine] of Object.entries(ENGINES)) {
 }
 
 // 桌面 1440：教学气泡距侧栏 ≥16px，且不压在四维行上（B3）
-test("chromium 1440: tutorial bubble keeps clear of the dim row and the sidebar", async () => {
+test("chromium 1440: tutorial bubble keeps clear of the dim row and the sidebar", { skip: !ENGINES.chromium }, async () => {
   const ctx = await browsers.chromium.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   try {
@@ -208,7 +217,7 @@ test("chromium 1440: tutorial bubble keeps clear of the dim row and the sidebar"
 });
 
 // 手机横屏：必须显示转竖屏提示（BREAKPOINTS）。用 <600 宽的窄屏横放（如 568×320）。
-test("chromium 568×320: phone landscape shows rotate-to-portrait hint", async () => {
+test("chromium 568×320: phone landscape shows rotate-to-portrait hint", { skip: !ENGINES.chromium }, async () => {
   const ctx = await browsers.chromium.newContext({ viewport: { width: 568, height: 320 } });
   const page = await ctx.newPage();
   try {

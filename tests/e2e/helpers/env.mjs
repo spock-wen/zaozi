@@ -12,7 +12,13 @@ export const ROOT = path.dirname(path.dirname(path.dirname(path.dirname(fileURLT
 export const DIST = path.join(ROOT, "dist");
 export const SEED = 20261012;
 
-export const ENGINES = { chromium, firefox, webkit };
+const ALL_ENGINES = { chromium, firefox, webkit };
+// E2E_ENGINES=firefox 或 "firefox,webkit"：只跑指定引擎（默认三引擎全跑）。
+// 只影响按 ENGINES 迭代的用例；写死引擎名的用例在别的引擎缺席时会自行 skip。
+const only = (process.env.E2E_ENGINES || "").split(",").map((s) => s.trim()).filter(Boolean);
+export const ENGINES = only.length
+  ? Object.fromEntries(Object.entries(ALL_ENGINES).filter(([n]) => only.includes(n)))
+  : ALL_ENGINES;
 
 // 视口清单（brief）：390×844、768×1024、1024×768、1280×800、1440×900
 export const VIEWPORTS = [
