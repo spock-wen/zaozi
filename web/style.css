@@ -238,24 +238,32 @@ body[data-view="desktop"] #banner{top:calc(56px + 8px);}
 
 /* 挑字 · 电脑端（design/v4_gamefeel/gf5_pick.html §11）：按 1280 设计稿绝对定位，
    左挑右看——说明卡在字池网格右侧（不是下方）。
-   ≥1280 整块水平居中：offset=(100vw-1280)/2，x 全体 +offset，y 不变（1440 → +80）。
    坐标帧 = getBoundingClientRect() 视口坐标；#pick 为 fixed inset:0，故与
    「相对 #pick 边框盒」一致（QA logs/pick_geo.log 的 ov.mjs 取法）。
    设计稿坐标（1280 宽，含其 56px 顶栏）：h2 x96 y96、挑字格 x96 y160、
-   字池 x96 y256 w560、说明卡 x820 y160 w360、出发键 x96 y640 w320、键位提示 x96 y720。 */
+   字池 x96 y256 w560、说明卡 x820 y160 w360、出发键 x96 y640 w320、键位提示 x96 y720。
+
+   W7（1024 视口溢出）：说明卡右缘原为 820+360=1180 > 1024。改为按视口宽等比缩放 x/宽：
+   --pick-w = min(100vw, 1280px)（设计稿宽），各项 x/宽 = 设计稿值 × --pick-w/1280（写成小数）。
+   - 恰好 1280：--pick-w=1280px、--pick-x=0 → 与设计稿逐像素一致（96/160/256/560/820/360/320/640/720）。
+   - ≥1280：--pick-w 封顶 1280px、--pick-x=(100vw-1280)/2 整块水平居中（1440 → +80），y 不变。
+   - 1024–1279：--pick-w=100vw、--pick-x=0，整块随视口等比收窄，说明卡右缘
+     ≤ 0.921875×100vw ≤ 视口宽，全部落在视口内（左缘 ≥0、与字池不重叠）。
+   只缩 x/宽，不缩 y（PM 的 y 数字在 1280 保持不变）。 */
 body[data-view="desktop"] #pick{
   display:block;
   padding:0;
+  --pick-w:min(100vw, 1280px);
   --pick-x:max(0px, calc((100vw - 1280px) / 2));
 }
-body[data-view="desktop"] #pick h2{position:absolute;left:calc(96px + var(--pick-x));top:96px;margin:0;}
-body[data-view="desktop"] #pick .pickslots{position:absolute;left:calc(96px + var(--pick-x));top:160px;margin:0;}
-body[data-view="desktop"] #pick .pool{position:absolute;left:calc(96px + var(--pick-x));top:256px;width:560px;grid-template-columns:repeat(7,1fr);gap:8px;}
+body[data-view="desktop"] #pick h2{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:96px;margin:0;}
+body[data-view="desktop"] #pick .pickslots{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:160px;margin:0;}
+body[data-view="desktop"] #pick .pool{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:256px;width:calc(var(--pick-w) * 0.4375);grid-template-columns:repeat(7,1fr);gap:8px;}
 body[data-view="desktop"] #pick .cand{width:auto;}
-body[data-view="desktop"] #pick .desc{position:absolute;left:calc(820px + var(--pick-x));top:160px;width:360px;margin:0;}
-body[data-view="desktop"] #pick .pickfoot{position:absolute;left:calc(96px + var(--pick-x));top:640px;margin:0;padding:0;}
-body[data-view="desktop"] #pick .go{width:320px;}
-body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(96px + var(--pick-x));top:720px;margin:0;}
+body[data-view="desktop"] #pick .desc{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.640625);top:160px;width:calc(var(--pick-w) * 0.28125);margin:0;}
+body[data-view="desktop"] #pick .pickfoot{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:640px;margin:0;padding:0;}
+body[data-view="desktop"] #pick .go{width:calc(var(--pick-w) * 0.25);}
+body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:720px;margin:0;}
 
 /* ---------- 先人 / 结局 / 冬夜 ---------- */
 #elder,#endseq,#winter,#pick{text-align:left;}
