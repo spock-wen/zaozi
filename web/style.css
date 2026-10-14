@@ -422,9 +422,12 @@ body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
 body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
 
 /* 顶栏「?」键位浮层（B 档；键盘模式才显示）。
-   左右选项贴着卡（B 档卡右缘 = 卡心 + 卡高×0.7/2，选项右缘 = 卡右缘 + 8 + 140），
-   1024 最宽卡高 428 时选项右缘到 810；浮层贴右上、宽 200（左缘 ≥ 816）即可与选项不交叠，
-   下方是整片空沟，故可放心向下长高（不与卡/选项/字匣交叠）。 */
+   选项按钮竖向跟着卡中线：选项顶边 = 32 + 卡高/2（顶栏 48 + 舞台上下留 16，
+   选项高 64 居中）。故浮层顶边 52 起、向下最多长到「选项顶边 − 4」即不压选项：
+   max-height = 卡高/2 − 24，与 #cardwrap 的卡高同一 clamp，卡高规则变它也自动跟。
+   （不能靠宽度避开：WebKit 对 #cardwrap 的 auto 宽不认 aspect-ratio，回落 max-content
+   把卡槽撑到 ~377，选项右缘被推到 848.5；Chromium 卡槽贴卡、选项右缘 810。按高度封顶对
+   两种引擎都成立。） */
 #keyhelp-btn{
   width:44px;height:44px;min-width:44px;display:none;align-items:center;justify-content:center;
   font-size:18px;font-weight:700;border-radius:8px;color:var(--paper-50);
@@ -433,7 +436,8 @@ body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;
 #keyhelp-btn[data-show="1"]{display:flex;}
 #keyhelp-btn:active{background:var(--night-line);}
 #keyhelp-pop{
-  position:absolute;top:calc(48px + 4px);right:8px;width:200px;max-height:calc(100dvh - 60px);
+  position:absolute;top:calc(48px + 4px);right:8px;width:200px;
+  max-height:calc(clamp(320px,100dvh - 172px,428px)/2 - 24px);
   overflow:auto;z-index:61;
   background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 12px;
   font-size:13px;line-height:20px;box-shadow:0 10px 30px rgba(0,0,0,.4);
