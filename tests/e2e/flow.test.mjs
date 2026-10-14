@@ -150,6 +150,24 @@ for (const [engine, type] of Object.entries(ENGINES)) {
   });
 }
 
+// 桌面 1440：教学气泡距侧栏 ≥16px，且不压在四维行上（B3）
+test("chromium 1440: tutorial bubble keeps clear of the dim row and the sidebar", async () => {
+  const ctx = await browsers.chromium.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+    await page.waitForFunction(() => !!window.__zz);
+    await page.locator("#coach").waitFor({ state: "visible", timeout: 3000 });
+    const coach = await page.locator("#coach").boundingBox();
+    const dims = await page.locator("#dims-desktop").boundingBox();
+    const sidebar = await page.locator("#sidebar").boundingBox();
+    assert.ok(coach.y >= dims.y + dims.height - 1, `气泡不能压在四维行上：coach.y=${coach.y} dims底=${dims.y + dims.height}`);
+    assert.ok(coach.x + coach.width <= sidebar.x - 16 + 1, `气泡距侧栏应 ≥16px：右缘 ${coach.x + coach.width}，侧栏 ${sidebar.x}`);
+  } finally {
+    await ctx.close();
+  }
+});
+
 // 手机横屏：必须显示转竖屏提示（BREAKPOINTS）。用 <600 宽的窄屏横放（如 568×320）。
 test("chromium 568×320: phone landscape shows rotate-to-portrait hint", async () => {
   const ctx = await browsers.chromium.newContext({ viewport: { width: 568, height: 320 } });

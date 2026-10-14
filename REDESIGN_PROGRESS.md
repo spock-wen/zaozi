@@ -25,4 +25,5 @@
 - 7/8 收尾核对完成（ae5e53e）：48 个卡面图资产并入发布树 + SW 预缓存；credits seal 行带 SOURCES.csv 的 credit 署名；shui 3 字形与设计稿逐字节一致。
 - 10 单测完成（本步）：新增 tests/card_art.test.mjs（只发 C01–C10、先人无图、gf4-休 不上线、资产逐字节一致、无杂文件）；修 index.html 重复的 #goals-slip id。16 个单测全过。
 - 11 e2e 完成（本步）：`npm run e2e` = node:test + playwright 库（本项目只装了 playwright，无 @playwright/test）。helpers/env.mjs 干净树重建 dist + 起 serve_pages 模拟 Pages。27 个 e2e 全过：viewports（3 引擎 × 390/768/1024/1280/1440，菜单/存档/静音 D1/版权）、flow（3 引擎 1280：教学/卡面图 picture+webp/目标弹层不秒关/锁卡提示且不遮字匣/天亮了不穿透/先人无图/挑字 14 字池/多代）、手机横屏转竖屏提示、offline（3 引擎 SW 后断网）、redirects（serve_pages 308 + no-cache）、fps（chromium 4× 节流 60.0fps）。
+- 修：字形首屏不出图——重写把 loadGlyphs 的 onload 重绘限制成只在 pick/winter，导致 card 阶段字匣/字录停在文字兜底。恢复基线行为（每次字形加载都 render），e2e viewports 加断言锁死。
 - 下一步：12 干净树 build dist，13 release_shots_v2 截图，14 REDESIGN_REPORT.md + DONE。
