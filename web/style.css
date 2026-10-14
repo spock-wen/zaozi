@@ -80,9 +80,9 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 }
 .card-drops .chiplink{color:var(--zhu-600);font-weight:700;margin-left:6px;}
 
-/* 卡角骨片四态 */
+/* 卡角骨片四态。z-index 让它恒在卡内正文（含 .card-head）之上，命中测试优先。 */
 .bonecorner{
-  position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:10px;
+  position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:10px;z-index:1;
   display:none;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--ink);
   background:linear-gradient(var(--bone-100),var(--bone-200));border:1px solid var(--bone-crack);
   transition:transform 120ms ease-out,box-shadow 120ms ease-out;

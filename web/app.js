@@ -41,6 +41,8 @@ const ui = {
   winter: freshWinter(),
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false,
+  engraved: false,                    // 本张卡卡角是否已刻：布尔量。undefined 会被
+                                      // classList.toggle(name, undefined) 当成「无 force」→ 误翻转
   pickFocus: null, pickTapped: null,
   presses: new Map(),                 // 挑字：每次按下（按 pointerId 分），值是 { token, node, key }
   swallow: [],                        // 已被 pointerup 处理、等待吞掉其合成 click 的 press token 队列
@@ -361,9 +363,11 @@ function renderCard() {
   $("card-speaker").textContent = c.speaker;
   $("card-title").textContent = c.title || "";
   $("card-text").textContent = c.text;
-  card.classList.toggle("engrave", st.phase === "engrave");
+  const engrave = st.phase === "engrave";
+  card.classList.toggle("engrave", engrave);
+  if (!engrave) ui.engraved = false;    // 离开「刻」就复位本张卡的已刻标记，别把 done 带到下一张「刻」卡
   const bc = $("bonecorner");
-  bc.classList.toggle("done", st.phase === "engrave" && ui.engraved);
+  bc.classList.toggle("done", engrave && ui.engraved);
   const drops = $("card-drops");
   if (st.phase === "engrave") {
     drops.hidden = false;
