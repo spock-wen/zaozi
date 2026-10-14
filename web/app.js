@@ -41,7 +41,8 @@ const ui = {
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false,
   pickFocus: null, pickTapped: null,
-  pickPtr: null, pickHandled: null,   // 挑字：pointerdown 捕获的候选 / pointerup 已处理的候选（吞掉随后的合成 click）
+  presses: new Map(),                 // 挑字：每次按下（按 pointerId 分），值是 { token, node, key }
+  swallow: [],                        // 已被 pointerup 处理、等待吞掉其合成 click 的 press token 队列
   lastDims: null,
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
@@ -215,7 +216,7 @@ function restore() {
 function newGame(s) {
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
-  ui.pickFocus = null; ui.pickTapped = null; ui.pickPtr = null; ui.pickHandled = null;
+  ui.pickFocus = null; ui.pickTapped = null; ui.presses.clear(); ui.swallow = [];
   ui.lastDims = null; saveNow(); render();
 }
 // ---------- 存档码 ----------
@@ -441,34 +442,73 @@ function winterCarve() {
   ui.winter = freshWinter(); render();
 }
 
-// 挑字候选的 HTML 缓存：内容没变时不再 el.innerHTML 重建（P1 竞态）。
-// afterAction 的 650ms render 若恰好落在某次 pointerdown 与 pointerup 之间，
-// 替换掉按下的节点会让浏览器不合成 click——真实玩家的点选被静默吞掉。
-let lastPickHTML = null;
+// 挑字屏「就地补丁」：候选 / 格子 / 出发键的 DOM 节点只建一次，之后只改 class 与文本。
+// 整块 innerHTML 重建会在按下与抬起之间换掉玩家正按着的节点，浏览器便不再合成 click（W8）；
+// 触屏的合成 click 又按坐标命中「补进同一格的新字」，把放回做两次（P1-1）。两处都从根上避免。
+function buildPickSkeleton(el) {
+  el.innerHTML =
+    `<h2></h2>` +
+    `<p class="season-note"></p>` +
+    `<div class="pickslots"></div>` +
+    `<div class="pool"></div>` +
+    `<div class="desc" id="pick-desc"></div>` +
+    `<div class="pickfoot"><button class="go" data-do="go" type="button"></button></div>`;
+}
+// 按 key 复用 container 的子节点：已有的平移到位并更新内容，缺的补、多的删。节点本身不换。
+function patchKeyed(container, items, keyOf, make, apply) {
+  const old = new Map();
+  for (const child of Array.from(container.children)) if (child.dataset.key != null) old.set(child.dataset.key, child);
+  const keep = new Set();
+  let prev = null;
+  for (const item of items) {
+    const k = String(keyOf(item));
+    keep.add(k);
+    let node = old.get(k);
+    if (!node) { node = make(item); node.dataset.key = k; }
+    apply(node, item);
+    const ref = prev ? prev.nextSibling : container.firstChild;
+    if (node !== ref) container.insertBefore(node, ref);
+    prev = node;
+  }
+  for (const [k, node] of old) if (!keep.has(k)) node.remove();
+}
 function renderPick() {
   const el = $("pick");
   el.hidden = st.phase !== "pick";
-  if (st.phase !== "pick") { ui.pickFocus = null; ui.pickTapped = null; ui.pickPtr = null; ui.pickHandled = null; lastPickHTML = null; return; }
+  if (st.phase !== "pick") {
+    ui.pickFocus = null; ui.pickTapped = null; ui.presses.clear(); ui.swallow = [];
+    delete el.dataset.pickBuilt;
+    return;
+  }
+  if (el.dataset.pickBuilt !== "1") { buildPickSkeleton(el); el.dataset.pickBuilt = "1"; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
-  const pool3 = PICK_CHARS;
+  el.querySelector("h2").textContent = `出发挑字 · 第 ${st.generation ?? 2} 代`;
   // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
-  const hint = document.body.dataset.view === "desktop"
+  el.querySelector(".season-note").textContent = document.body.dataset.view === "desktop"
     ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
     : "点一个字看它能做什么；再点一次带上。";
-  const html =
-    `<h2>出发挑字 · 第 ${st.generation ?? 2} 代</h2>` +
-    `<p class="season-note">${hint}</p>` +
-    `<div class="pickslots">${[0, 1, 2].map((i) => picks[i]
-      ? `<button class="pickslot" data-char="${picks[i]}" title="放回">${gimg(picks[i])}<span>${i + 1}·${picks[i]}</span></button>`
-      : `<div class="pickslot">空</div>`).join("")}</div>` +
-    `<div class="pool">${pool3.map((p, i) => {
+  patchKeyed(el.querySelector(".pickslots"), [0, 1, 2], (i) => i,
+    () => document.createElement("button"),
+    (node, i) => {
+      const ch = picks[i];
+      node.className = "pickslot";
+      node.dataset.slot = String(i);
+      if (ch) { node.dataset.char = ch; node.title = "放回"; node.innerHTML = `${gimg(ch)}<span>${i + 1}·${ch}</span>`; }
+      else { delete node.dataset.char; node.removeAttribute("title"); node.textContent = "空"; }
+    });
+  patchKeyed(el.querySelector(".pool"), PICK_CHARS, (p) => p.char,
+    () => document.createElement("button"),
+    (node, p) => {
       const sel = picks.indexOf(p.char), isSel = sel >= 0;
-      return `<button class="cand${isSel ? " sel" : ""}${full && !isSel ? " dim" : ""}${p.char === ui.pickFocus ? " focus" : ""}" data-char="${p.char}" data-i="${i}">${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}</button>`;
-    }).join("")}</div>` +
-    `<div class="desc" id="pick-desc"></div>` +
-    `<div class="pickfoot"><button class="go${full ? " ready" : ""}" data-do="go" ${full ? "" : "disabled"}>${full ? "带这三个字出发" : "还差字"}</button></div>`;
-  if (html !== lastPickHTML) { el.innerHTML = html; lastPickHTML = html; }
+      node.className = "cand" + (isSel ? " sel" : "") + (full && !isSel ? " dim" : "") + (p.char === ui.pickFocus ? " focus" : "");
+      node.dataset.char = p.char; node.dataset.i = String(PICK_CHARS.indexOf(p));
+      node.innerHTML = `${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}`;
+    });
+  const go = el.querySelector(".go");
+  go.disabled = !full;
+  go.textContent = full ? "带这三个字出发" : "还差字";
+  go.classList.toggle("ready", full);
   updatePickInfo();
 }
 // gf5 ①：说明卡只画有数据的行——没数据的行整行不画，绝不写「？」占位。
@@ -735,29 +775,51 @@ on($("winter"), (e) => {
   else if (d.dataset.do === "end") { const el = $("winter"); sfx.flip(); dispatch({ type: "winter_end" }); deferInteract($("endseq"), 400); deferInteract($("elder"), 400); return; }
   render();
 });
-on($("pick"), (e) => {
-  const c = e.target.closest("[data-char],[data-do]"); if (!c) return;
-  // pointerup 已处理过同一候选时吞掉这次合成 click，避免与 pointerup 双触发。
-  const handled = ui.pickHandled; ui.pickHandled = null;
-  if (c.dataset.char && c.dataset.char === handled) return;
-  if (c.dataset.do === "go") { const p = st.picks || []; if (p.length === RULES.word_box.slots) { sfx.ready(); dispatch({ type: "begin_generation", picks: p }); } return; }
-  if (c.dataset.char) pickClick(c.dataset.char);
-});
-// 候选点在 pointerdown 与 pointerup 之间被 renderPick 的 innerHTML 重建替换掉时，浏览器不会合成
-// click（按下与抬起的不是同一个节点），真实点选被静默吞掉。改为按下时记候选字、抬起时若仍在同一
-// 候选上就直接选中，不再依赖合成 click。
+// 挑字：指针（含触控）与合成 click 的交互。
+// 每次按下按 pointerId 记一条 press（token + 命中的节点）；抬起时只处理「自己这次按下」，
+// 命中的节点与按下时同一节点（或在原位补丁下仍连着）才动作。多指互不干扰。
+// 动作后把该 press 的 token 入队，随后的合成 click 按 token 吞掉——不比较字，故
+// 「放回一个字后格子补进另一个字、合成 click 命中新字」不会再被当成第二次放回（P1-1）。
+const PICK_HIT = "[data-char],[data-do]";
+let pickPressSeq = 0;
+const pickKey = (node) => node.dataset.do || node.dataset.char || null;
+function pickAction(node) {
+  if (node.dataset.do === "go") {
+    const p = st.picks || [];
+    if (p.length === RULES.word_box.slots) { sfx.ready(); dispatch({ type: "begin_generation", picks: p }); }
+    return;
+  }
+  if (node.dataset.char) pickClick(node.dataset.char);
+}
+function consumePickSwallow() {
+  const now = performance.now();
+  ui.swallow = ui.swallow.filter((s) => now - s.at < 700);   // 只吞紧随其后的那一次 click
+  if (!ui.swallow.length) return false;
+  ui.swallow.shift();
+  return true;
+}
 $("pick").addEventListener("pointerdown", (e) => {
-  const b = e.target.closest?.("[data-char]");
-  ui.pickPtr = b ? b.dataset.char : null;
-  ui.pickHandled = null;               // 新的按下作废旧 swallow
+  const node = e.target.closest?.(PICK_HIT) || null;
+  ui.presses.set(e.pointerId, { token: ++pickPressSeq, node, key: node ? pickKey(node) : null });
 });
 addEventListener("pointerup", (e) => {
-  if (ui.pickPtr == null) return;
-  const ch = ui.pickPtr; ui.pickPtr = null;
-  const b = e.target.closest?.("[data-char]");
-  if (b && b.dataset.char === ch) { ui.pickHandled = ch; pickClick(ch); }
+  const press = ui.presses.get(e.pointerId);
+  if (!press) return;
+  ui.presses.delete(e.pointerId);                          // 只清自己这一指
+  if (!press.node) return;
+  const node = e.target.closest?.(PICK_HIT) || null;
+  if (!node) return;
+  const same = node === press.node || (press.node.isConnected === false && press.key != null && pickKey(node) === press.key);
+  if (!same) return;                                       // 拖到别的控件再松手：不动作
+  ui.swallow.push({ token: press.token, at: performance.now() });
+  pickAction(node);
 });
-addEventListener("pointercancel", () => { ui.pickPtr = null; });
+addEventListener("pointercancel", (e) => { ui.presses.delete(e.pointerId); });
+on($("pick"), (e) => {
+  const c = e.target.closest(PICK_HIT); if (!c) return;
+  if (consumePickSwallow()) return;                        // 这次 click 由 pointerup 已处理的同一次按下合成
+  pickAction(c);
+});
 // gf5 电脑：悬停即显示右侧说明（不选中）。触控设备无 fine pointer，不走这里。
 $("pick").addEventListener("pointerover", (e) => {
   if (!hasFinePointer()) return;
