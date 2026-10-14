@@ -133,8 +133,14 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
 .slot.used{opacity:.35;text-decoration:line-through;}
 @keyframes breathe{0%,100%{box-shadow:0 0 0 2px rgba(216,180,106,.25)}50%{box-shadow:0 0 0 3px rgba(216,180,106,.8)}}
 
-/* ---------- 底部键位行（桌面） ---------- */
+/* ---------- 底部键位行（桌面；平板接了键鼠也显） ---------- */
 #keys{display:none;flex:0 0 auto;padding:6px 16px;font-size:12px;color:var(--muted);text-align:center;}
+/* BREAKPOINTS：平板竖屏「接了键盘（pointer:fine）才显键位行」、平板横屏「有键盘显键位」。
+   手机档（<600）设计上一律「不显键位」；触控设备（非 pointer:fine）也不显——两者都保持原样。 */
+@media (hover:hover) and (pointer:fine){
+  body[data-view="tablet-portrait"] #keys,
+  body[data-view="tablet-landscape"] #keys{display:block;}
+}
 
 /* ---------- 菜单 ---------- */
 #menu-pop{

@@ -341,12 +341,15 @@ function renderCard() {
   if (showOpts) { ol.textContent = "← " + c.left.label; or.textContent = c.right.label + " →"; }
   const side = previewSide();
   ol.classList.toggle("on", side === "left"); or.classList.toggle("on", side === "right");
-  // 手势/键位提示
-  $("gesture-hint").textContent = hasFinePointer() && showOpts
+  // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
+  $("gesture-hint").textContent = keyboardMode()
     ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
     : "左右拖卡做选择 · 长按看分量";
 }
 function hasFinePointer() { return matchMedia("(hover:hover) and (pointer:fine)").matches; }
+// 键鼠文案与键位行：接了键鼠（pointer:fine）才用（BREAKPOINTS 平板竖/横「有键盘显键位」）；
+// 手机档（<600）设计上一律「不显键位」，保持触控文案。
+function keyboardMode() { return hasFinePointer() && document.body.dataset.view !== "mobile"; }
 
 function renderCoach() {
   const el = $("coach");
@@ -523,7 +526,7 @@ function renderEnded() {
 }
 
 function renderKeys() {
-  $("keys").textContent = hasFinePointer()
+  $("keys").textContent = keyboardMode()
     ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
     : "";
 }
