@@ -30,4 +30,9 @@
 - 28 e2e + 16 单测全过。VERSION（干净树）= 见报告。
 - 12/13 完成（51267ac）：干净树构建 dist，VERSION=7ec28f7d7403；release_shots_v2/ 五档全页截图提交。
 - 14 完成：REDESIGN_REPORT.md（改动清单、各引擎测试数、VERSION、commit sha、已知缺口）。16 单测 + 28 e2e 全过，60fps（4× 节流）。不部署。
-- DONE
+- 15 补 e2e 覆盖（本次）：新增 `tests/e2e/touch.test.mjs`——390 `hasTouch` + 真 `tap()`，三引擎；覆盖 D1（tap「天亮了」不穿透、代末总结先出）、D2（目标弹层一次 tap 不秒关、静音每次 tap 只切一次 @390/1024、导出弹层 1024 能开）、D4（拖锁定第 3 张卡出「先点卡角骨片刻下这件事」、toast 不遮字匣）、挑字 14 字切片以现代字呈现且季节标签非空、全 UI 无「占位」。抽出 `tests/e2e/helpers/flow.mjs` 复用动作。
+- 修 3（触控）：WebKit 对普通元素一次 tap 不合成 `click`，导致目标弹层/菜单「点外面收起」失效——改 `pointerdown` + `click` 双通道（`app.js`）。
+- 16 主流程扩视口：`flow.test.mjs` 现按 390/1280/1440 三视口 × 三引擎跑（1440 侧栏默认展开时目标清单在侧栏验）。
+- 17 干净树 build：commit 61cfb2c 上构建 dist，VERSION=d3d9cfc7782b（内容哈希，184 文件）。重生成五档截图与已提交的 `release_shots_v2/` 逐字节一致（本改动只动 JS 交互，UI 未变，无需刷新）。
+- 18 复跑：`npm test` 16 全过；`npm run e2e` 46 全过（chromium 16 / firefox 13 / webkit 13 / 引擎无关 4）。REDESIGN_REPORT.md 更新（新 VERSION、build commit、测试数）。不部署。
+- DONE（v2.1）

@@ -3,8 +3,8 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`7ec28f7d7403`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
-- **构建 commit**：`51267ac5ae6724aeda8c1a409c849128e3304672`
+- **dist VERSION**：`d3d9cfc7782b`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **构建 commit**：`61cfb2c307e8890efecdd02dc16b3618703d4418`
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
 
@@ -18,7 +18,7 @@
 ### B. 审核 P0 / QA 修
 - ☰ 菜单手机/平板竖屏右上 44×44 可点（B1）；只在 `:focus-visible` 出焦点环（B2）；1440 教学气泡距侧栏 ≥16（B3，见下）；resize 节流（B4）。
 - 重放失败先备份存档再删（B5）；绝不显示占位文案（B5）。
-- 每个按钮用 click 单通道，pointer/touch 与 click 不双触发（D1/D2）；「天亮了」不穿透到新翻出的「交给第2代」（B7）；目标弹窗打开瞬间不被关（B8）；静音每次只切一次（B9）；导出对话框在 1024 能开（B10）；拖已锁卡出专属提示「先点卡角骨片刻下这件事」、toast 不遮字匣（B11）。
+- 每个按钮用 click 单通道，pointer/touch 与 click 不双触发（D1/D2）；「天亮了」不穿透到新翻出的「交给第2代」（B7）；目标弹窗打开瞬间不被关（B8）；静音每次只切一次（B9）；导出对话框在 1024 能开（B10）；拖已锁卡出专属提示「先点卡角骨片刻下这件事」、toast 不遮字匣（B11）。目标弹层/菜单的「点外面收起」同时监听 `pointerdown` 与 `click`，兼容触控（D2，见下）。
 
 ### C. 卡面图（v5_cardart）
 - 资产拷进发布树 `web/img/cardart/`（48 个：6 图 × m/d × 1x/2x × webp/png）；`<picture>` + webp srcset 1x/2x + png 兜底（手机 296×216、电脑 400×292 比例不裁切）；`build_dist.mjs` 拷贝 `web/img`，`sw.js` 预缓存全部 48 个（构建时自动生成清单）。
@@ -32,12 +32,13 @@
 - 旧存档码仍可读（`savecode` 格式未变，单测覆盖）。
 - dist VERSION 来自内容哈希；本分支解钉 `tools/baseline_version.txt`，原「字节复现 baseline」测试在本分支移除并改为有意义检查（构建完整 + `dist/src` 忠实于 strip + VERSION=内容哈希），见「已知缺口」。
 - 单测 + Playwright e2e（chromium/firefox/webkit × 390×844 / 768×1024 / 1024×768 / 1280×800 / 1440×900）。
-- 干净树构建 dist；`release_shots_v2/` 五档全页截图（已提交）；本报告。
+- 干净树构建 dist；`release_shots_v2/` 五档全页截图（已提交，本次改动只动 JS 交互，重生成后逐字节一致，无需刷新）；本报告。
 
-### 重做过程中修掉的两个真实缺陷
+### 重做过程中修掉的三个真实缺陷
 1. **字形首屏不出图**：重写把 `loadGlyphs` 的重绘限制成只在 pick/winter，card 阶段字匣/字录停在文字兜底。恢复基线行为（每次字形加载都 `render()`）。
 2. **桌面教学气泡**：原本压在四维行上、1280 时挡住卡角骨片。按 gf3 电脑稿降到卡顶并设 `pointer-events:none`；同时修「收起侧栏在桌面/平板横仍占 336 宽」（BREAKPOINTS：收起只留 44 标签，改回 `width:0`）。
    （另修 `index.html` 重复的 `#goals-slip` id。）
+3. **WebKit 触控点空白处不收起目标弹层/菜单**：新增的 390 触控 e2e 发现，WebKit 对普通元素的一次 tap 不合成 `click`，导致只监听 `click` 的「点外面收起」永不触发。改为 `pointerdown` + `click` 双通道（合成 click 仍有效，不破坏既有测试）。
 
 ## 二、测试
 
@@ -49,16 +50,18 @@
 - `version_hash.test.mjs`：内容哈希对同长度内容变化敏感。
 
 ### e2e（`npm run e2e` = node:test + playwright 库；本项目只装了 `playwright`，无 `@playwright/test`）
-`tests/e2e/helpers/env.mjs` 在干净树重建 dist 并起 `web/serve_pages.mjs`（Pages 模拟器）。**共 28 个，全过。**
+`tests/e2e/helpers/env.mjs` 在干净树重建 dist 并起 `web/serve_pages.mjs`（Pages 模拟器）。**共 46 个，全过。**
 
-| 引擎 | viewports（菜单/存档/静音/版权） | flow（教学→卡面图→目标→冬夜→先人→挑字→第2代） | offline（SW 后断网） | fps（4× 节流） | 小计 |
-|---|---|---|---|---|---|
-| chromium | 5 | 3 | 1 | 1 | **10** |
-| firefox | 5 | 1 | 1 | 0 | **7** |
-| webkit | 5 | 1 | 1 | 0 | **7** |
+| 引擎 | viewports（菜单/存档/静音/版权） | flow（390/1280/1440：教学→卡面图→目标→冬夜→先人→挑字→第2代） | touch（390 hasTouch/tap + 1024：D1/D2/D4/挑字/无占位） | offline（SW 后断网） | fps（4× 节流） | 小计 |
+|---|---|---|---|---|---|---|
+| chromium | 5 | 3 | 4 | 1 | 1 | **14** |
+| firefox | 5 | 3 | 4 | 1 | 0 | **13** |
+| webkit | 5 | 3 | 4 | 1 | 0 | **13** |
 
-另 4 个引擎无关：`redirects.test.mjs`（`/index.html`→`/`、`/credits.html`→`/credits` 308；`/credits` 服内容；`/sw.js` no-cache）。
+chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维行（B3）、568×320 手机横屏转竖屏提示 → chromium 合计 **16**。
+另 4 个引擎无关：`redirects.test.mjs`（`/index.html`→`/`、`/credits.html`→`/credits` 308；`/credits` 服内容；`/sw.js` no-cache）。合计 16 + 13 + 13 + 4 = **46**。
 关键断言：390/768 菜单 44×44 可见可点、导出弹层在 1024 可开；静音 pointer+click 只切一次（D1）；字匣字形首屏出图；卡面图 `<picture>`+webp 实际加载；先人卡无图；锁卡提示含「骨片」且 toast 在字匣之上；「天亮了」不穿透；目标弹层打开后 500ms 仍在；挑字 14 字池、季节标签已填；手机横屏转竖屏提示；SW 装好后断网仍能起局。
+**新增触控套件**（`touch.test.mjs`，390 `hasTouch` + `tap()`，三引擎）：D1 tap「天亮了」不穿透且代末总结先出；D2 目标弹层一次 tap 不秒关、静音每次 tap 只切一次（390 与 1024）、导出弹层 1024 能开；D4 拖锁定第 3 张卡出「先点卡角骨片刻下这件事」且 toast 不遮字匣；挑字恰为 14 字切片并以现代字呈现、季节标签非空；全 UI 可见文本无「占位」。
 **60fps 检查**：chromium `Emulation.setCPUThrottlingRate(4)` 下稳态 **60.0fps**（均 16.67ms，p95 16.70ms）。
 
 ## 三、已知缺口
