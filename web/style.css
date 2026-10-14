@@ -392,6 +392,13 @@ body[data-short="B"] #stage .optbtn{width:140px;}
    键位提示已由 A 的键位行 / B 顶栏「?」承担，旧整句手势文案在矮屏是重复噪声。 */
 body[data-short] #gesture-hint{display:none;}
 
+/* 字匣：常规 N 64（格 52）/ A 60（格 48）/ B 56（格 48）。
+   N 与 A/B 同理：border-box 下顶边框 1px 会把 64 撑到 65，故去顶边框；
+   把手只服务手机/平板上拉抽屉，桌面 N 与矮屏一样收起（设计稿桌面字匣无把手）。
+   N = 格 52 + 上下内边距 12（BREAKPOINTS §矮屏 表：N 字匣 64（格 52））。 */
+body[data-view="desktop"]:not([data-short]) .wb-handle{display:none;}
+body[data-view="desktop"]:not([data-short]) #wordbox-bar{border-top:0;padding:6px 8px;min-height:64px;}
+
 /* 字匣：A 60（格 48）/ B 56（格 48） */
 body[data-short="A"] #wordbox-bar,
 body[data-short="B"] #wordbox-bar{margin:0 16px;}
