@@ -21,6 +21,7 @@ const SIDEBAR_KEY = "zaozi.sidebar.open";
 const MUTE_KEY = "zaozi.mute";
 const MOTION_KEY = "zaozi.motion";
 const BACKUP_KEY = SAVE_KEY + ".bak";
+const KEYHELP_PREFIX = "zaozi.keyhelp.";   // 矮屏 B：每个存档首次进入自动弹一次键位「?」
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -44,6 +45,7 @@ const ui = {
   presses: new Map(),                 // 挑字：每次按下（按 pointerId 分），值是 { token, node, key }
   swallow: [],                        // 已被 pointerup 处理、等待吞掉其合成 click 的 press token 队列
   lastDims: null,
+  keyhelpOpen: false,                 // 矮屏 B：顶栏「?」键位浮层
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
 
@@ -85,6 +87,22 @@ const sfx = {
 
 // ---------- 布局 ----------
 let lastLayout = "";
+// 矮屏分档（design/v3_mobile/BREAKPOINTS.md §矮屏）：只用于桌面档（宽 ≥1024），
+// 手机与平板不变。按视口高 innerHeight 分：A 601–760、B ≤600（>760 即常规 N）。
+function shortTier(view) {
+  if (view !== "desktop") return "";
+  const h = innerHeight;
+  if (h <= 600) return "B";
+  if (h <= 760) return "A";
+  return "";
+}
+// 矮屏把四维资源条并入 48 顶栏；常规档放回卡上方（#cardcol 里 #cardwrap 之前）。
+function setShortTier(tier) {
+  if (tier) document.body.dataset.short = tier; else delete document.body.dataset.short;
+  const bar = $("topbar"), cardcol = $("cardcol"), dimsD = $("dims-desktop");
+  if (tier) { if (dimsD.parentElement !== bar) bar.insertBefore(dimsD, $("topright")); }
+  else if (dimsD.parentElement !== cardcol) cardcol.insertBefore(dimsD, $("cardwrap"));
+}
 function computeLayout() {
   const w = innerWidth, h = innerHeight;
   let view;
@@ -92,11 +110,13 @@ function computeLayout() {
   else if (w >= 600) view = h >= w ? "tablet-portrait" : "tablet-landscape";
   else view = "mobile";
   const orient = h >= w ? "portrait" : "landscape";
-  const key = view + ":" + orient;
+  const tier = shortTier(view);
+  const key = view + ":" + orient + ":" + tier + ":" + (h < 492 ? "s" : "");
   if (key === lastLayout) return;
   lastLayout = key;
   document.body.dataset.view = view;
   document.body.dataset.orient = orient;
+  setShortTier(tier);
   $("rotate-hint").hidden = !(view === "mobile" && orient === "landscape");
   document.body.dataset.reduced = reducedPref() ? "1" : "0";
   applySidebar();
@@ -111,11 +131,19 @@ function applySidebar() {
   const stored = localStorage.getItem(SIDEBAR_KEY);
   let open = stored === null ? w >= 1440 : stored === "1";
   if (w < 1100) open = false;                 // 1024 附近强制收起
+  if (innerHeight < 492) open = false;        // 太矮：侧栏强制收起（BREAKPOINTS 矮屏）
   bar.classList.toggle("collapsed", !open);
   document.body.classList.toggle("side-collapsed", view === "desktop" && !open);
 }
 let resizeT;
-addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(computeLayout, 120); });
+addEventListener("resize", () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => {
+    computeLayout();                          // 档位变化时内部已 render()
+    renderShort(); applySidebar(); renderCoach();   // 只变高不变档：同步顶栏/气泡/侧栏
+    maybeAutoKeyhelp();
+  }, 120);
+});
 addEventListener("orientationchange", () => setTimeout(computeLayout, 150));
 matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", computeLayout);
 
@@ -355,14 +383,43 @@ function hasFinePointer() { return matchMedia("(hover:hover) and (pointer:fine)"
 function keyboardMode() { return hasFinePointer() && document.body.dataset.view !== "mobile"; }
 
 function renderCoach() {
-  const el = $("coach");
+  const el = $("coach"), col = $("coachcol");
+  col.style.cssText = "";               // 先清掉上次矮屏的定位，常规档交回 CSS
+  el.style.fontSize = "";
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
   const step = card && isTutorialCard(card.id) ? tutorialStepOf(card.id) : null;
   if (!step) { el.hidden = true; return; }
   el.hidden = false;
   const desktop = document.body.dataset.view === "desktop";
   const text = desktop && step.coach_desktop ? step.coach_desktop : step.coach;
-  el.innerHTML = `${text}${desktop ? "" : ""}`;
+  el.innerHTML = text;
+  if (desktop && document.body.dataset.short) placeCoach(step);
+}
+// 矮屏教学气泡：放在卡外侧的空沟里（默认右侧），不压卡、不压字匣、不压目标。
+// 竖向对齐目标（字匣提示 → 气泡底边 = 字匣底边；其余对齐目标/卡竖向中线）。
+function placeCoach(step) {
+  const col = $("coachcol"), el = $("coach");
+  const sb = $("stage").getBoundingClientRect(), cb = $("card").getBoundingClientRect();
+  const GAP = 16, MAXW = 320, MINW = 240;
+  const rightStart = cb.right + GAP - sb.left;
+  const rightAvail = sb.width - GAP - rightStart;
+  const leftAvail = cb.left - GAP - sb.left - GAP;
+  let left, width;
+  if (rightAvail >= MINW) { left = rightStart; width = Math.min(MAXW, rightAvail); }
+  else if (leftAvail >= MINW) { width = Math.min(MAXW, leftAvail); left = cb.left - GAP - sb.left - width; }
+  else { width = Math.min(MAXW, cb.width); left = cb.left - sb.left; el.style.fontSize = "13px"; }  // 两边都不够：垫到卡上方
+  col.style.left = left + "px"; col.style.right = "auto"; col.style.width = width + "px";
+  const sel = step.teach === "drop" ? "#wordbox-bar" : step.teach === "engrave" ? "#bonecorner" : null;
+  const tb = sel ? document.querySelector(sel)?.getBoundingClientRect() : null;
+  if (step.teach === "drop" && tb) {    // 对字匣的提示：气泡底边 = 字匣底边
+    col.style.top = "auto";
+    col.style.bottom = (sb.bottom - tb.bottom) + "px";
+  } else {
+    const ref = tb || cb, h = el.getBoundingClientRect().height;
+    let top = (ref.top + ref.height / 2) - sb.top - h / 2;
+    top = Math.max(GAP, Math.min(Math.max(GAP, sb.height - h - GAP), top));
+    col.style.top = top + "px"; col.style.bottom = "auto";
+  }
 }
 function renderWordbox() {
   $("wordbox").innerHTML = st.wordBox.map((ch, i) => {
@@ -574,10 +631,43 @@ function renderEnded() {
   if (pending) deferInteract(el, 400);
 }
 
+// 键位行：N 整句；A 缩成一行短句（12 号，高 28）；B 不占行，收进顶栏「?」浮层；
+// 触控设备（非 pointer:fine）与手机档三档都不显。
 function renderKeys() {
-  $("keys").textContent = keyboardMode()
-    ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
-    : "";
+  const tier = document.body.dataset.short || "";
+  const el = $("keys");
+  if (!keyboardMode() || tier === "B") { el.textContent = ""; return; }
+  el.textContent = tier === "A"
+    ? "←→选 1–3落字 Space分量 K/Enter刻"
+    : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层";
+}
+// 矮屏 B 顶栏「?」浮层：列出全部键位。首次进入某存档自动弹一次（3 秒后收起）。
+function keyhelpHTML() {
+  return [
+    ["← →", "选字；再按同向或 Enter 提交"],
+    ["1–3", "落字"],
+    ["Space", "按住看分量"],
+    ["K", "刻字（或点卡角骨片）"],
+    ["Enter", "刻"],
+    ["Esc", "关浮层"],
+  ].map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
+}
+function renderShort() {
+  const tier = document.body.dataset.short || "";
+  const showBtn = tier === "B" && keyboardMode();
+  $("keyhelp-btn").dataset.show = showBtn ? "1" : "0";
+  if (!showBtn) ui.keyhelpOpen = false;
+  const pop = $("keyhelp-pop");
+  pop.hidden = !ui.keyhelpOpen;
+  if (ui.keyhelpOpen) pop.innerHTML = keyhelpHTML();
+  $("too-short").hidden = !(document.body.dataset.view === "desktop" && innerHeight < 492);
+}
+function maybeAutoKeyhelp() {
+  if (document.body.dataset.short !== "B" || !keyboardMode()) return;
+  const key = KEYHELP_PREFIX + seed;
+  try { if (localStorage.getItem(key) === "1") return; localStorage.setItem(key, "1"); } catch { return; }
+  ui.keyhelpOpen = true; renderShort();
+  setTimeout(() => { if (ui.keyhelpOpen) { ui.keyhelpOpen = false; renderShort(); } }, 3000);
 }
 
 function render() {
@@ -591,7 +681,7 @@ function render() {
   renderSide();
   renderGoalSlip(); renderGoalPanel();
   renderWinter(); renderPick(); renderElder(); renderEnded();
-  renderKeys();
+  renderKeys(); renderShort();
   if (st.phase !== "ended" && st.phase !== "pick" && st.phase !== "winter") $("endseq").hidden = true;
 }
 
@@ -667,7 +757,7 @@ addEventListener("pointercancel", onUp);
 
 addEventListener("keydown", (e) => {
   if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }
-  if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; render(); return; }
+  if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; render(); return; }
   if (st.phase === "pick") {
     // 键盘光标、金色焦点框和鼠标悬停是同一个状态 ui.pickFocus（P1-2）：
     // 移动光标时同步重绘焦点框和说明卡；Space 选中的就是框里的字。
@@ -712,6 +802,7 @@ function commitSide(dir) {
 }
 
 // ---------- 事件绑定 ----------
+on($("keyhelp-btn"), () => { ui.keyhelpOpen = !ui.keyhelpOpen; renderShort(); });
 on($("menubtn"), () => { ui.menuOpen = !ui.menuOpen; renderMenu(); });
 function renderMenu() {
   const m = $("menu-pop"); m.hidden = !ui.menuOpen; $("menubtn").setAttribute("aria-expanded", String(ui.menuOpen));
@@ -842,11 +933,18 @@ const closeMenuOutside = (e) => {                 // 点外面关菜单
 };
 document.addEventListener("pointerdown", closeMenuOutside);  // WebKit 触控点空白处不合成 click
 document.addEventListener("click", closeMenuOutside);
+// 点「?」浮层外面也收起（同菜单：pointerdown + click 双通道）
+const closeKeyhelpOutside = (e) => {
+  if (ui.keyhelpOpen && !e.target.closest("#keyhelp-pop") && !e.target.closest("#keyhelp-btn")) { ui.keyhelpOpen = false; renderShort(); }
+};
+document.addEventListener("pointerdown", closeKeyhelpOutside);
+document.addEventListener("click", closeKeyhelpOutside);
 
 // ---------- 调试钩子 ----------
 window.__zz = {
   get st() { return st; }, get seed() { return seed; }, get actions() { return actions; },
   get view() { return document.body.dataset.view; },
+  get short() { return document.body.dataset.short || ""; },
   get animating() { return ui.animating; },
   get debugGoal() { return DEBUG_GOAL; },
   dispatch, newGame, restore, render, code: () => encodeSaveCode(seed, actions),
@@ -860,5 +958,6 @@ window.__zz = {
 if (!DEBUG_GOAL) restore();          // 调试图标（debug_goal）时不读旧存档，保证这一局就是目标被塞进去的局
 computeLayout();
 render();
+maybeAutoKeyhelp();                  // 矮屏 B：该存档首次进入自动弹一次键位「?」
 loadGlyphs();
 if (BUILD_DIST && "serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

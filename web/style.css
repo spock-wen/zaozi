@@ -365,8 +365,8 @@ body[data-short="B"] #topbar .float{top:calc(100% + 2px);}
 /* 卡高（宽由 aspect-ratio 得）；#stage 内边距与左右选项宽度按档收窄 */
 body[data-short="A"] #cardwrap{height:clamp(380px,calc(100dvh - 188px),468px);}
 body[data-short="B"] #cardwrap{height:clamp(320px,calc(100dvh - 172px),428px);}
-body[data-short="A"] #stage,
-body[data-short="B"] #stage{padding:4px 12px;gap:8px;}
+body[data-short="A"] #stage{padding:12px;gap:8px;}   /* 卡上/下距 12 */
+body[data-short="B"] #stage{padding:16px 12px;gap:8px;} /* 卡上/下距 16 */
 body[data-short="A"] #stage .optbtn{width:160px;}
 body[data-short="B"] #stage .optbtn{width:140px;}
 body[data-short="A"] #gesture-hint,
@@ -383,8 +383,21 @@ body[data-short="A"] .slot img,
 body[data-short="B"] .slot img{width:28px;height:28px;}
 
 /* 键位行：A 缩成一行 28；B 收进顶栏「?」浮层（JS 隐藏 #keys） */
-body[data-short="A"] #keys{height:28px;margin-top:8px;padding:0 16px;font-size:12px;line-height:28px;}
+body[data-short="A"] #keys{height:28px;margin:8px 0 20px;padding:0 16px;font-size:12px;line-height:28px;white-space:nowrap;}
+body[data-short="B"] #keys{display:none;}
 body[data-short="B"] #app{padding-bottom:36px;}   /* 底边留白：飘字 / 达成条 */
+
+/* 卡下落字框：矮屏压成一行，别把卡内文挤成两行 */
+body[data-short="A"] .card-drops,
+body[data-short="B"] .card-drops{height:auto;min-height:0;padding:4px 8px;font-size:12px;white-space:nowrap;overflow:hidden;}
+
+/* 桌面矮屏：顶栏行 56→48；四维条（JS 移进顶栏的 #dims-desktop）自适应收窄；
+   字匣按设计稿收成居中胶囊（背景不再整行铺满，教学气泡才有空沟不压它）。 */
+body[data-view="desktop"][data-short] #app{grid-template-rows:48px auto auto auto;align-content:start;}
+body[data-short] .wb-handle{display:none;}   /* 矮屏字匣不带把手：A 高 60 / B 高 56 */
+body[data-short] #topbar #dims-desktop{width:auto;flex:1 1 auto;min-width:0;margin:0;}
+body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
+body[data-short] #wordbox-bar{width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
 
 /* 顶栏「?」键位浮层（B 档；键盘模式才显示） */
 #keyhelp-btn{
@@ -437,8 +450,8 @@ body[data-short="A"] #pick .pickslots,
 body[data-short="B"] #pick .pickslots{grid-area:slots;position:static;left:auto;top:auto;margin:0;min-height:0;}
 body[data-short="A"] #pick .pool,
 body[data-short="B"] #pick .pool{grid-area:pool;position:static;left:auto;top:auto;margin:0;width:100%;grid-template-columns:repeat(7,1fr);gap:8px;}
-body[data-short="A"] #pick-desc,
-body[data-short="B"] #pick-desc{grid-area:desc;position:static;left:auto;top:auto;margin:0;align-self:start;}
+body[data-short="A"] #pick .desc,
+body[data-short="B"] #pick .desc{grid-area:desc;position:static;left:auto;top:auto;margin:0;width:auto;align-self:start;}
 body[data-short="A"] #pick .pickfoot,
 body[data-short="B"] #pick .pickfoot{grid-area:foot;position:static;left:auto;top:auto;margin:0;padding:0;}
 body[data-short="A"] #pick .pickinfo{max-width:280px;}
