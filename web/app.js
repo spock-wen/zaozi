@@ -634,7 +634,15 @@ on($("menu-pop"), (e) => {
 on($("goals-slip"), () => {
   ui.panelOpen = true; renderGoalPanel();
   setTimeout(() => {                                   // 打开的那一下不能立刻被关掉（B8）
-    const closer = (e) => { if (!e.target.closest("#goals-panel") && !e.target.closest("#goals-slip")) { ui.panelOpen = false; renderGoalPanel(); document.removeEventListener("click", closer); } };
+    const closer = (e) => {
+      if (!e.target.closest("#goals-panel") && !e.target.closest("#goals-slip")) {
+        ui.panelOpen = false; renderGoalPanel();
+        document.removeEventListener("pointerdown", closer);
+        document.removeEventListener("click", closer);
+      }
+    };
+    // WebKit 触控点空白处不一定合成 click，pointerdown 才是可靠通道（D2）
+    document.addEventListener("pointerdown", closer);
     document.addEventListener("click", closer);
   }, 0);
 });
@@ -673,9 +681,11 @@ on($("dlgcopy"), async () => { const t = $("dlgtext"); try { await navigator.cli
 on($("dlgapply"), importCode);
 on($("dlgclose"), closeDlg);
 $("savedlg").addEventListener("click", (e) => { if (e.target === $("savedlg")) closeDlg(); });
-document.addEventListener("click", (e) => {                 // 点外面关菜单
+const closeMenuOutside = (e) => {                 // 点外面关菜单
   if (ui.menuOpen && !e.target.closest("#menu-pop") && !e.target.closest("#menubtn")) { ui.menuOpen = false; renderMenu(); }
-});
+};
+document.addEventListener("pointerdown", closeMenuOutside);  // WebKit 触控点空白处不合成 click
+document.addEventListener("click", closeMenuOutside);
 
 // ---------- 调试钩子 ----------
 window.__zz = {
