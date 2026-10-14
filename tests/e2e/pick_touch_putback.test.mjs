@@ -89,14 +89,15 @@ for (const [engine] of Object.entries(ENGINES)) {
   });
 }
 
-// ---------- 4：多点触控（仅 chromium 有 CDP 多点触控） ----------
+// ---------- 4/5：多点触控（仅 chromium 有 CDP 多点触控） ----------
 
 // 两指同时按下 → 稍候 → 两指同时抬起（CDP Input.dispatchTouchEvent）。
-async function twoFingerTap(page, chars) {
+// 按下时记下的字在抬起时才动作；同时抬起会先后触发两指的 pointerup。
+async function twoFingerTapAt(page, selectors) {
   const pts = [];
-  for (const ch of chars) {
-    const box = await page.locator(`#pick .cand[data-char='${ch}']`).boundingBox();
-    if (!box) throw new Error(`找不到候选「${ch}」`);
+  for (const sel of selectors) {
+    const box = await page.locator(sel).boundingBox();
+    if (!box) throw new Error(`找不到 ${sel}`);
     pts.push({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
   }
   const cdp = await page.context().newCDPSession(page);
@@ -107,10 +108,13 @@ async function twoFingerTap(page, chars) {
     });
     await page.waitForTimeout(50);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForTimeout(50);
   } finally {
     await cdp.detach();
   }
 }
+const cand = (ch) => `#pick .cand[data-char='${ch}']`;
+const slot = (i) => `#pick .pickslot[data-slot='${i}']`;
 
 test("chromium 390 touch: 双指同时按两个已选候选，各自只放回一个字", {
   skip: ENGINES.chromium ? false : "仅 chromium 支持 CDP 多点触控（其它引擎跳过）",
@@ -122,7 +126,7 @@ test("chromium 390 touch: 双指同时按两个已选候选，各自只放回一
     assert.deepEqual(await picksOf(page), ["水", "木"], "应已选中 水、木");
 
     const before = await toggleCount(page);
-    await twoFingerTap(page, ["水", "木"]);
+    await twoFingerTapAt(page, [cand("水"), cand("木")]);
     // 两指各自 pointerup 各放回一个：最终为空。（修复前 pickPtr 只留后一指，两指都会丢。）
     try {
       await page.waitForFunction(() => (window.__zz.st.picks || []).length === 0, null, { timeout: 2000 });
@@ -130,6 +134,35 @@ test("chromium 390 touch: 双指同时按两个已选候选，各自只放回一
     const after = await picksOf(page);
     const toggles = (await toggleCount(page)) - before;
     assert.deepEqual(after, [], `双指各放回一个后应为空，实际 ${JSON.stringify(after)}`);
+    assert.equal(toggles, 2, `应恰好两次放回（每指一次），实际 ${toggles}`);
+
+    assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+  } finally {
+    await ctx.close();
+  }
+});
+
+// D1：两指同时按第 1、3 格（水、人），同时松开。头一指放回「水」后格子就地补位
+// （日→第 1 格、人→第 2 格、第 3 格变空），后一指的 pointerup 命中同一个已空的第 3 格节点。
+// 修复前读抬起时节点内容 → 第 3 格没 data-char → 漏放回，剩「日,人」；修后应按按下时记下的「人」放回，剩「日」。
+test("chromium 390 touch: 双指同时按第 1、3 格再同时松开，各放回一个字（D1）", {
+  skip: ENGINES.chromium ? false : "仅 chromium 支持 CDP 多点触控（其它引擎跳过）",
+}, async () => {
+  const { ctx, page, errs } = await openPick("chromium");
+  try {
+    await addChar(page, "水");
+    await addChar(page, "日");
+    await addChar(page, "人");
+    assert.deepEqual(await picksOf(page), ["水", "日", "人"], "应已填满三格");
+
+    const before = await toggleCount(page);
+    await twoFingerTapAt(page, [slot(0), slot(2)]);
+    try {
+      await page.waitForFunction(() => (window.__zz.st.picks || []).length === 1, null, { timeout: 2000 });
+    } catch { /* 下面的断言给出细节 */ }
+    const after = await picksOf(page);
+    const toggles = (await toggleCount(page)) - before;
+    assert.deepEqual(after, ["日"], `两指各放回自己那个字后应只剩 日，实际 ${JSON.stringify(after)}`);
     assert.equal(toggles, 2, `应恰好两次放回（每指一次），实际 ${toggles}`);
 
     assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));

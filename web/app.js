@@ -894,13 +894,16 @@ on($("winter"), (e) => {
 const PICK_HIT = "[data-char],[data-do]";
 let pickPressSeq = 0;
 const pickKey = (node) => node.dataset.do || node.dataset.char || null;
-function pickAction(node) {
-  if (node.dataset.do === "go") {
+// 动作按「按下那一刻记下的字/动作」执行（doAttr+char），不再读抬起时手指下的节点：
+// 多指同时松开时，前指的放回会让格子就地补位（第 3 格的字挪到第 2 格、第 3 格变空），
+// 后指的 pointerup 会命中同一个已空的格子节点——读当前内容就什么都不做，漏放回（D1）。
+function pickAction(doAttr, char) {
+  if (doAttr === "go") {
     const p = st.picks || [];
     if (p.length === RULES.word_box.slots) { sfx.ready(); dispatch({ type: "begin_generation", picks: p }); }
     return;
   }
-  if (node.dataset.char) pickClick(node.dataset.char);
+  if (char) pickClick(char);
 }
 function consumePickSwallow() {
   const now = performance.now();
@@ -911,25 +914,35 @@ function consumePickSwallow() {
 }
 $("pick").addEventListener("pointerdown", (e) => {
   const node = e.target.closest?.(PICK_HIT) || null;
-  ui.presses.set(e.pointerId, { token: ++pickPressSeq, node, key: node ? pickKey(node) : null });
+  // 记下按下那一刻的字与动作；抬起时按它执行（不读抬起时手指下的节点，见 pickAction 注释）。
+  ui.presses.set(e.pointerId, {
+    token: ++pickPressSeq,
+    node,
+    key: node ? pickKey(node) : null,
+    do: node?.dataset.do || null,
+    char: node?.dataset.char || null,
+  });
 });
 addEventListener("pointerup", (e) => {
   const press = ui.presses.get(e.pointerId);
   if (!press) return;
   ui.presses.delete(e.pointerId);                          // 只清自己这一指
   if (!press.node) return;
-  const node = e.target.closest?.(PICK_HIT) || null;
-  if (!node) return;
-  const same = node === press.node || (press.node.isConnected === false && press.key != null && pickKey(node) === press.key);
+  // 抬起仍落在按下时的那一个控件上（或在原位补丁下它已脱离、但按下时的 key 仍能对上）才动作。
+  // 不能按「抬起时手指下带 data-char 的节点」判：多指同时松开时，前指的放回会让格子就地补位
+  // （第 3 格的字挪到第 2 格、第 3 格变空），后指下的格子已没有 data-char，那样判会整条漏掉（D1）。
+  const same = press.node.isConnected
+    ? press.node.contains(e.target)
+    : (press.key != null && e.target.closest?.(PICK_HIT) != null && pickKey(e.target.closest(PICK_HIT)) === press.key);
   if (!same) return;                                       // 拖到别的控件再松手：不动作
   ui.swallow.push({ token: press.token, at: performance.now() });
-  pickAction(node);
+  pickAction(press.do, press.char);                        // 用按下时记下的字/动作，不用抬起时的节点内容
 });
 addEventListener("pointercancel", (e) => { ui.presses.delete(e.pointerId); });
 on($("pick"), (e) => {
   const c = e.target.closest(PICK_HIT); if (!c) return;
   if (consumePickSwallow()) return;                        // 这次 click 由 pointerup 已处理的同一次按下合成
-  pickAction(c);
+  pickAction(c.dataset.do || null, c.dataset.char || null);
 });
 // gf5 电脑：悬停即显示右侧说明（不选中）。触控设备无 fine pointer，不走这里。
 $("pick").addEventListener("pointerover", (e) => {
