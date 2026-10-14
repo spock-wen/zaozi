@@ -88,3 +88,66 @@ for (const [engine] of Object.entries(ENGINES)) {
     });
   }
 }
+
+// W7 回归（1024 视口溢出）：桌面档下沿 1024–1279 时，整块（含右侧说明卡）必须落在视口内。
+// 逐一量 #pick 的每个后代：rect.right ≤ window.innerWidth、rect.left ≥ 0；
+// 说明卡（.pickinfo）完整可见（四边都在视口内），且与字池网格不重叠。
+const FIT_VIEWPORTS = [
+  { name: "1024", width: 1024, height: 768 },
+  { name: "1100", width: 1100, height: 800 },
+  { name: "1279", width: 1279, height: 800 },
+];
+
+for (const [engine] of Object.entries(ENGINES)) {
+  for (const vp of FIT_VIEWPORTS) {
+    test(`${engine} ${vp.name}: 电脑端挑字整块落在视口内（W7）`, async () => {
+      const ctx = await browsers[engine].newContext({ viewport: { width: vp.width, height: vp.height } });
+      const page = await ctx.newPage();
+      const errs = [];
+      collectErrors(page, errs);
+      try {
+        await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+        await page.waitForFunction(() => !!window.__zz);
+        await toPickDesktop(page);
+        assert.equal(await page.evaluate(() => document.body.dataset.view), "desktop", "应为桌面档");
+
+        // 悬停「木」让说明卡出现后再量。
+        await page.locator("#pick .cand[data-char='木']").hover();
+        await page.waitForTimeout(60);
+
+        const { iw, ih, boxes } = await page.evaluate(() => ({
+          iw: window.innerWidth, ih: window.innerHeight,
+          boxes: [...document.querySelectorAll("#pick *")].map((el) => {
+            const r = el.getBoundingClientRect();
+            return { tag: el.tagName.toLowerCase(), cls: el.className || "", x: r.x, right: r.right };
+          }),
+        }));
+
+        // 每个后代的左右缘都在视口内。
+        for (const b of boxes) {
+          assert.ok(b.right <= iw + 0.5, `${b.tag}.${b.cls} 右缘 ${b.right} 应 ≤ 视口宽 ${iw}`);
+          assert.ok(b.x >= -0.5, `${b.tag}.${b.cls} 左缘 ${b.x} 应 ≥ 0`);
+        }
+
+        // 说明卡完整可见（四边都在视口内）。
+        const info = await rect(page, "#pick-desc .pickinfo");
+        assert.ok(info, "说明卡应存在");
+        assert.ok(info[0] >= 0 && info[0] + info[2] <= iw + 0.5,
+          `说明卡应水平完整可见：x=${info[0]} w=${info[2]} iw=${iw}`);
+        assert.ok(info[1] >= 0 && info[1] + info[3] <= ih + 0.5,
+          `说明卡应竖直完整可见：y=${info[1]} h=${info[3]} ih=${ih}`);
+
+        // 说明卡不与字池网格重叠。
+        const pool = await rect(page, "#pick .pool");
+        assert.ok(pool, "字池网格应存在");
+        const overlap = info[0] < pool[0] + pool[2] && pool[0] < info[0] + info[2] &&
+                        info[1] < pool[1] + pool[3] && pool[1] < info[1] + info[3];
+        assert.ok(!overlap, `说明卡不应与字池重叠：info=${JSON.stringify(info)} pool=${JSON.stringify(pool)}`);
+
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}
