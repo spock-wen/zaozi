@@ -2,11 +2,11 @@
 """
 Compute SHA256 checksums and image dimensions for card art assets across:
 1. Store assets: /cursor/stores/store-a39b3a5b-baf8-4319-bd0f-2caefb6dae75/zaozi-formal/v5_cardart/assets/
-2. Web img: /workspace/qa-zaozi-web-c9a1886/src/web/img/cardart/
-3. Dist img: /workspace/qa-zaozi-web-c9a1886/src/dist/img/cardart/
+2. Web img: /workspace/qa-zaozi-web-f6f799e/src/web/img/cardart/
+3. Dist img: /workspace/qa-zaozi-web-f6f799e/src/dist/img/cardart/
 
 Verify each listed file against the store's SHA256SUMS file.
-Output CSV to /workspace/qa-zaozi-web-c9a1886/cardart/sha_compare.csv with columns:
+Output CSV to /workspace/qa-zaozi-web-f6f799e/cardart/sha_compare.csv with columns:
 name,store_sha,web_sha,dist_sha,sumsfile_ok,width,height,match
 
 Print summary of counts.
@@ -25,10 +25,10 @@ except ImportError:
     HAS_PIL = False
 
 STORE_ASSETS_DIR = "/cursor/stores/store-a39b3a5b-baf8-4319-bd0f-2caefb6dae75/zaozi-formal/v5_cardart/assets"
-WEB_IMG_DIR = "/workspace/qa-zaozi-web-c9a1886/src/web/img/cardart"
-DIST_IMG_DIR = "/workspace/qa-zaozi-web-c9a1886/src/dist/img/cardart"
+WEB_IMG_DIR = "/workspace/qa-zaozi-web-f6f799e/src/web/img/cardart"
+DIST_IMG_DIR = "/workspace/qa-zaozi-web-f6f799e/src/dist/img/cardart"
 STORE_SUMS_FILE = "/cursor/stores/store-a39b3a5b-baf8-4319-bd0f-2caefb6dae75/zaozi-formal/v5_cardart/SHA256SUMS"
-OUTPUT_CSV_FILE = "/workspace/qa-zaozi-web-c9a1886/cardart/sha_compare.csv"
+OUTPUT_CSV_FILE = "/workspace/qa-zaozi-web-f6f799e/cardart/sha_compare.csv"
 
 
 def compute_sha256(filepath):
