@@ -8,7 +8,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { phase, clearTutorial, playToWinter, dragCard, visibleText } from "./helpers/flow.mjs";
+import { phase, clearTutorial, playToWinter, dragCard, visibleText, toPick } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -87,6 +87,46 @@ for (const [engine] of Object.entries(ENGINES)) {
       const goLabel = (await page.locator("#pick .go").textContent()).trim();
       assert.ok(["还差字", "带这三个字出发"].includes(goLabel), `出发键文案应为 gf5 两态之一，得到：${goLabel}`);
       assert.ok(!(await visibleText(page)).includes("占位"), "挑字界面不应出现「占位」");
+
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test(`${engine} 390 touch: gf5 两步挑字（tap1 看说明 / tap2 选中 / tap3 放回）`, async () => {
+    const ctx = await touchCtx(engine);
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz);
+      await toPick(page);
+      const picks = () => page.evaluate(() => window.__zz.st.picks);
+
+      // ① tap1：只出说明卡（落 / 部件 / 解锁 三行），不填格、不选中。
+      await page.locator("#pick .cand[data-char='水']").tap();
+      await page.waitForTimeout(80);
+      assert.deepEqual(await picks(), [], "tap1 不应填格");
+      assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "tap1 应出说明卡");
+      assert.deepEqual(await page.locator("#pick-desc .pi-row b").allInnerTexts(), ["落", "部件", "解锁"], "说明卡应为落/部件/解锁 三行");
+      assert.equal(await page.locator("#pick .pickslot[data-char]").count(), 0, "tap1 不应填格");
+      assert.equal(await page.locator("#pick .cand.sel").count(), 0, "tap1 不应选中");
+
+      // ② tap2：同一字再点一次 → 朱底 + 序号角标 + 填第 1 格。
+      await page.locator("#pick .cand[data-char='水']").tap();
+      await page.waitForTimeout(80);
+      assert.deepEqual(await picks(), ["水"], "tap2 应选中");
+      assert.equal(await page.locator("#pick .cand.sel[data-char='水'] .badge").textContent(), "1", "选中字应带顺序角标 1");
+      assert.equal(await page.locator("#pick .pickslot").first().getAttribute("data-char"), "水", "tap2 应填第 1 格");
+
+      // ③ tap3：点已选字 → 放回（格子清空、角标消失）。
+      await page.locator("#pick .cand.sel[data-char='水']").tap();
+      await page.waitForTimeout(80);
+      assert.deepEqual(await picks(), [], "tap3 应放回");
+      assert.equal(await page.locator("#pick .cand.sel").count(), 0, "放回后不应有已选字");
+      assert.equal(await page.locator("#pick .pickslot[data-char]").count(), 0, "放回后格子应空");
 
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
     } finally {

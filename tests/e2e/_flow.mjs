@@ -68,7 +68,10 @@ log("elder visible:", await p.locator("#elder").isVisible());
 await p.locator("#elder [data-do=heir]").click();
 await p.waitForTimeout(400);
 log("pick phase:", await st(), "cands=", await p.locator("#pick .cand").count(), "season=", await p.locator("#season-chip").textContent());
-for (const ch of ["水", "休", "木"]) await p.locator(`#pick .cand[data-char="${ch}"]`).click();
+for (const ch of ["水", "休", "木"]) {                       // gf5：点一下看说明、再点一次带上
+  await p.locator(`#pick .cand[data-char="${ch}"]`).click();
+  await p.locator(`#pick .cand[data-char="${ch}"]`).click();
+}
 await p.waitForTimeout(200);
 log("go enabled:", await p.locator("#pick .go").isEnabled());
 await p.locator("#pick .go").click();

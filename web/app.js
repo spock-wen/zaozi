@@ -39,6 +39,7 @@ const ui = {
   winter: freshWinter(),
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false, pickCursor: 0,
+  pickFocus: null, pickTapped: null,
   lastDims: null,
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
@@ -212,6 +213,7 @@ function restore() {
 function newGame(s) {
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false; ui.pickCursor = 0;
+  ui.pickFocus = null; ui.pickTapped = null;
   ui.lastDims = null; saveNow(); render();
 }
 // ---------- 存档码 ----------
@@ -437,7 +439,7 @@ function winterCarve() {
 function renderPick() {
   const el = $("pick");
   el.hidden = st.phase !== "pick";
-  if (st.phase !== "pick") return;
+  if (st.phase !== "pick") { ui.pickFocus = null; ui.pickTapped = null; return; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
   const pool3 = PICK_CHARS;
@@ -453,10 +455,41 @@ function renderPick() {
       : `<div class="pickslot">空</div>`).join("")}</div>` +
     `<div class="pool">${pool3.map((p, i) => {
       const sel = picks.indexOf(p.char), isSel = sel >= 0;
-      return `<button class="cand${isSel ? " sel" : ""}${full && !isSel ? " dim" : ""}" data-char="${p.char}" data-i="${i}">${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}</button>`;
+      return `<button class="cand${isSel ? " sel" : ""}${full && !isSel ? " dim" : ""}${p.char === ui.pickFocus ? " focus" : ""}" data-char="${p.char}" data-i="${i}">${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}</button>`;
     }).join("")}</div>` +
     `<div class="desc" id="pick-desc"></div>` +
     `<div class="pickfoot"><button class="go${full ? " ready" : ""}" data-do="go" ${full ? "" : "disabled"}>${full ? "带这三个字出发" : "还差字"}</button></div>`;
+  updatePickInfo();
+}
+// gf5 ①：说明卡（落 / 部件 / 解锁 三行；数据缺的写「？」）。部件 = 字池里用它当部件或底字的字。
+function charParts(ch) {
+  return PICK_CHARS.filter((p) => {
+    if (p.char === ch) return false;
+    const d = CHARS[p.char] || {};
+    return (Array.isArray(d.components) && d.components.includes(ch)) || d.base === ch;
+  }).map((p) => p.char);
+}
+function pickInfoHTML(ch) {
+  const p = PICK_CHARS.find((x) => x.char === ch) || {};
+  const parts = charParts(ch);
+  return `<div class="pickinfo"><div class="pi-h">${ch}${p.meaning ? ` <span>${p.meaning}</span>` : ""}</div>` +
+    `<div class="pi-row"><b>落</b><span>？</span></div>` +
+    `<div class="pi-row"><b>部件</b><span>${parts.length ? "能拼出：" + parts.join("、") : "？"}</span></div>` +
+    `<div class="pi-row"><b>解锁</b><span>？</span></div></div>`;
+}
+function updatePickInfo() {
+  const el = $("pick"); if (!el) return;
+  const desc = el.querySelector("#pick-desc");
+  if (desc) desc.innerHTML = ui.pickFocus ? pickInfoHTML(ui.pickFocus) : "";
+  el.querySelectorAll(".cand").forEach((c) => c.classList.toggle("focus", c.dataset.char === ui.pickFocus));
+}
+// gf5 ①②③：第一次点只看说明；同一字再点一次选中；已选字（或格内字）点一下放回。
+// 电脑悬停只更新说明，不算第一次点击——所以用 pickTapped 区分「悬停看」和「点过一下」。
+function pickClick(ch) {
+  const picks = st.picks || [];
+  if (picks.includes(ch)) { ui.pickFocus = ch; ui.pickTapped = null; dispatch({ type: "pick_toggle", char: ch }); sfx.unpick(); }
+  else if (ui.pickTapped === ch) { ui.pickTapped = null; pickToggle(ch); }
+  else { ui.pickFocus = ch; ui.pickTapped = ch; render(); }
 }
 function pickToggle(ch) {
   const picks = (st.picks || []).slice();
@@ -680,7 +713,14 @@ on($("winter"), (e) => {
 on($("pick"), (e) => {
   const c = e.target.closest("[data-char],[data-do]"); if (!c) return;
   if (c.dataset.do === "go") { const p = st.picks || []; if (p.length === RULES.word_box.slots) { sfx.ready(); dispatch({ type: "begin_generation", picks: p }); } return; }
-  if (c.dataset.char) pickToggle(c.dataset.char);
+  if (c.dataset.char) pickClick(c.dataset.char);
+});
+// gf5 电脑：悬停即显示右侧说明（不选中）。触控设备无 fine pointer，不走这里。
+$("pick").addEventListener("pointerover", (e) => {
+  if (!hasFinePointer()) return;
+  const b = e.target.closest?.(".cand[data-char]"); if (!b) return;
+  if (ui.pickFocus === b.dataset.char) return;
+  ui.pickFocus = b.dataset.char; updatePickInfo();
 });
 on($("endseq"), (e) => { const b = e.target.closest("[data-do]"); if (b?.dataset.do === "elder") { ui.elderShown = true; sfx.genEnd(); render(); } });
 on($("elder"), (e) => { const b = e.target.closest("[data-do]"); if (b?.dataset.do === "heir") { dispatch({ type: "heir" }); } });

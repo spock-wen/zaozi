@@ -30,6 +30,18 @@ export async function clearTutorial(page) {
   await commit(page, "left");                 // → 第一张普通卡
 }
 
+// 从开局一路点到挑字阶段（触控用 tap）：教学 → 冬夜 → 天亮了 → 先人 → 交给第 2 代 → 挑字。
+export async function toPick(page) {
+  await clearTutorial(page);
+  await playToWinter(page);
+  await page.locator("#winter-end").tap();
+  await page.locator("#endseq").waitFor({ state: "visible", timeout: 12000 });
+  await page.locator("#endseq [data-do=elder]").tap();
+  await page.locator("#elder").waitFor({ state: "visible" });
+  await page.locator("#elder [data-do=heir]").tap();
+  await page.locator("#pick").waitFor({ state: "visible" });
+}
+
 export async function dragCard(page) {
   const c = await page.locator("#card").boundingBox();
   const cx = c.x + c.width / 2, cy = c.y + c.height / 2;

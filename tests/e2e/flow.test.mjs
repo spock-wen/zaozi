@@ -113,7 +113,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#elder").waitFor({ state: "visible" });
         assert.equal(await page.locator("#elder picture, #elder .card-art, #elder img").count(), 0, "先人卡不能有卡面图");
 
-        // 挑字：14 字池、季节标签已填、D1 单次选中
+        // 挑字：14 字池、季节标签已填、gf5 ①②③ 两步选字
         await page.locator("#elder [data-do=heir]").click();
         await page.locator("#pick").waitFor({ state: "visible" });
         assert.equal(await page.locator("#pick .cand").count(), 14, "挑字候选应为 14 字池");
@@ -131,19 +131,45 @@ for (const [engine] of Object.entries(ENGINES)) {
         } else {
           assert.ok(pickHint.includes("再点一次带上"), `手机挑字提示应为点选引导，得到：${pickHint}`);
         }
+        // gf5 ①：第一次点只看说明（出说明卡、落/部件/解锁 三行），不填格；
+        // 含 pointerdown+click 双触发回归（只当一次点击）。
         await firePointerThenClick(page, "#pick .cand[data-char='水']");
         await page.waitForTimeout(80);
-        assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水"], "一次点击只能选一个字");
-        await page.locator("#pick .cand[data-char='休']").click();
+        assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), [], "第一次点不应选中");
+        assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "第一次点应出说明卡");
+        const infoRows = await page.locator("#pick-desc .pi-row b").allInnerTexts();
+        assert.deepEqual(infoRows, ["落", "部件", "解锁"], "说明卡应为落/部件/解锁 三行");
+        assert.equal(await page.locator("#pick .cand.sel").count(), 0, "第一次点不应有已选字");
+        // gf5 ②：同一字再点一次才入格、变朱、带序号角标。
+        await page.locator("#pick .cand[data-char='水']").click();
+        await page.waitForTimeout(80);
+        assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水"], "同一字再点一次才选中");
+        assert.equal(await page.locator("#pick .cand.sel[data-char='水'] .badge").textContent(), "1", "选中字应带顺序角标 1");
+        // gf5 ①：部件行从数据里推（木 → 休、林、本）。
         await page.locator("#pick .cand[data-char='木']").click();
+        const woodParts = (await page.locator("#pick-desc .pi-row").nth(1).innerText()).trim();
+        assert.ok(woodParts.includes("休") && woodParts.includes("本") && woodParts.includes("林"), `木 的部件应为 休/林/本，得到：${woodParts}`);
+        for (const ch of ["休", "木"]) {
+          await page.locator(`#pick .cand[data-char='${ch}']`).click();
+          await page.locator(`#pick .cand[data-char='${ch}']`).click();
+        }
         await page.waitForTimeout(80);
         assert.ok(await page.locator("#pick .go").isEnabled(), "选满三个后出发键可用");
         assert.equal((await page.locator("#pick .go").textContent()).trim(), "带这三个字出发", "选满三个后按钮应为「带这三个字出发」");
-
-        // 满了再点第 4 个：不该改动已选
+        // 满了再点第 4 个：第一次看说明、第二次提示「先放回一个」，已选不动。
         await firePointerThenClick(page, "#pick .cand[data-char='日']");
+        await page.locator("#pick .cand[data-char='日']").click();
         await page.waitForTimeout(80);
         assert.equal((await page.evaluate(() => window.__zz.st.picks)).length, 3, "选满后不能再加");
+
+        // gf5 ③：点已选字（或格内字）放回，后面的字补位；放回后再走一次两步可重选。
+        await page.locator("#pick .cand.sel[data-char='木']").click();
+        await page.waitForTimeout(80);
+        assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水", "休"], "点已选字应放回");
+        await page.locator("#pick .cand[data-char='木']").click();
+        await page.locator("#pick .cand[data-char='木']").click();
+        await page.waitForTimeout(80);
+        assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水", "休", "木"], "放回后可再选");
 
         await page.locator("#pick .go").click();
         await page.waitForTimeout(400);
