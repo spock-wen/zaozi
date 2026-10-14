@@ -437,9 +437,11 @@ body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;
 #keyhelp-pop .kh-row{display:flex;gap:8px;}
 #keyhelp-pop .kh-row b{flex:0 0 104px;color:var(--zhu-600);}
 
-/* 视口高 <492：顶栏下出一行提示（桌面/平板横屏；点不到东西之前先说清） */
+/* 视口高 <492：顶栏下出一行提示（桌面/平板横屏；点不到东西之前先说清）。
+   左对齐贴住舞台左缘：卡在 320 下限时恒为 224 宽、水平居中，1024 起卡左缘 = (vw−224)/2 ≥ 400，
+   提示右缘 ≤ 285，故与卡（含卡头）不交叠；居中摆放会压住卡头。 */
 #too-short{
-  position:fixed;left:50%;top:calc(48px + 4px);transform:translateX(-50%);z-index:58;max-width:90vw;
+  position:fixed;left:12px;top:calc(48px + 4px);z-index:58;max-width:90vw;
   background:var(--paper-100);color:var(--ink);border-radius:10px;padding:6px 14px;font-size:13px;
   box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;
 }
