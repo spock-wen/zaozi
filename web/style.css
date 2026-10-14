@@ -369,8 +369,9 @@ body[data-short="A"] #stage{padding:12px;gap:8px;}   /* 卡上/下距 12 */
 body[data-short="B"] #stage{padding:16px 12px;gap:8px;} /* 卡上/下距 16 */
 body[data-short="A"] #stage .optbtn{width:160px;}
 body[data-short="B"] #stage .optbtn{width:140px;}
-body[data-short="A"] #gesture-hint,
-body[data-short="B"] #gesture-hint{min-height:0;}
+/* 矮屏不显手势行：设计稿 short_screen_720/600 面板 1 卡下只有卡→字匣→键位；
+   键位提示已由 A 的键位行 / B 顶栏「?」承担，旧整句手势文案在矮屏是重复噪声。 */
+body[data-short] #gesture-hint{display:none;}
 
 /* 字匣：A 60（格 48）/ B 56（格 48） */
 body[data-short="A"] #wordbox-bar,
@@ -397,7 +398,9 @@ body[data-view="desktop"][data-short] #app{grid-template-rows:48px auto auto aut
 body[data-short] .wb-handle{display:none;}   /* 矮屏字匣不带把手：A 高 60 / B 高 56 */
 body[data-short] #topbar #dims-desktop{width:auto;flex:1 1 auto;min-width:0;margin:0;}
 body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
-body[data-short] #wordbox-bar{width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
+/* 字匣在矮屏是居中胶囊：去掉顶边框（border-box 下 1px 会把 A/B 撑到 61/57，
+   设计要 60/56 = 格 48 + 上下内边距 12/8），四角同半径。 */
+body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
 
 /* 顶栏「?」键位浮层（B 档；键盘模式才显示） */
 #keyhelp-btn{
