@@ -37,4 +37,5 @@
 - 18 复跑：`npm test` 16 全过；`npm run e2e` 46 全过（chromium 16 / firefox 13 / webkit 13 / 引擎无关 4）。REDESIGN_REPORT.md 更新（新 VERSION、build commit、测试数）。不部署。
 - 19 作家审核 P1：横幅用 goals.json banner；Node<22 先报错；VERSION=3232828264d4；单测 17、e2e 46 全过。
 - 20 QA 复测 W1（P1）：菜单「字源与版权」进不去。根因 `app.js` 的 `on()` 对每次 click 都 `preventDefault`，把 `<a href>` 的默认跳转也拦了。改成带 `href` 的真链接不拦（照常导航），其余点击行为不变。新增 `tests/e2e/credits_link.test.mjs`（三引擎 × 390 tap / 1280 click：开菜单→点链接→落 `/credits` 且版权表 >50 行带 Richard Sears）；反修复时该测试超时失败，证明确实锁死。e2e 52、单测 17 全过。
+- 21 QA 复测 W4（P1·发布）：干净树 `npm ci && npm run build` 崩 ENOENT、且第一次 VERSION=e3b0c44298fc。根因 `build_dist.mjs` 在 rmrf/mkdirp 重建 dist 之前就 `resolveVersion` 去扫 dist。改成：dist 用 rm -rf + mkdir -p 从零重建；VERSION 移到「所有发布文件写完之后、生成 sw.js 之前」再算（sw.js 除外，它嵌 VERSION）。`rm -rf dist && npm run build` 一次成功，VERSION=cec268a33090（=内容哈希，第二次相同；W1 改动使哈希随内容变，故与 3232828264d4 不同）。新增 `tests/build_clean.test.mjs`：`git archive HEAD` 到临时目录、一次构建，断言 VERSION≠空哈希、等于内容哈希、且（工作树干净时）等于仓库里一次构建的 VERSION。单测 18 全过。
 - DONE（v2.2）

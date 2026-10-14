@@ -27,12 +27,7 @@ function copyTree(src, dest) {
   }
 }
 
-// ---- 版本号：--version 参数 > ZAOZI_VERSION / VERSION_OVERRIDE 环境变量
-// ---- > tools/baseline_version.txt（重建期钉住 baseline 的 7dc14fa2ab57）
-// ---- > 内容哈希。原算法已失传，钉住值才能逐字节复现线上 dist。
-const version = resolveVersion(DIST, process.argv.slice(2));
-
-// ---- 1. 清空 dist ----
+// ---- 1. 清空 dist（rm -rf + mkdir -p，干净树里也能从零建出来）----
 rmrf(DIST);
 mkdirp(DIST);
 
@@ -80,7 +75,15 @@ const creditsTmpl = fs.readFileSync(path.join(ROOT, "tools/credits_template.html
 const sourcesCsv = fs.readFileSync(path.join(ROOT, "data/glyph_sources.csv"), "utf8");
 writeFile(path.join(DIST, "credits.html"), renderCredits(csvText, creditsTmpl, sourcesCsv));
 
-// ---- 8. 文件清单 + 版本 + sw.js ----
+// ---- 8. 版本号（内容哈希）----
+// 必须等全部发布文件都写完之后再算，而且 dist 已由第 1 步从零重建：
+//   - 干净树里 dist 还不存在时先扫会 ENOENT；
+//   - 若沿用上一版残留，干净树第一次会算成空目录的哈希 e3b0c44298fc，
+//     第二次才对——发版只构建一次就会带着旧 VERSION，用户拿不到新版。
+// 优先级：--version 参数 > ZAOZI_VERSION / VERSION_OVERRIDE 环境变量 > 内容哈希。
+const version = resolveVersion(DIST, process.argv.slice(2));
+
+// ---- 9. 文件清单 + sw.js ----
 // 清单 = dist 内全部文件（除 sw.js 与 _headers），"./index.html" 记作 "./"，
 // 排序时把 "./" 当作 "./index.html"（按码点比，ASCII 路径下与默认排序一致），
 // 每行 4 条，行尾带逗号。
@@ -95,7 +98,7 @@ for (let i = 0; i < entries.length; i += 4) {
 const swTmpl = fs.readFileSync(path.join(ROOT, "tools/sw.template.js"), "utf8");
 writeFile(path.join(DIST, "sw.js"), swTmpl.replace("{{VERSION}}", version).replace("{{FILES}}", fileLines.join("\n")));
 
-// ---- 9. _headers（Cloudflare Pages：sw.js 不缓存，每次拉新）----
+// ---- 10. _headers（Cloudflare Pages：sw.js 不缓存，每次拉新）----
 writeFile(path.join(DIST, "_headers"), "/sw.js\n  Cache-Control: no-cache\n");
 
 console.log(`built dist/ — ${distFiles.length + 2} files (incl. sw.js + _headers), VERSION=${version}`);
