@@ -3,9 +3,12 @@
 - baseline_dist/: 129 files mirrored from https://zaozi.pages.dev, every fetch HTTP 200, sw.js VERSION=7dc14fa2ab57. index.html fetched from / and credits.html from /credits (Pages 308s the .html URLs). Precache list = 128 entries + sw.js.
 - _headers: NOT fetchable (Pages serves the SPA HTML for /_headers). Original content is known from notes: `/sw.js` Cache-Control: no-cache.
 - Origin: github.com/spock-wen/zaozi-web (private). A post-commit hook auto-pushes all branches after each commit; failures go to .git/push_fail.log.
-## Source reconstruction (Command Code, in progress)
-- src/rng.ts, savecode.ts, engine.ts: type annotations sized to fill the stripped whitespace exactly; stripTypeScriptTypes round-trip is byte-identical.
-- Still to do: types.ts, validator.ts, web/app.js dev shell, serve.mjs, serve_pages.mjs, tools/build_dist.mjs, sw.template.js, version_hash.mjs, credits_*, tests.
+## Source reconstruction (Command Code, done 2026-10-14)
+- src/rng.ts, savecode.ts, engine.ts, types.ts, validator.ts: type annotations sized to fill the stripped whitespace exactly; stripTypeScriptTypes round-trip is byte-identical (tools/check_strip.mjs).
+- web/app.js dev shell (BUILD_DIST=false, GLYPH_BASE="../", ../src imports) + web/serve.mjs + web/serve_pages.mjs.
+- tools/: build_dist.mjs, sw.template.js ({{VERSION}}/{{FILES}}), version_hash.mjs (+baseline_version.txt pin), credits_table.mjs + credits_template.html (__COUNT__/__ROWS__), public_csv.mjs, compare_baseline.mjs.
+- tests/: node --test, 10 cases green.
+- `npm run build` → dist/ is byte-identical to baseline_dist/ (129/129; only _headers extra, expected — not fetchable live). See REBUILD_PROGRESS.md for the per-file list.
 ## Gaps
 - Types are inferred, not original. The private glyph CSV (with notes) is lost; only the public CSV survives.
 - Version-hash algorithm unknown: 7 sha256 variants tried, none reproduced 7dc14fa2ab57.
