@@ -399,7 +399,9 @@ function renderCoach() {
 // 竖向对齐目标（字匣提示 → 气泡底边 = 字匣底边；其余对齐目标/卡竖向中线）。
 function placeCoach(step) {
   const col = $("coachcol"), el = $("coach");
-  const sb = $("stage").getBoundingClientRect(), cb = $("card").getBoundingClientRect();
+  // 用 #cardwrap（不被拖拽/飞出动画改 transform）当卡的槽位，别用 #card——
+  // 否则切卡瞬间（卡片 transform 还在 160ms 过渡里）读到的是移动中的卡，气泡会算到卡上面。
+  const sb = $("stage").getBoundingClientRect(), cb = $("cardwrap").getBoundingClientRect();
   const GAP = 16, MAXW = 320, MINW = 240;
   const rightStart = cb.right + GAP - sb.left;
   const rightAvail = sb.width - GAP - rightStart;
@@ -422,7 +424,7 @@ function placeCoach(step) {
 // 竖向位置若与目标（卡、左右选项、字匣、卡上落字框、卡角刻）相交，就滑到最近的空白处。
 // 只考虑横向会撞的那些目标；找不到空位就保持原位（由外层夹到舞台内）。
 function slideClearOfTargets(top, h, vx, w) {
-  const rects = [$("opt-left"), $("opt-right"), $("wordbox-bar"), $("card-drops"), $("bonecorner"), $("card")]
+  const rects = [$("opt-left"), $("opt-right"), $("wordbox-bar"), $("card-drops"), $("bonecorner"), $("cardwrap")]
     .filter((e) => e && !e.hidden && getComputedStyle(e).display !== "none")
     .map((e) => e.getBoundingClientRect())
     .filter((r) => Math.min(vx + w, r.right) - Math.max(vx, r.left) > 0);
