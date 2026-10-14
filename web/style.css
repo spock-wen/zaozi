@@ -421,7 +421,10 @@ body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
    设计要 60/56 = 格 48 + 上下内边距 12/8），四角同半径。 */
 body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
 
-/* 顶栏「?」键位浮层（B 档；键盘模式才显示） */
+/* 顶栏「?」键位浮层（B 档；键盘模式才显示）。
+   左右选项贴着卡（B 档卡右缘 = 卡心 + 卡高×0.7/2，选项右缘 = 卡右缘 + 8 + 140），
+   1024 最宽卡高 428 时选项右缘到 810；浮层贴右上、宽 200（左缘 ≥ 816）即可与选项不交叠，
+   下方是整片空沟，故可放心向下长高（不与卡/选项/字匣交叠）。 */
 #keyhelp-btn{
   width:44px;height:44px;min-width:44px;display:none;align-items:center;justify-content:center;
   font-size:18px;font-weight:700;border-radius:8px;color:var(--paper-50);
@@ -430,12 +433,14 @@ body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;
 #keyhelp-btn[data-show="1"]{display:flex;}
 #keyhelp-btn:active{background:var(--night-line);}
 #keyhelp-pop{
-  position:absolute;top:calc(48px + 4px);right:16px;width:248px;z-index:61;
-  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 14px;
-  font-size:13px;line-height:22px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+  position:absolute;top:calc(48px + 4px);right:8px;width:200px;max-height:calc(100dvh - 60px);
+  overflow:auto;z-index:61;
+  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 12px;
+  font-size:13px;line-height:20px;box-shadow:0 10px 30px rgba(0,0,0,.4);
 }
 #keyhelp-pop .kh-row{display:flex;gap:8px;}
-#keyhelp-pop .kh-row b{flex:0 0 104px;color:var(--zhu-600);}
+#keyhelp-pop .kh-row + .kh-row{margin-top:3px;}
+#keyhelp-pop .kh-row b{flex:0 0 64px;color:var(--zhu-600);}
 
 /* 视口高 <492：顶栏下出一行提示（桌面/平板横屏；点不到东西之前先说清）。
    左对齐贴住舞台左缘：卡在 320 下限时恒为 224 宽、水平居中，1024 起卡左缘 = (vw−224)/2 ≥ 400，
