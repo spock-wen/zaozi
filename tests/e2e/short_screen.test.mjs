@@ -182,3 +182,85 @@ for (const engine of Object.keys(ENGINES)) {
     }
   });
 }
+
+// ---------- 4. 教学气泡不得盖住目标：不压卡/不压字匣/不压落字框/不压卡角刻，目标可点、可按 1 落字 ----------
+const COACH_VPS = [{ w: 1024, h: 600 }, { w: 1280, h: 720 }];
+for (const engine of Object.keys(ENGINES)) {
+  for (const vp of COACH_VPS) {
+    test(`${engine} 教学气泡 ${vp.w}×${vp.h}: 不盖目标 + 第 4 张字匣可点/按 1 落字`, async () => {
+      const { ctx, page, errs } = await open(engine, { width: vp.w, height: vp.h });
+      try {
+        const snap = () =>
+          page.evaluate(() => {
+            const R = (s) => {
+              const e = document.querySelector(s);
+              if (!e) return null;
+              const r = e.getBoundingClientRect();
+              return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
+            };
+            const coach = R("#coachcol");
+            const hit = (s) => {
+              const e = document.querySelector(s);
+              if (!e) return null;
+              const r = e.getBoundingClientRect();
+              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+              return t ? (t.closest(s.split(" ").pop()) ? "self" : t.id || t.className) : "none";
+            };
+            return {
+              short: document.body.dataset.short,
+              coach, card: R("#card"), wb: R("#wordbox-bar"), drops: R("#card-drops"),
+              slot: R("#wordbox .slot.ok"), bone: R("#bonecorner"),
+              optL: R("#opt-left"), optR: R("#opt-right"),
+              coachH: document.querySelector("#coach").getBoundingClientRect().height,
+              vh: innerHeight, vw: innerWidth,
+              pe: getComputedStyle(document.querySelector("#coachcol")).pointerEvents,
+              slotHit: hit("#wordbox .slot.ok"), boneHit: hit("#bonecorner"),
+              phase: window.__zz.st.phase, current: window.__zz.st.current,
+            };
+          });
+        const noOverlap = (g, key, label) => {
+          const a = g.coach, b = g[key];
+          if (!a || !b) return;
+          assert.ok(!intersect(a, b), `气泡与${label}不得交叠：coach=${JSON.stringify(a)} ${key}=${JSON.stringify(b)}`);
+        };
+
+        // T01/T02：气泡在卡外空沟，不压卡、不压左右选项
+        for (const stepIdx of [0, 1]) {
+          if (stepIdx === 1) await commit(page, "left");   // T01 → T02
+          const g = await snap();
+          assert.ok(g.coach, "教学气泡应有包围盒");
+          assert.ok(g.coach.y >= 0 && g.coach.bottom <= g.vh + 1, "气泡应在视口内");
+          assert.equal(g.pe, "none", "气泡应 pointer-events:none（纯提示不挡点击）");
+          noOverlap(g, "card", "卡本体");
+          noOverlap(g, "optL", "左选项");
+          noOverlap(g, "optR", "右选项");
+        }
+        await commit(page, "right");                       // T02 → T03（刻）
+        const t3 = await snap();
+        assert.equal(t3.phase, "engrave");
+        noOverlap(t3, "bone", "卡角「刻」");
+        assert.equal(t3.boneHit, "self", `卡角「刻」应可点到，实际命中：${t3.boneHit}`);
+
+        await page.locator("#bonecorner").click();          // 刻 → T04
+        await page.waitForTimeout(300);
+        const t4 = await snap();
+        assert.equal(t4.current, "T04");
+        noOverlap(t4, "card", "卡本体");
+        noOverlap(t4, "wb", "字匣");
+        noOverlap(t4, "drops", "卡上落字框");
+        noOverlap(t4, "slot", "字匣格");
+        assert.equal(t4.slotHit, "self", `第 4 张字匣格应可点到，实际命中：${t4.slotHit}`);
+        assert.ok(t4.drops.y >= 0 && t4.drops.bottom <= t4.vh + 1, "落字框应在屏内");
+
+        await page.keyboard.press("1");                     // 按 1 落字
+        await page.waitForTimeout(300);
+        assert.equal(await page.evaluate(() => window.__zz.st.current), "T05", "按 1 应落字进入 T05");
+        assert.equal(await page.evaluate(() => window.__zz.st.phase), "card");
+
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}
