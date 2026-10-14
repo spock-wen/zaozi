@@ -441,9 +441,13 @@ function renderPick() {
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
   const pool3 = PICK_CHARS;
+  // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
+  const hint = document.body.dataset.view === "desktop"
+    ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
+    : "点一个字看它能做什么；再点一次带上。";
   el.innerHTML =
     `<h2>出发挑字 · 第 ${st.generation ?? 2} 代</h2>` +
-    `<p class="season-note">开春。从字录里挑三个字带上路（← → 移动，Space 选，Backspace 放回，Enter 出发）。</p>` +
+    `<p class="season-note">${hint}</p>` +
     `<div class="pickslots">${[0, 1, 2].map((i) => picks[i]
       ? `<button class="pickslot" data-char="${picks[i]}" title="放回">${gimg(picks[i])}<span>${i + 1}·${picks[i]}</span></button>`
       : `<div class="pickslot">空</div>`).join("")}</div>` +
@@ -452,7 +456,7 @@ function renderPick() {
       return `<button class="cand${isSel ? " sel" : ""}${full && !isSel ? " dim" : ""}" data-char="${p.char}" data-i="${i}">${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}</button>`;
     }).join("")}</div>` +
     `<div class="desc" id="pick-desc"></div>` +
-    `<div class="pickfoot"><button class="go${full ? " ready" : ""}" data-do="go" ${full ? "" : "disabled"}>出发</button></div>`;
+    `<div class="pickfoot"><button class="go${full ? " ready" : ""}" data-do="go" ${full ? "" : "disabled"}>${full ? "带这三个字出发" : "还差字"}</button></div>`;
 }
 function pickToggle(ch) {
   const picks = (st.picks || []).slice();

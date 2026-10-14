@@ -80,6 +80,12 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.ok((await page.locator(`#pick .cand[data-char="${ch}"]`).innerText()).includes(ch), `候选 ${ch} 应显示现代字`);
       }
       assert.ok((await page.locator("#season-chip").textContent()).trim().length > 0, "挑字阶段季节标签应非空");
+
+      // gf5：手机挑字用点选引导（点一下看说明、再点一次带上），出发键文案为 gf5 两态之一
+      const pickHint = (await page.locator("#pick .season-note").textContent()).trim();
+      assert.ok(pickHint.includes("再点一次带上"), `手机挑字提示应为点选引导，得到：${pickHint}`);
+      const goLabel = (await page.locator("#pick .go").textContent()).trim();
+      assert.ok(["还差字", "带这三个字出发"].includes(goLabel), `出发键文案应为 gf5 两态之一，得到：${goLabel}`);
       assert.ok(!(await visibleText(page)).includes("占位"), "挑字界面不应出现「占位」");
 
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));

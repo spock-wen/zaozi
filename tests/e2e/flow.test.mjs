@@ -118,6 +118,19 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#pick").waitFor({ state: "visible" });
         assert.equal(await page.locator("#pick .cand").count(), 14, "挑字候选应为 14 字池");
         assert.equal((await page.locator("#season-chip").textContent()).trim(), "春", "挑字阶段季节标签要填上");
+
+        // gf5：挑字提示按档位（桌面 ← → / Space；手机点选引导），出发键文案为 gf5 两态之一
+        const pickView = await page.evaluate(() => document.body.dataset.view);
+        const pickHint = (await page.locator("#pick .season-note").textContent()).trim();
+        const goEmpty = (await page.locator("#pick .go").textContent()).trim();
+        assert.ok(["还差字", "带这三个字出发"].includes(goEmpty), `出发键文案应为 gf5 两态之一，得到：${goEmpty}`);
+        assert.equal(goEmpty, "还差字", "未选满时应显示「还差字」");
+        assert.ok(!(await page.locator("#pick .go").isEnabled()), "未选满时出发键应不可用");
+        if (pickView === "desktop") {
+          assert.ok(pickHint.includes("←") && pickHint.includes("→") && pickHint.includes("Space"), `桌面挑字提示应含 ← → 与 Space，得到：${pickHint}`);
+        } else {
+          assert.ok(pickHint.includes("再点一次带上"), `手机挑字提示应为点选引导，得到：${pickHint}`);
+        }
         await firePointerThenClick(page, "#pick .cand[data-char='水']");
         await page.waitForTimeout(80);
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), ["水"], "一次点击只能选一个字");
@@ -125,6 +138,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#pick .cand[data-char='木']").click();
         await page.waitForTimeout(80);
         assert.ok(await page.locator("#pick .go").isEnabled(), "选满三个后出发键可用");
+        assert.equal((await page.locator("#pick .go").textContent()).trim(), "带这三个字出发", "选满三个后按钮应为「带这三个字出发」");
 
         // 满了再点第 4 个：不该改动已选
         await firePointerThenClick(page, "#pick .cand[data-char='日']");

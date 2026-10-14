@@ -218,8 +218,8 @@ body[data-view="desktop"] #banner{top:calc(56px + 8px);}
 #pick .cand.sel{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);}
 #pick .cand.dim{opacity:.4;}
 #pick .cand .badge{position:absolute;}.gocenter{align-items:center;}
-#pick .pickfoot{margin-top:auto;display:flex;justify-content:flex-end;padding-top:12px;}
-#pick .go{min-height:44px;padding:0 20px;border-radius:10px;background:var(--night-700);border:1px solid var(--night-line);font-weight:700;}
+#pick .pickfoot{margin-top:auto;display:flex;padding-top:12px;}
+#pick .go{width:100%;min-height:48px;border-radius:24px;background:var(--night-700);border:1px solid var(--night-line);font-weight:700;font-size:15px;color:var(--muted);}
 #pick .go.ready{background:var(--zhu-600);border-color:var(--zhu-600);color:#fff;}
 #pick .desc{font-size:13px;color:var(--paper-200);min-height:20px;margin-top:6px;}
 
