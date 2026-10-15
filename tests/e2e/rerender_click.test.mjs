@@ -37,8 +37,18 @@ const current = (page) => page.evaluate(() => window.__zz.st.current);
 const picksOf = (page) => page.evaluate(() => window.__zz.st.picks || []);
 const render = (page) => page.evaluate(() => window.__zz.render());
 
+// 按之前先等卡停稳：切卡/入场时 #card 在飞入或回位，目标按钮跟着移动，按下与抬起会落在
+// 不同位置——那是「移动的目标」而不是 E2（重绘换节点）。本套件只验后者，故先把基线静下来。
+async function settle(page) {
+  await page.waitForFunction(() => {
+    const c = document.getElementById("card");
+    return !window.__zz.animating && (!c || c.getAnimations().every((a) => a.playState !== "running"));
+  }, null, { timeout: 5000 });
+}
+
 // 按下 →（触发一次 render）→ 抬起：render 恰好落在 down 与 up 之间（Escape 会调用 render()）。
 async function pressWithRenderBetween(page, sel) {
+  await settle(page);
   const box = await page.locator(sel).first().boundingBox();
   if (!box) throw new Error(`找不到 ${sel}`);
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
@@ -50,6 +60,7 @@ async function pressWithRenderBetween(page, sel) {
 
 // 任务给出的确定性复现：按下 → 直接强制 window.__zz.render() → 抬起。
 async function pressBetween(page, sel) {
+  await settle(page);
   const box = await page.locator(sel).first().boundingBox();
   if (!box) throw new Error(`找不到 ${sel}`);
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
@@ -317,6 +328,7 @@ test("chromium 390 touch(CDP): down/up 间 render() 不丢点击（字匣落字/
   collectErrors(page, errs);
   const cdp = await ctx.newCDPSession(page);
   const touchBetween = async (sel) => {
+    await settle(page);
     const box = await page.locator(sel).first().boundingBox();
     if (!box) throw new Error(`找不到 ${sel}`);
     const x = box.x + box.width / 2, y = box.y + box.height / 2;

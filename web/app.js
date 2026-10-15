@@ -345,10 +345,10 @@ function pumpBanner() {
 function renderSprout() { /* 开春展开：每代第一张卡显示三件事，随后收起 */ }
 
 function renderTopbar() {
-  $("gennum").textContent = st.generation ?? 1;
-  $("bonesnum").textContent = st.bones;
+  setText($("gennum"), st.generation ?? 1);
+  setText($("bonesnum"), st.bones);
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
-  $("season-chip").textContent = card ? SEASON[card.season] : (st.phase === "pick" ? "春" : "—");
+  setText($("season-chip"), card ? SEASON[card.season] : (st.phase === "pick" ? "春" : "—"));
   $("bones-chip").hidden = false;
 }
 function renderCard() {
@@ -360,10 +360,10 @@ function renderCard() {
   const art = artHTML(c);
   patchHTML($("card-art"), art);
   $("card-art").hidden = !art;
-  $("card-season").textContent = SEASON[c.season];
-  $("card-speaker").textContent = c.speaker;
-  $("card-title").textContent = c.title || "";
-  $("card-text").textContent = c.text;
+  setText($("card-season"), SEASON[c.season]);
+  setText($("card-speaker"), c.speaker);
+  setText($("card-title"), c.title || "");
+  setText($("card-text"), c.text);
   const engrave = st.phase === "engrave";
   card.classList.toggle("engrave", engrave);
   if (!engrave) ui.engraved = false;    // 离开「刻」就复位本张卡的已刻标记，别把 done 带到下一张「刻」卡
@@ -383,13 +383,13 @@ function renderCard() {
   const ol = $("opt-left"), or = $("opt-right");
   const showOpts = document.body.dataset.view === "desktop" || document.body.dataset.view === "tablet-landscape";
   ol.hidden = !showOpts; or.hidden = !showOpts;
-  if (showOpts) { ol.textContent = "← " + c.left.label; or.textContent = c.right.label + " →"; }
+  if (showOpts) { setText(ol, "← " + c.left.label); setText(or, c.right.label + " →"); }
   const side = previewSide();
   ol.classList.toggle("on", side === "left"); or.classList.toggle("on", side === "right");
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
-  $("gesture-hint").textContent = keyboardMode()
+  setText($("gesture-hint"), keyboardMode()
     ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
-    : "左右拖卡做选择 · 长按看分量";
+    : "左右拖卡做选择 · 长按看分量");
 }
 function hasFinePointer() { return matchMedia("(hover:hover) and (pointer:fine)").matches; }
 // 键鼠文案与键位行：接了键鼠（pointer:fine）才用（BREAKPOINTS 平板竖/横「有键盘显键位」）；
@@ -480,6 +480,10 @@ function patchHTML(el, html) {
   return true;
 }
 function dropHTML(el) { htmlCache.delete(el); }
+// 文本与 innerHTML 同理：把同样的文本再赋一次也会换掉元素内部的文本节点。若这次重绘恰落在
+// 「按下」与「抬起」之间，WebKit 会因为按下时命中的节点被换掉而不再合成 click（E2 的同一类；
+// 实测把 textContent 设成与原来完全相同的值也会触发）。值没变就不写，节点保持不动。
+function setText(el, text) { const s = String(text); if (el.textContent !== s) el.textContent = s; }
 
 function renderWinter() {
   const el = $("winter");
@@ -576,19 +580,19 @@ function renderPick() {
   if (el.dataset.pickBuilt !== "1") { buildPickSkeleton(el); el.dataset.pickBuilt = "1"; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
-  el.querySelector("h2").textContent = `出发挑字 · 第 ${st.generation ?? 2} 代`;
+  setText(el.querySelector("h2"), `出发挑字 · 第 ${st.generation ?? 2} 代`);
   // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
-  el.querySelector(".season-note").textContent = document.body.dataset.view === "desktop"
+  setText(el.querySelector(".season-note"), document.body.dataset.view === "desktop"
     ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
-    : "点一个字看它能做什么；再点一次带上。";
+    : "点一个字看它能做什么；再点一次带上。");
   patchKeyed(el.querySelector(".pickslots"), [0, 1, 2], (i) => i,
     () => document.createElement("button"),
     (node, i) => {
       const ch = picks[i];
       node.className = "pickslot";
       node.dataset.slot = String(i);
-      if (ch) { node.dataset.char = ch; node.title = "放回"; node.innerHTML = `${gimg(ch)}<span>${i + 1}·${ch}</span>`; }
-      else { delete node.dataset.char; node.removeAttribute("title"); node.textContent = "空"; }
+      if (ch) { node.dataset.char = ch; node.title = "放回"; patchHTML(node, `${gimg(ch)}<span>${i + 1}·${ch}</span>`); }
+      else { delete node.dataset.char; node.removeAttribute("title"); patchHTML(node, "空"); }
     });
   patchKeyed(el.querySelector(".pool"), PICK_CHARS, (p) => p.char,
     () => document.createElement("button"),
@@ -596,11 +600,11 @@ function renderPick() {
       const sel = picks.indexOf(p.char), isSel = sel >= 0;
       node.className = "cand" + (isSel ? " sel" : "") + (full && !isSel ? " dim" : "") + (p.char === ui.pickFocus ? " focus" : "");
       node.dataset.char = p.char; node.dataset.i = String(PICK_CHARS.indexOf(p));
-      node.innerHTML = `${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}`;
+      patchHTML(node, `${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}`);
     });
   const go = el.querySelector(".go");
   go.disabled = !full;
-  go.textContent = full ? "带这三个字出发" : "还差字";
+  setText(go, full ? "带这三个字出发" : "还差字");
   go.classList.toggle("ready", full);
   updatePickInfo();
 }
@@ -672,10 +676,10 @@ function renderEnded() {
 function renderKeys() {
   const tier = document.body.dataset.short || "";
   const el = $("keys");
-  if (!keyboardMode() || tier === "B") { el.textContent = ""; return; }
-  el.textContent = tier === "A"
+  if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
+  setText(el, tier === "A"
     ? "←→选 1–3落字 Space分量 K/Enter刻"
-    : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层";
+    : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层");
 }
 // 矮屏 B 顶栏「?」浮层：列出全部键位。首次进入某存档自动弹一次（3 秒后收起）。
 function keyhelpHTML() {
