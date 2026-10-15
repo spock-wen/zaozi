@@ -169,3 +169,8 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - Removed a node_modules symlink that had been committed by mistake (a6f5a40).
 - Loops: bonecorner_hit + keyhelp_entry 30/30 on each of chromium/firefox/webkit (one worktree per engine; each e2e file runs buildDist() on load, so parallel runs in one checkout wipe dist mid-serve. That only affected my parallel loop; npm run e2e uses --test-concurrency=1).
 - Full 3-engine e2e, 3 consecutive runs (product = de92759, VERSION 55989b7737b8): 235/235, 235/235, 235/235. Unit 28/28.
+
+## Round 17 — ec61666 retest: probe fixes (tests only, VERSION unchanged 55989b7737b8)
+- Every elementFromPoint centre probe (bonecorner_hit, coach_overlap, pick_desktop_layout, tray_n_tier, short_tutorial, short_screen) now uses the centre of (element rect ∩ viewport) inset from every edge. Chromium rounds x, so a 刻 centre in [389.5,390) at 390 wide returned null (QA efp_probe) (da7e96c). goals_hit already probed 1px inside; keyhelp_entry/short_overlap do not use elementFromPoint.
+- bonecorner_hit mid-entry: the card is rotated (~3°), so the bounding box is ~s·sinθ wider than 刻 itself. Inset k = 1 + 2×(bbox − layout size) so the probe lands inside 刻 itself. With only a 1px inset, firefox 390×844 failed 3/30 (narrow edge strip hit card-head, or the visible strip was <2px). The probe is skipped only when the inset intersection is empty, and then it asserts 刻 is almost entirely off-screen right (r.left ≥ innerWidth − 2k). Failure messages include rect/k/pt (235e6ea).
+- bonecorner_hit 30× per engine (separate checkouts): chromium 30/30, firefox 30/30, webkit 30/30.
