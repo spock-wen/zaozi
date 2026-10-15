@@ -591,7 +591,8 @@ function renderPick() {
   if (el.dataset.pickBuilt !== "1") { buildPickSkeleton(el); el.dataset.pickBuilt = "1"; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
-  setText(el.querySelector("h2"), `出发挑字 · 第 ${st.generation ?? 2} 代`);
+  // 挑字页标题显示即将开始的代：此刻 st.generation 还是刚结束的那一代（begin_generation 之后才 +1），与交棒按钮（n+1）保持一致。
+  setText(el.querySelector("h2"), `出发挑字 · 第 ${(st.generation ?? 1) + 1} 代`);
   // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
   setText(el.querySelector(".season-note"), document.body.dataset.view === "desktop"
     ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
