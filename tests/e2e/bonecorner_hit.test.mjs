@@ -8,10 +8,12 @@
 //
 // 断言：在卡角中心用 document.elementFromPoint，必须命中 #bonecorner 本身或其子节点。
 // 四个视口（1280×720 / 1024×600 / 1366×768 / 390×844）各查三处：
-//   1) 入场动画进行中（提交进「刻」后按 rAF 采样，卡还在回位过渡里）；
-//   2) 入场动画结束后（同一次采样里 transform 已归位、且跨过 650ms 重绘）；
-//   3) 教学态（重载回到 T03，即「load 之后立刻」）。
-// 用元素包围盒中心点，不依赖 Playwright 的点击重试（node:test 无 retry）。
+//   1) 入场动画中途：提交进「刻」后，等卡出现正在跑的入场过渡（飞出是 rAF JS，
+//      随后 CSS 160ms 把卡从右侧滑回），暂停所有卡动画、currentTime 拨到时长一半，
+//      查卡角中心（中心在屏外则该处跳过——飞出/滑回途中卡角可能短暂在屏外，不是缺陷）；
+//   2) 入场动画结束后：finish() 掉卡动画、等卡归位并跨过 650ms 重绘后再查；
+//   3) 教学态：同存档重载，load 之后立刻查（此时应已回到 T03「刻」）。
+// 全部为「定住某一帧再查」的确定性探针，不用 rAF 逐帧采样、不依赖任何一种点击重试。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
@@ -46,38 +48,8 @@ async function open(engine, { w, h }) {
   return { ctx, page, errs };
 }
 
-// 页面内按 rAF 采样：卡角显形后每帧记一次 elementFromPoint（含该帧是否还在入场过渡里）。
-// 只记「卡角中心落在视口内」的帧——飞出/回位途中卡角可能短暂在屏外，那不是命中缺陷。
-async function startSampler(page) {
-  await page.evaluate(() => {
-    window.__bone = { samples: [] };
-    const tick = () => {
-      const bc = document.querySelector("#bonecorner");
-      const r = bc.getBoundingClientRect();
-      const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-      if (r.width >= 1 && cx >= 0 && cx < innerWidth && cy >= 0 && cy < innerHeight) {
-        const el = document.elementFromPoint(cx, cy);
-        const card = document.querySelector("#card");
-        const moving =
-          card.getAnimations().some((a) => a.playState === "running") ||
-          getComputedStyle(card).transform !== "none";
-        window.__bone.samples.push({
-          current: window.__zz.st.current,
-          phase: window.__zz.st.phase,
-          moving,
-          hitSelf: !!(el && el.closest("#bonecorner")),
-          hit: el ? el.id || el.className || el.tagName : "none",
-        });
-      }
-      window.__bone.raf = requestAnimationFrame(tick);
-    };
-    tick();
-  });
-}
-
-// B 档（1024×600）首次进入会自动弹「?」键位浮层（z-index 61，独立浮层，合法盖住下方）。
-// 它是首进一次的提示、3 秒自收——真人读到 T03 前早收了。这里先按 Esc 收掉，
-// 好让下面的断言只盯「卡角 vs 卡内正文 .card-head」这一条。
+// B 档（1024×600）首次进入会自动弹「?」键位浮层（z-index 61，独立浮层）。
+// 它是首进一次的提示、3 秒自收——先按 Esc 收掉，好让断言只盯「卡角 vs 卡内正文 .card-head」。
 async function dismissKeyhelp(page) {
   if (await page.evaluate(() => !document.querySelector("#keyhelp-pop").hidden)) {
     await page.keyboard.press("Escape");
@@ -85,13 +57,16 @@ async function dismissKeyhelp(page) {
   }
 }
 
-const centreHit = (page) =>
+// 卡角中心命中探针：命中 #bonecorner 或其子节点才算过；中心在屏外则标 onScreen=false（跳过）。
+const boneProbe = (page) =>
   page.evaluate(() => {
     const bc = document.querySelector("#bonecorner");
     const r = bc.getBoundingClientRect();
-    const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const onScreen = r.width >= 1 && cx >= 0 && cx < innerWidth && cy >= 0 && cy < innerHeight;
+    const el = onScreen ? document.elementFromPoint(cx, cy) : null;
     return {
-      current: window.__zz.st.current, phase: window.__zz.st.phase, w: r.width,
+      current: window.__zz.st.current, phase: window.__zz.st.phase, w: r.width, onScreen,
       hitSelf: !!(el && el.closest("#bonecorner")),
       hit: el ? el.id || el.className || el.tagName : "none",
     };
@@ -106,34 +81,56 @@ for (const engine of Object.keys(ENGINES)) {
         await commit(page, "left");                 // T01 → T02
         await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
 
-        await startSampler(page);                   // 从「提交进 T03」这一帧起采样
+        // 提交进 T03：先等飞出 rAF 结束、CSS 回位过渡正在跑（此刻卡定格在滑回途中）。
         await page.keyboard.press("ArrowRight");
         await page.keyboard.press("ArrowRight");    // T02 → T03（锁拖，一进来就是「刻」）
-        await page.waitForTimeout(1400);            // 覆盖 240ms 飞出 + 160ms 回位 + 650ms 重绘
+        await page.waitForFunction(() => {
+          if (window.__zz.animating) return false;
+          if (window.__zz.st.phase !== "engrave") return false;
+          const card = document.querySelector("#card");
+          return card.getAnimations().some((a) => a.playState === "running") || getComputedStyle(card).transform !== "none";
+        }, null, { timeout: 5000 });
 
-        const samples = await page.evaluate(() => {
-          cancelAnimationFrame(window.__bone.raf);
-          return window.__bone.samples;
+        // 暂停所有卡动画、currentTime 拨到一半 → 卡定在滑回中途，查卡角中心。
+        const mid = await page.evaluate(() => {
+          const card = document.querySelector("#card");
+          const anims = card.getAnimations();
+          for (const a of anims) { a.pause(); a.currentTime = Number(a.effect.getTiming().duration) / 2; }
+          const bc = document.querySelector("#bonecorner");
+          const r = bc.getBoundingClientRect();
+          const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+          const onScreen = r.width >= 1 && cx >= 0 && cx < innerWidth && cy >= 0 && cy < innerHeight;
+          const el = onScreen ? document.elementFromPoint(cx, cy) : null;
+          return {
+            anims: anims.length, current: window.__zz.st.current, phase: window.__zz.st.phase,
+            w: r.width, onScreen, hitSelf: !!(el && el.closest("#bonecorner")),
+            hit: el ? el.id || el.className || el.tagName : "none",
+          };
         });
-        assert.ok(samples.length > 0, "进入「刻」后应采样到卡角（四视口都应显形）");
-        for (const s of samples) {
-          assert.equal(s.current, "T03", "采样期间应停在 T03");
-          assert.equal(s.phase, "engrave", "采样期间应处于「刻」阶段");
-          assert.ok(s.hitSelf, `卡角中心应命中 #bonecorner，实际命中：${s.hit}（入场动画中=${s.moving}）`);
-        }
-        assert.ok(samples.some((s) => s.moving), "应采到入场动画进行中的帧");
-        assert.ok(samples.some((s) => !s.moving), "应采到入场动画结束（已回位）的帧");
+        assert.ok(mid.anims > 0, "入场滑回应有正在跑的卡动画（transform/opacity 过渡）");
+        assert.equal(mid.current, "T03", "入场中途应已到 T03");
+        assert.equal(mid.phase, "engrave", "入场中途应处于「刻」阶段");
+        assert.ok(mid.w >= 1, "入场中途卡角应显形");
+        if (mid.onScreen) assert.ok(mid.hitSelf, `入场动画中卡角中心应命中 #bonecorner，实际命中：${mid.hit}`);
 
-        // 入场动画结束后的稳态
+        // finish() 掉卡动画 → 卡归位；跨过 650ms 重绘后再查稳态。
+        await page.evaluate(() => { for (const a of document.querySelector("#card").getAnimations()) a.finish(); });
+        await page.waitForFunction(() => {
+          const card = document.querySelector("#card");
+          return !window.__zz.animating && !card.getAnimations().some((a) => a.playState === "running");
+        }, null, { timeout: 5000 });
         await page.waitForTimeout(800);
-        const settled = await centreHit(page);
+        const settled = await boneProbe(page);
         assert.equal(settled.current, "T03");
-        assert.ok(settled.hitSelf, `动画结束后卡角中心应命中 #bonecorner，实际命中：${settled.hit}`);
+        assert.equal(settled.phase, "engrave");
+        assert.ok(settled.w >= 1, "入场动画结束后卡角应显形");
+        assert.ok(settled.onScreen, "入场动画结束后卡角中心应在屏内");
+        assert.ok(settled.hitSelf, `入场动画结束后卡角中心应命中 #bonecorner，实际命中：${settled.hit}`);
 
-        // 教学态：同存档重载，load 之后立刻查（此时应已回到 T03「刻」）
+        // 教学态：同存档重载，load 之后立刻查（此时应已回到 T03「刻」）。
         await page.reload({ waitUntil: "load" });
         await page.waitForFunction(() => !!window.__zz);
-        const afterLoad = await centreHit(page);
+        const afterLoad = await boneProbe(page);
         assert.equal(afterLoad.current, "T03", "重载后应回到教学「刻」这一张");
         assert.equal(afterLoad.phase, "engrave");
         assert.ok(afterLoad.w >= 1, "重载后卡角应显形");

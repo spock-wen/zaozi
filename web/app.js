@@ -676,22 +676,99 @@ function keyhelpHTML() {
     ["Esc", "关浮层"],
   ].map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
 }
+// 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
+// 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。
+function cardEntryBusy() {
+  return ui.animating || $("card").getAnimations().some((a) => a.playState === "running");
+}
+// 等卡入场动画结束：先等 rAF 阶段，再等 CSS 过渡跑完（Promise.all(finished)），
+// 过渡对象还没建好的一帧用一次 transitionend 兜底。
+function whenCardEntryDone() {
+  return new Promise((resolve) => {
+    const card = $("card");
+    const step = () => {
+      if (ui.animating) { requestAnimationFrame(step); return; }
+      const running = card.getAnimations().filter((a) => a.playState === "running");
+      if (!running.length) { resolve(); return; }
+      let fired = false;
+      const fin = () => { if (fired) return; fired = true; card.removeEventListener("transitionend", onEnd); step(); };
+      const onEnd = (e) => { if (e.target === card) fin(); };
+      card.addEventListener("transitionend", onEnd);
+      Promise.allSettled(running.map((a) => a.finished)).then(fin, fin);
+    };
+    step();
+  });
+}
+let keyhelpSettle = null;             // 入场中被隐去时挂的「稳住后再显形」等待
+function armKeyhelpReshow() {
+  if (keyhelpSettle) return;
+  keyhelpSettle = whenCardEntryDone().then(() => { keyhelpSettle = null; renderShort(); });
+}
+let keyhelpCloseT = 0;
+function scheduleKeyhelpClose() {
+  clearTimeout(keyhelpCloseT);
+  keyhelpCloseT = setTimeout(() => {
+    if (!ui.keyhelpOpen) return;
+    if (cardEntryBusy()) { scheduleKeyhelpClose(); return; }   // 入场中不收起：等它稳住再计时
+    ui.keyhelpOpen = false; renderShort();
+  }, 3000);
+}
+// 当前教学步要指的目标（落字 → 字匣；刻 → 卡角）；与占位气泡 placeCoach 用同一套映射。
+function keyhelpTargets() {
+  const els = [];
+  const bc = $("bonecorner");
+  if (bc && getComputedStyle(bc).display !== "none") els.push(bc);
+  const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
+  const step = card && isTutorialCard(card.id) ? tutorialStepOf(card.id) : null;
+  const sel = step && step.teach === "drop" ? "#wordbox-bar" : step && step.teach === "engrave" ? "#bonecorner" : null;
+  const t = sel ? document.querySelector(sel) : null;
+  if (t && t !== bc && !t.hidden && getComputedStyle(t).display !== "none") els.push(t);
+  return els;
+}
+// 浮层默认右上贴边；若与卡角「刻」或当前教学目标相交，就下移（再不行靠左）让开。
+function placeKeyhelp() {
+  const pop = $("keyhelp-pop");
+  pop.style.top = ""; pop.style.left = ""; pop.style.right = "";
+  const rects = keyhelpTargets().map((e) => e.getBoundingClientRect());
+  if (!rects.length) return;
+  const hits = () => {
+    const p = pop.getBoundingClientRect();
+    return rects.some((r) => Math.min(p.right, r.right) - Math.max(p.left, r.left) > 0 && Math.min(p.bottom, r.bottom) - Math.max(p.top, r.top) > 0);
+  };
+  if (!hits()) return;
+  const ph = pop.getBoundingClientRect().height;
+  const bottom = Math.max(...rects.map((r) => r.bottom));
+  pop.style.top = Math.max(8, Math.min(innerHeight - ph - 8, bottom + 8)) + "px";
+  if (!hits()) return;
+  pop.style.left = "8px"; pop.style.right = "auto";
+  if (!hits()) return;
+  pop.style.top = "8px";
+}
 function renderShort() {
   const tier = document.body.dataset.short || "";
   const showBtn = tier === "B" && keyboardMode();
   $("keyhelp-btn").dataset.show = showBtn ? "1" : "0";
   if (!showBtn) ui.keyhelpOpen = false;
   const pop = $("keyhelp-pop");
-  pop.hidden = !ui.keyhelpOpen;
-  if (ui.keyhelpOpen) pop.innerHTML = keyhelpHTML();
+  const busy = cardEntryBusy();
+  const wasHidden = pop.hidden;
+  pop.hidden = !ui.keyhelpOpen || busy;
+  if (ui.keyhelpOpen && !busy) {
+    pop.innerHTML = keyhelpHTML();
+    placeKeyhelp();
+    if (wasHidden) scheduleKeyhelpClose();        // 重新显形：自收计时从可见这一刻起算
+  } else if (ui.keyhelpOpen) {
+    armKeyhelpReshow();                            // 入场中：等卡稳住再显形
+  }
   $("too-short").hidden = !(document.body.dataset.view === "desktop" && innerHeight < 492);
 }
 function maybeAutoKeyhelp() {
   if (document.body.dataset.short !== "B" || !keyboardMode()) return;
   const key = KEYHELP_PREFIX + seed;
   try { if (localStorage.getItem(key) === "1") return; localStorage.setItem(key, "1"); } catch { return; }
-  ui.keyhelpOpen = true; renderShort();
-  setTimeout(() => { if (ui.keyhelpOpen) { ui.keyhelpOpen = false; renderShort(); } }, 3000);
+  ui.keyhelpOpen = true;
+  whenCardEntryDone().then(() => { if (ui.keyhelpOpen) renderShort(); });   // 卡还在入场就等它走完再弹
+  renderShort();
 }
 
 function render() {
@@ -755,7 +832,7 @@ function onUp() {
 function rebound() {
   const from = ui.dx;
   if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); return; }
-  ui.animating = true; const t0 = performance.now(), dur = 320;
+  ui.animating = true; renderShort(); const t0 = performance.now(), dur = 320;
   const tick = (t) => {
     const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
     ui.dx = from * (1 - e); cardEl().style.transform = `translateX(${ui.dx}px)`; renderDimsOnly();
@@ -765,7 +842,7 @@ function rebound() {
 }
 function flyOut(targetX, done) {
   if (reducedPref()) { cardEl().style.opacity = "0"; setTimeout(() => { cardEl().style.opacity = ""; done(); }, 120); return; }
-  ui.animating = true; const from = ui.dx, t0 = performance.now(), dur = 240, deg = Math.sign(targetX) * 18;
+  ui.animating = true; renderShort(); const from = ui.dx, t0 = performance.now(), dur = 240, deg = Math.sign(targetX) * 18;
   const tick = (t) => {
     const k = Math.min(1, (t - t0) / dur), e = k * k;
     ui.dx = from + (targetX - from) * e;
