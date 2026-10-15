@@ -6,9 +6,9 @@
 // 卡不动不提交；webkit 不发 cancel 也丢了 pointerup，卡粘在鼠标上，下一次随便一点就替玩家提交
 // 「选右」。修法：#card{user-select:none;-webkit-user-select:none}（卡内本来就没有需要选的文字）。
 //
-// 本用例：三引擎 × 1280×800 / 390×844 鼠标，在同一局里连拖三次：
+// 本用例（照测试基线）：三引擎 × 1280×800 / 390×844 鼠标，同一局里三轮、每轮三拖，全程不清选区：
 //   ① 从卡几何中心向左；② 再从卡几何中心向右；③ 从卡面图片中心向左。
-// 每次断言：拖到一半卡跟手、松手只提交一次且方向正确、松手后无 .dragging、
+// 每次断言：无未被阻止的原生 dragstart、无 pointercancel、拖到一半卡跟手、松手只提交一次且方向正确、松手后无 .dragging、
 // 拖与拖之间不点空白（保留可能的选区）；三拖后点一下卡外空白（#gen-line）不会多出提交
 // （无误提交「选右」）；最后断言每次拖完都没有残留选区。
 import { test, before, after } from "node:test";
@@ -61,19 +61,26 @@ async function prep(page, needArt) {
 
 for (const [engine] of Object.entries(ENGINES)) {
   for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
-    test(`${engine} ${vp.width} mouse: centre→centre→image drags each commit once, no stuck drag, no selection`, async () => {
+    test(`${engine} ${vp.width} mouse: 3 rounds of centre→centre→image drags each commit once, no stuck drag, no selection`, async () => {
       const ctx = await browsers[engine].newContext({ viewport: vp });
       const page = await ctx.newPage();
       const errs = [];
       collectErrors(page, errs);
       const sels = [];
       try {
+        // 记录原生 dragstart（是否被阻止）与 pointercancel：选区残留时浏览器会对 ARTICLE/IMG 起原生拖拽
+        await page.addInitScript(() => {
+          window.__ev = { dragstart: [], cancel: 0 };
+          addEventListener("dragstart", (e) => window.__ev.dragstart.push({ tag: e.target.nodeName || "#text", prevented: e.defaultPrevented }));
+          addEventListener("pointercancel", () => { window.__ev.cancel++; });
+        });
         await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
         await page.waitForFunction(() => !!window.__zz);
         await clearTutorial(page);
-        const plan = [["centre", "left"], ["centre", "right"], ["image", "left"]];
+        const round = [["centre", "left"], ["centre", "right"], ["image", "left"]];
+        const plan = [...round, ...round, ...round];  // 测试基线：三轮，全程不清选区
         for (const [i, [from, side]] of plan.entries()) {
-          const label = `第 ${i + 1} 拖（${from}→${side}）`;
+          const label = `第 ${Math.floor(i / 3) + 1} 轮第 ${(i % 3) + 1} 拖（${from}→${side}）`;
           await prep(page, from === "image");
           const card = await page.locator("#card").boundingBox();
           let x, y;
@@ -89,6 +96,9 @@ for (const [engine] of Object.entries(ENGINES)) {
           const mid = await cardDx(page);
           await page.mouse.move(x + dir * card.width * 0.5, y, { steps: 5 });
           await page.mouse.up();
+          const ev = await page.evaluate(() => { const e = window.__ev; const r = { ds: e.dragstart.filter((d) => !d.prevented), cancel: e.cancel }; e.dragstart = []; e.cancel = 0; return r; });
+          assert.deepEqual(ev.ds, [], `${label}：不应有未被阻止的原生 dragstart`);
+          assert.equal(ev.cancel, 0, `${label}：不应有 pointercancel`);
           assert.ok(mid * dir > 20, `${label}：拖到一半卡应跟手（translateX=${mid}）`);
           await page.waitForFunction((n) => !window.__zz.animating && window.__zz.actions.length > n, before.n, { timeout: 3000 })
             .catch(() => {});
@@ -105,7 +115,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.waitForTimeout(500);
         const end = await snap(page);
         assert.equal(end.n, n0, `三拖后点空白不应多出提交（误提交 ${JSON.stringify(end.last)}）`);
-        assert.deepEqual(sels, ["", "", ""], `每次拖完都不应留下选区：${JSON.stringify(sels)}`);
+        assert.deepEqual(sels, Array(plan.length).fill(""), `每次拖完都不应留下选区：${JSON.stringify(sels)}`);
         assert.deepEqual(errs, []);
       } finally {
         await ctx.close();
