@@ -468,10 +468,21 @@ function renderSide() {
   $("drawer-body").innerHTML = `<h3 style="color:#8a6a2a">字录 / 骨片 / 日志</h3>` + html;
 }
 
+// 生成结果没变就别重设 innerHTML：重设会把整块节点换掉，若恰落在「按下」与「抬起」之间，
+// 浏览器不会再合成 click，那一次点击就静默丢了（E2）。元素隐藏时清缓存，下次显示必定重建。
+const htmlCache = new WeakMap();
+function patchHTML(el, html) {
+  if (htmlCache.get(el) === html) return false;
+  htmlCache.set(el, html);
+  el.innerHTML = html;
+  return true;
+}
+function dropHTML(el) { htmlCache.delete(el); }
+
 function renderWinter() {
   const el = $("winter");
   el.hidden = st.phase !== "winter";
-  if (st.phase !== "winter") return;
+  if (st.phase !== "winter") { dropHTML(el); return; }
   const w = ui.winter;
   if (w.tally && !st.tallies.some((t) => t.id === w.tally)) ui.winter = freshWinter();
   const t = st.tallies.find((x) => x.id === ui.winter.tally);
@@ -491,8 +502,7 @@ function renderWinter() {
     h += `<div><button class="act" data-do="carve">刻（Enter）</button><button class="act" data-do="defer">留到明年</button></div>`;
   }
   h += `<hr><button class="act" data-do="end" id="winter-end">天亮了</button>`;
-  el.innerHTML = h;
-  if (t && CHARS[t.target].method === "xiangxing") drawTrace(t.target);
+  if (patchHTML(el, h) && t && CHARS[t.target].method === "xiangxing") drawTrace(t.target);
 }
 function drawTrace(target) {
   const el = $("xcv"); if (!el) return;
@@ -635,23 +645,23 @@ function shakeSlots() { const s = $("pick")?.querySelector(".pickslots"); if (!s
 function renderElder() {
   const el = $("elder");
   el.hidden = !(st.phase === "ended" && ui.elderShown);
-  if (el.hidden) return;
+  if (el.hidden) { dropHTML(el); return; }
   const n = st.generation ?? 1;
-  el.innerHTML = `<div class="card-e"><h1>${TUTORIAL.elder.header.replace("{n}", String(n))}</h1>
+  patchHTML(el, `<div class="card-e"><h1>${TUTORIAL.elder.header.replace("{n}", String(n))}</h1>
     <p><b>${TUTORIAL.elder.title}</b></p><p>${TUTORIAL.elder.body}</p>
-    <div class="btnrow"><button class="act primary" data-do="heir">${TUTORIAL.elder.button_next.replace("{n}", String(n + 1))}</button></div></div>`;
+    <div class="btnrow"><button class="act primary" data-do="heir">${TUTORIAL.elder.button_next.replace("{n}", String(n + 1))}</button></div></div>`);
 }
 function renderEnded() {
   const el = $("endseq");
   const pending = ui.bannerQueue.length > 0 || ui.bannerOn;   // 达成横幅先出，不能与结局重叠（A9）
   const show = st.phase === "ended" && !ui.elderShown && !pending;
   el.hidden = !show;
-  if (!show) return;
+  if (!show) { dropHTML(el); return; }
   const e = st.ending, L = st.legacy;
-  el.innerHTML = `<div class="card-e"><h1>${e.name}</h1><p>${e.kind === "good" ? "这一代平安走完。" : "这一代没撑住。"}</p>
+  patchHTML(el, `<div class="card-e"><h1>${e.name}</h1><p>${e.kind === "good" ? "这一代平安走完。" : "这一代没撑住。"}</p>
     <p>${DIMS.map((k) => `${DIMNAME[k]} ${st.dims[k]}`).join(" · ")} · 骨片 ${st.bones}</p>
     <p>传下字录：${L ? L.zilu.join(" ") : "—"} · 传下事签：${L?.carriedTally ? L.carriedTally.id : "无"}</p>
-    <div class="btnrow"><button class="act primary" data-do="elder">先人</button></div></div>`;
+    <div class="btnrow"><button class="act primary" data-do="elder">先人</button></div></div>`);
   if (pending) deferInteract(el, 400);
 }
 
