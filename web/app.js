@@ -409,6 +409,16 @@ function renderCoach() {
   patchHTML(el, text);
   if (desktop && document.body.dataset.short) placeCoach(step);
 }
+// 目标若在 #card 内（#bonecorner / #card-drops），卡可能正处入场过渡（.card 的 transform 160ms）
+// 或拖拽中——此时 getBoundingClientRect 读到的是被 transform 挪走的盒（T03 #coach 曾因此偏 ~190px，
+// 直到下一次 render 才被纠正）。改用不被变换影响的 #cardwrap 视口盒 + 目标相对卡的 offset*，
+// 得到「未变换」的视口矩形。.card 填满 #cardwrap，故卡槽的 left/top 即卡的 left/top。
+function targetRect(el) {
+  if (!el.closest("#card")) return el.getBoundingClientRect();
+  const cw = $("cardwrap").getBoundingClientRect();
+  const left = cw.left + el.offsetLeft, top = cw.top + el.offsetTop;
+  return { left, top, right: left + el.offsetWidth, bottom: top + el.offsetHeight, width: el.offsetWidth, height: el.offsetHeight };
+}
 // 矮屏教学气泡：放在卡外侧的空沟里（默认右侧），不压卡、不压字匣、不压目标。
 // 竖向对齐目标（字匣提示 → 气泡底边 = 字匣底边；其余对齐目标/卡竖向中线）。
 function placeCoach(step) {
@@ -426,7 +436,8 @@ function placeCoach(step) {
   else { width = Math.min(MAXW, cb.width); left = cb.left - sb.left; el.style.fontSize = "13px"; }  // 两边都不够：垫到卡上方
   col.style.left = left + "px"; col.style.right = "auto"; col.style.width = width + "px";
   const sel = step.teach === "drop" ? "#wordbox-bar" : step.teach === "engrave" ? "#bonecorner" : null;
-  const tb = sel ? document.querySelector(sel)?.getBoundingClientRect() : null;
+  const tel = sel ? document.querySelector(sel) : null;
+  const tb = tel ? targetRect(tel) : null;
   const ref = tb || cb, h = el.getBoundingClientRect().height;
   let top = step.teach === "drop" && tb ? tb.bottom - h : ref.top + ref.height / 2 - h / 2;
   // 气泡在卡外侧（横向）会与同侧选项按钮重叠——「左右拖卡做选择」这些步的目标就落在选项上，
@@ -440,7 +451,7 @@ function placeCoach(step) {
 function slideClearOfTargets(top, h, vx, w) {
   const rects = [$("opt-left"), $("opt-right"), $("wordbox-bar"), $("card-drops"), $("bonecorner"), $("cardwrap")]
     .filter((e) => e && !e.hidden && getComputedStyle(e).display !== "none")
-    .map((e) => e.getBoundingClientRect())
+    .map((e) => targetRect(e))                 // 卡内目标也要取「未变换」矩形（同 placeCoach）
     .filter((r) => Math.min(vx + w, r.right) - Math.max(vx, r.left) > 0);
   const hits = (t) => rects.some((r) => Math.min(t + h, r.bottom) - Math.max(t, r.top) > 0);
   if (!hits(top)) return top;
@@ -829,7 +840,6 @@ function render() {
 
 // ---------- 拖卡 / 键盘 ----------
 const cardEl = () => $("card");
-function inCard(x, y) { const r = cardEl().getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }
 function threshold() { return DRAG_RATIO * cardEl().getBoundingClientRect().width; }
 
 function onDown(e) {
@@ -892,7 +902,10 @@ function flyOut(targetX, done) {
   };
   requestAnimationFrame(tick);
 }
-addEventListener("pointerdown", (e) => { if (inCard(e.clientX, e.clientY) && !e.target.closest("button")) onDown(e); });
+// 只在按下点真的落在 #card 内才起拖：按坐标判定会在「浮层盖住卡」时（#drawer-mask / #savedlg /
+// 菜单 / 目标面板…）也在卡上方起拖，onDown 的 setPointerCapture 把随后的 click 重定向到 #card，
+// 浮层自身的关闭点击就永远不触发（Firefox 390 触屏 6/6）。改用命中目标判定。
+addEventListener("pointerdown", (e) => { if (e.target.closest("#card") && !e.target.closest("button")) onDown(e); });
 addEventListener("pointermove", onMove);
 addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);

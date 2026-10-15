@@ -167,3 +167,83 @@ for (const engine of Object.keys(ENGINES)) {
     });
   }
 }
+
+// ---------- 追加：T03「刻」#coach 不被卡入场过渡带偏，「?」开/关 5 次也不挪位 ----------
+//
+// 根因（任务 FIX 2）：placeCoach 用 #bonecorner.getBoundingClientRect() 当刻字步的参考。#bonecorner
+// 在被 transform 的 #card 内，卡还在入场过渡（rotate/translate）时读到的是位移中的盒，#coach 会算到
+// ~190px 外（例：1024×513 下 top 265 而非 74），直到下一次 render（如关「?」）才被纠正——看起来像
+// 浮层把 #coach 挪了。修法：卡内目标改用 #cardwrap 视口盒 + 目标相对卡的 offset*（targetRect）。
+//
+// 用例：走到 T03「刻」并静置；起一段与入场同构的 #card transform 过渡，pause+currentTime 定格在
+// 中点，跑 render()，断言 #coach 矩形与稳定位一致（修复前会偏 ~190px）；让过渡 finish 后再断言
+// 一次。随后点「?」（#keyhelp-btn）开/关 ≥5 次，每次循环前后 #coach 矩形一致（±0.5px）。
+
+const render = (page) => page.evaluate(() => window.__zz.render());
+
+for (const engine of Object.keys(ENGINES)) {
+  for (const vp of VPS) {
+    test(`${engine} T03「刻」 ${vp.w}×${vp.h}: 卡入场过渡中点 #coach 仍在正确位，「?」开/关 5 次不挪位`, async () => {
+      const { ctx, page, errs } = await open(engine, vp);
+      try {
+        if (await page.evaluate(() => !document.querySelector("#keyhelp-pop").hidden)) {
+          await page.keyboard.press("Escape");
+          await page.waitForFunction(() => document.querySelector("#keyhelp-pop").hidden, null, { timeout: 5000 });
+        }
+        await waitEntryDone(page);
+        await commit(page, "left");                 // T01 → T02
+        await commit(page, "right");                // T02 → T03（锁拖，一进来就是「刻」）
+        await page.waitForFunction(() => window.__zz.st.phase === "engrave", null, { timeout: 5000 });
+        await waitEntryDone(page);
+        await waitCoachSettled(page);
+        const settled = (await geom(page)).cr;
+
+        // 起一段与入场同构的 #card transform 过渡，暂停并定格在中点。
+        await page.evaluate(() => { document.getElementById("card").style.transform = "translateX(190px) rotate(10deg)"; });
+        await page.waitForFunction(() => document.getElementById("card").getAnimations().some((a) => a.playState === "running"), null, { timeout: 5000 });
+        await page.evaluate(() => {
+          const card = document.getElementById("card");
+          for (const a of card.getAnimations()) { a.pause(); a.currentTime = (a.effect.getTiming().duration || 0) / 2; }
+        });
+        // 卡被 transform 定格在中点时跑 render()：#coach 必须仍落在稳定位（不得被位移中的 #bonecorner 带偏）。
+        await render(page);
+        const frozen = (await geom(page)).cr;
+        assert.ok(sameRect(frozen, settled), `卡入场过渡中点时 #coach 应与稳定位一致：settled=${JSON.stringify(settled)} frozen=${JSON.stringify(frozen)}`);
+
+        // 过渡跑到终点（#card 仍处变换终值）：#coach 仍应一致。
+        await page.evaluate(() => { document.getElementById("card").getAnimations().forEach((a) => a.finish()); });
+        await render(page);
+        const finished = (await geom(page)).cr;
+        assert.ok(sameRect(finished, settled), `入场过渡跑完时 #coach 应与稳定位一致：settled=${JSON.stringify(settled)} finished=${JSON.stringify(finished)}`);
+
+        // 复原卡（清掉内联 transform）回到稳定态。
+        await page.evaluate(() => {
+          const card = document.getElementById("card");
+          card.getAnimations().forEach((a) => a.cancel());
+          card.style.transform = "";
+        });
+        await waitEntryDone(page);
+        await waitCoachSettled(page);
+        const restored = (await geom(page)).cr;
+        assert.ok(sameRect(restored, settled), `复原后 #coach 应回到稳定位：settled=${JSON.stringify(settled)} restored=${JSON.stringify(restored)}`);
+
+        // 「?」开/关 ≥5 次：#coach 矩形每次循环前后一致（±0.5px）。
+        for (let i = 0; i < 5; i++) {
+          const before = (await geom(page)).cr;
+          await page.click("#keyhelp-btn");
+          await page.waitForFunction(() => !document.querySelector("#keyhelp-pop").hidden, null, { timeout: 5000 });
+          await page.waitForTimeout(60);
+          await page.click("#keyhelp-btn");
+          await page.waitForFunction(() => document.querySelector("#keyhelp-pop").hidden, null, { timeout: 5000 });
+          await page.waitForTimeout(60);
+          const after = (await geom(page)).cr;
+          assert.ok(sameRect(after, before), `第 ${i + 1} 次「?」开/关后 #coach 不应挪位：before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
+        }
+
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}

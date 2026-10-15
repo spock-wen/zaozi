@@ -382,3 +382,121 @@ test("chromium 390 touch(CDP): down/up 间 render() 不丢点击（字匣落字/
     await ctx.close();
   }
 });
+
+// ---------- ⑤ 浮层盖在卡上时，点浮层的关闭点击不能被「按坐标起拖」吞掉 ----------
+//
+// 根因（任务 FIX 1）：全局 pointerdown 用 inCard(clientX,clientY) 判定是否起拖。#drawer-mask /
+// #savedlg 背景 / 菜单 / 目标面板这些盖住卡的浮层，点它们（坐标仍落在卡矩形内）会被当成拖卡：
+// onDown 里 cardEl().setPointerCapture 把随后的 click 重定向到 #card，浮层自身的关闭永不触发
+// （Firefox 390 触屏遮罩中心 6/6 失效）。修法：仅当 e.target.closest("#card") 时才起拖。
+//
+// 覆盖：390×844 触屏 与 390×844 鼠标，各三引擎。抽屉经 #wb-handle 打开，点遮罩中心（卡正上方）
+// 与 (10,10)，各测 plain 与「down/up 之间 render()」；触屏的 down/up 间 render 用 chromium
+// CDP（touchStart→render→touchEnd），其余引擎无 CDP，用一次鼠标等价复核。另覆盖其它「点浮层/
+// 点外面」关闭的浮层：存档弹层背景、菜单外点、目标面板「点暗处关」。
+
+async function pressAt(page, cdp, how, x, y, between = false) {
+  if (how === "mouse") {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    if (between) await render(page);
+    await page.mouse.up();
+  } else if (how === "cdp") {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id: 1 }] });
+    if (between) await render(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } else if (how === "tap") {
+    if (between) throw new Error("tap 无法在 down/up 间插入 render");
+    await page.touchscreen.tap(x, y);
+  } else throw new Error("unknown how " + how);
+}
+
+const waitHidden = async (page, id) => {
+  try { await page.waitForFunction((i) => document.getElementById(i).hidden, id, { timeout: 3000 }); return true; }
+  catch { return false; }
+};
+
+// 抽屉：每种按法 × 两个点（中心=卡正上方、左上角）都要能关掉。
+async function checkDrawerCloses(page, presses) {
+  for (const [px, py] of [[195, 422], [10, 10]]) {
+    for (const p of presses) {
+      await page.evaluate(() => { document.getElementById("drawer").hidden = true; });
+      await page.locator("#wb-handle").click();
+      await page.waitForFunction(() => !document.getElementById("drawer").hidden, null, { timeout: 3000 });
+      await pressAt(page, p.cdp || null, p.how, px, py, !!p.between);
+      assert.ok(await waitHidden(page, "drawer"), `抽屉遮罩 (${px},${py}) how=${p.how} between=${!!p.between} 应被关闭`);
+    }
+  }
+}
+
+// 其余「点浮层/点外面」关闭：菜单外点、目标面板暗处、存档弹层背景（e.target === #savedlg）。
+async function checkOtherOverlaysClose(page, how, cdp) {
+  const press = (x, y) => pressAt(page, cdp || null, how, x, y, false);
+
+  await page.locator("#menubtn").click();
+  await page.waitForFunction(() => !document.getElementById("menu-pop").hidden, null, { timeout: 3000 });
+  await press(195, 422);                              // 卡上（菜单之外）
+  assert.ok(await waitHidden(page, "menu-pop"), "菜单应被「点外面」关闭");
+  await settle(page);
+
+  await page.locator("#goals-slip").click();
+  await page.waitForFunction(() => !document.getElementById("goals-panel").hidden, null, { timeout: 3000 });
+  await page.waitForTimeout(50);                      // closer 在 setTimeout(0) 里挂上
+  await press(195, 520);                              // 面板下方，仍在卡上
+  assert.ok(await waitHidden(page, "goals-panel"), "目标面板应被「点暗处」关闭");
+  await settle(page);
+
+  await page.locator("#menubtn").click();
+  await page.waitForFunction(() => !document.getElementById("menu-pop").hidden, null, { timeout: 3000 });
+  await page.locator('#menu-pop [data-menu="export"]').click();
+  await page.waitForFunction(() => !document.getElementById("savedlg").hidden, null, { timeout: 3000 });
+  const bp = await page.evaluate(() => {              // 卡矩形内、只命中 #savedlg 背景的点
+    const dl = document.getElementById("savedlg");
+    const c = document.getElementById("card").getBoundingClientRect();
+    for (let y = Math.round(Math.max(2, c.top + 2)); y < Math.min(innerHeight - 2, c.bottom - 2); y += 5)
+      for (let x = Math.round(Math.max(2, c.left + 2)); x < Math.min(innerWidth - 2, c.right - 2); x += 5)
+        if (document.elementFromPoint(x, y) === dl) return { x, y };
+    return null;
+  });
+  assert.ok(bp, "应在卡矩形内找到只命中 #savedlg 背景的点");
+  await press(bp.x, bp.y);
+  assert.ok(await waitHidden(page, "savedlg"), "存档弹层应被「点背景」关闭");
+}
+
+for (const engine of Object.keys(ENGINES)) {
+  test(`${engine} 390 鼠标：浮层盖住卡时「点浮层/点外面」不被起拖吞掉`, async () => {
+    const ctx = await browsers[engine].newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    const errs = []; collectErrors(page, errs);
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz);
+      await settle(page);
+      await checkDrawerCloses(page, [{ how: "mouse" }, { how: "mouse", between: true }]);
+      await checkOtherOverlaysClose(page, "mouse", null);
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+}
+
+for (const engine of Object.keys(ENGINES)) {
+  test(`${engine} 390 触屏：浮层盖住卡时「点浮层/点外面」不被起拖吞掉`, async () => {
+    const ctx = await browsers[engine].newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+    const page = await ctx.newPage();
+    const errs = []; collectErrors(page, errs);
+    const isChromium = engine === "chromium";
+    const cdp = isChromium ? await ctx.newCDPSession(page) : null;
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz);
+      await settle(page);
+      // chromium：真触屏（CDP 可插 render）；其余引擎：合成 tap + 一次鼠标的 down/up 间 render 等价复核。
+      const presses = isChromium
+        ? [{ how: "cdp", cdp }, { how: "cdp", cdp, between: true }]
+        : [{ how: "tap" }, { how: "mouse", between: true }];
+      await checkDrawerCloses(page, presses);
+      await checkOtherOverlaysClose(page, "tap", null);
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+}
