@@ -79,3 +79,4 @@
 49. Round 20 (frozen): drawer mask pointer-capture fix + coach untransformed ref; VERSION 63bade20c0e3.
 50. Round 21: card <img> draggable=false (mouse drag from card art), e2e card_img_drag; VERSION 72e2a899e2b1; e2e 278/278.
 51. Round 22: #card user-select:none (leftover selection broke next drag; webkit spurious commit), e2e card_select_drag 3 rounds; VERSION 427bd7d950e9; e2e 284/284.
+52. Round 23: #card dragstart preventDefault + clear selection when a mouse card drag starts; e2e card_outside_select_drag; VERSION c4b6a44e4c2f; e2e 308/308.

@@ -11,9 +11,9 @@
 //   (a) 从卡下提示行 #gesture-hint 按下，斜划进卡里松手，再从卡面图片向左拖卡；
 //   (b) 从顶栏 #gen-line 按下，拖选进卡里松手，再从卡中心向左拖卡；
 //   (c) Ctrl+A 全选（Linux/Windows 的全选键；webkit 在 Linux 上 Meta+A 不是全选），再从卡面图片向左拖卡。
-// 每个场景断言：拖到一半卡跟手、松手恰好提交一次且为「选左」、无 .dragging 残留、
+// 每个场景断言（拖卡这一下）：无原生 dragstart、无 pointercancel、拖到一半卡跟手、松手恰好提交一次且为「选左」、无 .dragging 残留、无选区残留，
 // 之后在卡外空白点一下不多出提交。另：按钮仍能点（#opt-left/#opt-right 各提交一次、菜单能开），
-// 致谢页文字仍可选（三击标题、拖选段落都有选区）。
+// 致谢页文字仍可选（三击标题、拖选段落、Ctrl+A 全选都有选区）。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
@@ -60,6 +60,12 @@ async function openAtCard(engine, vp) {
   await page.evaluate((c) => window.__zz.importCode(c), CODE);
   await page.waitForFunction(() => window.__zz.st.phase === "card" && !window.__zz.animating);
   await page.waitForTimeout(600);
+  // 记录原生 dragstart（含是否被阻止）与 pointercancel
+  await page.evaluate(() => {
+    window.__ev = { dragstart: [], cancel: 0 };
+    addEventListener("dragstart", (e) => window.__ev.dragstart.push({ tag: e.target.nodeName, prevented: e.defaultPrevented }));
+    addEventListener("pointercancel", () => { window.__ev.cancel++; });
+  });
   return { ctx, page, errs };
 }
 
@@ -78,6 +84,7 @@ async function dragLeftAndCheck(page, label, from) {
   if (from === "image") { const r = await rectOf(page, "#card-art img"); x = r.x + r.w / 2; y = r.y + r.h / 2; }
   else { x = card.x + card.w / 2; y = card.y + card.h / 2; }
   const n0 = await nActs(page);
+  await page.evaluate(() => { window.__ev.dragstart = []; window.__ev.cancel = 0; });  // 只看拖卡这一下
   await page.mouse.move(x, y);
   await page.mouse.down();
   for (let k = 1; k <= 6; k++) { await page.mouse.move(x - card.w * 0.27 * k / 6, y); await page.waitForTimeout(16); }
@@ -88,14 +95,19 @@ async function dragLeftAndCheck(page, label, from) {
   await page.waitForTimeout(300);
   const stuck = await page.locator("#card").evaluate((el) => el.classList.contains("dragging"));
   const n1 = await nActs(page), last = await lastAct(page);
+  const ev = await page.evaluate(() => window.__ev);
+  const sel = await page.evaluate(() => { const s = getSelection(); return s && s.rangeCount && !s.isCollapsed ? (String(s).slice(0, 30) || "<非文本选区>") : ""; });
   // 卡外空白点一下（顶栏代数行）：粘卡时这一下会误提交
   await page.locator("#gen-line").click();
   await page.waitForTimeout(600);
   const n2 = await nActs(page);
+  assert.deepEqual(ev.dragstart, [], `${label}：拖卡时不应触发原生 dragstart`);
+  assert.equal(ev.cancel, 0, `${label}：拖卡时不应有 pointercancel`);
   assert.ok(mid < -20, `${label}：拖到一半卡应跟手（translateX=${mid}）`);
   assert.equal(n1, n0 + 1, `${label}：松手应恰好提交一次（${n0}→${n1}）`);
   assert.equal(last?.side, "left", `${label}：应提交「选左」（实际 ${JSON.stringify(last)}）`);
   assert.ok(!stuck, `${label}：松手后不应残留 .dragging`);
+  assert.equal(sel, "", `${label}：拖卡后不应残留选区（${JSON.stringify(sel)}）`);
   assert.equal(n2, n1, `${label}：之后点空白不应多出提交（误提交 ${JSON.stringify(await lastAct(page))}）`);
 }
 
@@ -158,7 +170,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     } finally { await ctx.close(); }
   });
 
-  test(`${engine} credits page text is still selectable (triple-click title, drag-select)`, async () => {
+  test(`${engine} credits page text is still selectable (triple-click title, drag-select, Ctrl+A)`, async () => {
     const ctx = await browsers[engine].newContext({ viewport: { width: 1280, height: 800 } });
     const page = await ctx.newPage();
     try {
@@ -172,6 +184,11 @@ for (const [engine] of Object.entries(ENGINES)) {
       await slide(page, p.x + 2, p.y + p.h / 2, p.x + Math.min(p.w, 300) - 2, p.y + p.h / 2, 8);
       const s2 = await page.evaluate(() => String(getSelection()).trim());
       assert.ok(s2.length > 0, "拖选段落应选中文字");
+      await page.evaluate(() => getSelection().removeAllRanges());
+      await page.mouse.click(5, 5);
+      await page.keyboard.press("Control+A");
+      const s3 = await page.evaluate(() => String(getSelection()).trim().length);
+      assert.ok(s3 > s2.length, `Ctrl+A 应全选致谢页（选中 ${s3} 字）`);
     } finally { await ctx.close(); }
   });
 }
