@@ -182,7 +182,7 @@ function loadGlyphs() {
   }).catch((e) => toast("字形包没加载上：" + e.message));
 }
 const glyphURL = (ch) => GLYPH[CHARS[ch]?.glyph_id] || "";
-const gimg = (ch) => (glyphURL(ch) ? `<img src="${glyphURL(ch)}" alt="${ch}" loading="lazy">` : `<span>${ch}</span>`);
+const gimg = (ch) => (glyphURL(ch) ? `<img src="${glyphURL(ch)}" alt="${ch}" loading="lazy" draggable="false">` : `<span>${ch}</span>`);
 function artHTML(card) {
   const art = CARD_ART.cards[card.id]; if (!art) return "";
   const b = CARD_ART.base;

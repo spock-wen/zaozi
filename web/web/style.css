@@ -133,6 +133,8 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
   display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--paper-200);
 }
 .slot img{width:30px;height:30px;background:var(--paper-100);border-radius:4px;}
+/* 工程审核 P2-12：字匣字形小图不许原生拖拽 */
+#wordbox img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
 .slot.ok{border-color:var(--gold-400);box-shadow:0 0 0 2px rgba(216,180,106,.5);animation:breathe 1200ms ease-in-out 2;}
 .slot.used{opacity:.35;text-decoration:line-through;}
 @keyframes breathe{0%,100%{box-shadow:0 0 0 2px rgba(216,180,106,.25)}50%{box-shadow:0 0 0 3px rgba(216,180,106,.8)}}
