@@ -725,24 +725,46 @@ function keyhelpTargets() {
   if (t && t !== bc && !t.hidden && getComputedStyle(t).display !== "none") els.push(t);
   return els;
 }
-// 浮层默认右上贴边；若与卡角「刻」或当前教学目标相交，就下移（再不行靠左）让开。
+// 浮层默认右上贴边；与任何「要避让的框」相交时就换位。要避让的框 = 卡角「刻」+ 当前教学目标
+// （落字→字匣、刻→卡角）+ 教学气泡 #coach + 左右选项 + 矮屏提示：这些都不能被浮层压住
+// （#coach 是 PM 决定 T03「刻」必须让开的；左右选项是 BREAKPOINTS「点击目标不被盖住」硬规则）。
+// 候选位置按 右上（CSS 默认）→右下方→左下方→右上/左上→上方 依次挑，取第一个整块落在视口内、
+// 且不与任何框相交的位置。整屏都放不下时，才隐去 #coach 让位（唯一允许的第二选择，关闭时还原）。
 function placeKeyhelp() {
   const pop = $("keyhelp-pop");
+  const coach = $("coach");
+  if (coach) coach.style.visibility = "";                 // 每次重排先还原上次让位时隐去的 #coach
   pop.style.top = ""; pop.style.left = ""; pop.style.right = "";
-  const rects = keyhelpTargets().map((e) => e.getBoundingClientRect());
-  if (!rects.length) return;
-  const hits = () => {
-    const p = pop.getBoundingClientRect();
-    return rects.some((r) => Math.min(p.right, r.right) - Math.max(p.left, r.left) > 0 && Math.min(p.bottom, r.bottom) - Math.max(p.top, r.top) > 0);
+  const shown = (e) => !!e && !e.hidden && e.getBoundingClientRect().width > 0
+    && getComputedStyle(e).display !== "none" && getComputedStyle(e).visibility !== "hidden";
+  const items = keyhelpTargets().map((e) => ({ e, r: e.getBoundingClientRect() }));
+  for (const sel of ["opt-left", "opt-right", "too-short", "coach"]) {
+    const e = $(sel);
+    if (shown(e)) items.push({ e, r: e.getBoundingClientRect() });
+  }
+  if (!items.length) return;                              // 没有要避让的框：保持 CSS 默认位
+  const d = pop.getBoundingClientRect();
+  const pw = d.width, ph = d.height, M = 8, VW = innerWidth, VH = innerHeight;
+  if (pw <= 0 || ph <= 0) return;
+  const inter = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0;
+  const pick = (rs) => {
+    const xr = VW - M - pw, xl = M;
+    const below = Math.max(0, ...rs.map((r) => r.bottom)) + M;
+    const above = Math.min(...rs.map((r) => r.top)) - M - ph;
+    const cands = [[d.left, d.top], [xr, below], [xl, below], [xr, d.top], [xl, d.top], [xr, above], [xl, above]];
+    for (const [l, t] of cands) {
+      if (l < M - 0.5 || t < M - 0.5 || l + pw > VW - M + 0.5 || t + ph > VH - M + 0.5) continue;
+      const box = { left: l, top: t, right: l + pw, bottom: t + ph };
+      if (!rs.some((r) => inter(box, r))) return [l, t];
+    }
+    return null;
   };
-  if (!hits()) return;
-  const ph = pop.getBoundingClientRect().height;
-  const bottom = Math.max(...rects.map((r) => r.bottom));
-  pop.style.top = Math.max(8, Math.min(innerHeight - ph - 8, bottom + 8)) + "px";
-  if (!hits()) return;
-  pop.style.left = "8px"; pop.style.right = "auto";
-  if (!hits()) return;
-  pop.style.top = "8px";
+  let pos = pick(items.map((i) => i.r));
+  if (!pos && coach) {                                    // 全屏都放不下：隐去 #coach 让位（唯一允许的第二选择）
+    coach.style.visibility = "hidden";
+    pos = pick(items.filter((i) => i.e !== coach).map((i) => i.r));
+  }
+  if (pos) { pop.style.left = pos[0] + "px"; pop.style.right = "auto"; pop.style.top = pos[1] + "px"; }
 }
 function renderShort() {
   const tier = document.body.dataset.short || "";
@@ -757,8 +779,10 @@ function renderShort() {
     pop.innerHTML = keyhelpHTML();
     placeKeyhelp();
     if (wasHidden) scheduleKeyhelpClose();        // 重新显形：自收计时从可见这一刻起算
-  } else if (ui.keyhelpOpen) {
-    armKeyhelpReshow();                            // 入场中：等卡稳住再显形
+  } else {
+    const coach = $("coach");
+    if (coach) coach.style.visibility = "";        // 浮层收起（或入场中临时隐去）：还原被让位隐去的 #coach
+    if (ui.keyhelpOpen) armKeyhelpReshow();        // 入场中：等卡稳住再显形
   }
   $("too-short").hidden = !(document.body.dataset.view === "desktop" && innerHeight < 492);
 }
