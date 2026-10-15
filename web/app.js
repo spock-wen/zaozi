@@ -845,6 +845,9 @@ function threshold() { return DRAG_RATIO * cardEl().getBoundingClientRect().widt
 function onDown(e) {
   if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
   if (st.phase !== "card" || ui.animating) return;
+  // 真正起拖时才清掉页面上已有的文字选区（鼠标）：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
+  // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
+  if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
   ui.dragging = true; ui.dragged = false; ui.startX = e.clientX;
   cardEl().classList.add("dragging");
   cardEl().setPointerCapture?.(e.pointerId);
@@ -906,6 +909,8 @@ function flyOut(targetX, done) {
 // 菜单 / 目标面板…）也在卡上方起拖，onDown 的 setPointerCapture 把随后的 click 重定向到 #card，
 // 浮层自身的关闭点击就永远不触发（Firefox 390 触屏 6/6）。改用命中目标判定。
 addEventListener("pointerdown", (e) => { if (e.target.closest("#card") && !e.target.closest("button")) onDown(e); });
+// 卡上不许原生拖拽（图片 / 选中内容）：dragstart 一律拦掉，否则 webkit 丢 pointerup 粘卡、其他引擎 pointercancel。
+cardEl().addEventListener("dragstart", (e) => e.preventDefault());
 addEventListener("pointermove", onMove);
 addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);
