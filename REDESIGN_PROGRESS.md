@@ -76,3 +76,4 @@
 46. Round 18 gate: 3× full e2e.
 47. Round 19: E2 whole-class patchHTML audit + E3 ending every generation; VERSION c84e0eb2102a.
 48. Round 19 gate: rr.mjs 0 swallowed; 3× full e2e.
+49. Round 20 (frozen): drawer mask pointer-capture fix + coach untransformed ref; VERSION 63bade20c0e3.
