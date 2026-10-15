@@ -190,7 +190,7 @@ function artHTML(card) {
     `<source media="(min-width:1024px)" type="image/webp" srcset="${b}${art}_d@1x.webp 1x, ${b}${art}_d@2x.webp 2x">` +
     `<source media="(min-width:1024px)" type="image/png" srcset="${b}${art}_d@1x.png 1x, ${b}${art}_d@2x.png 2x">` +
     `<source type="image/webp" srcset="${b}${art}_m@1x.webp 1x, ${b}${art}_m@2x.webp 2x">` +
-    `<img src="${b}${art}_m@1x.png" alt="" width="296" height="216" decoding="async"></picture>`;
+    `<img src="${b}${art}_m@1x.png" alt="" width="296" height="216" decoding="async" draggable="false"></picture>`;
 }
 
 // ---------- 交互助手 ----------
