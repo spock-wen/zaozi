@@ -319,14 +319,14 @@ function renderGoalSlip() {
   const desktopExpanded = document.body.dataset.view === "desktop" && !$("sidebar").classList.contains("collapsed");
   const show = st.phase !== "ended" && st.phase !== "pick" && gs.length > 0 && !desktopExpanded;
   slip.hidden = !show;
-  if (!show) return;
-  slip.innerHTML = `目标 ${gs.map((g) => `<i class="gdot${g.achieved ? " on" : ""}"></i>`).join("")}`;
+  if (!show) { dropHTML(slip); return; }
+  patchHTML(slip, `目标 ${gs.map((g) => `<i class="gdot${g.achieved ? " on" : ""}"></i>`).join("")}`);
 }
 function renderGoalPanel() {
   const p = $("goals-panel");
   p.hidden = !ui.panelOpen;
-  if (!ui.panelOpen) return;
-  p.innerHTML = goalsState().map((g) => `<div class="goal${g.achieved ? " on" : ""}"><span class="mk">${g.achieved ? "◆" : "◇"}</span><span>${g.text}</span></div>`).join("");
+  if (!ui.panelOpen) { dropHTML(p); return; }
+  patchHTML(p, goalsState().map((g) => `<div class="goal${g.achieved ? " on" : ""}"><span class="mk">${g.achieved ? "◆" : "◇"}</span><span>${g.text}</span></div>`).join(""));
 }
 function syncGoalEvents() {
   const ev = st.goalEvents || [];
@@ -357,8 +357,9 @@ function renderCard() {
   $("stage").hidden = false;
   if (!canCard) { return; }
   const c = curCard();
-  $("card-art").innerHTML = artHTML(c);
-  $("card-art").hidden = !artHTML(c);
+  const art = artHTML(c);
+  patchHTML($("card-art"), art);
+  $("card-art").hidden = !art;
   $("card-season").textContent = SEASON[c.season];
   $("card-speaker").textContent = c.speaker;
   $("card-title").textContent = c.title || "";
@@ -371,12 +372,13 @@ function renderCard() {
   const drops = $("card-drops");
   if (st.phase === "engrave") {
     drops.hidden = false;
-    drops.innerHTML = `卡上出现一道迹：${st.pendingTrace.tally_text} <button class="act" data-do="skip" style="margin-left:8px">先不刻</button>`;
+    patchHTML(drops, `卡上出现一道迹：${st.pendingTrace.tally_text} <button class="act" data-do="skip" style="margin-left:8px">先不刻</button>`);
   } else if (c.drops && c.drops.length) {
     const d = c.drops.filter((x) => st.wordBox.includes(x.char))[0];
     drops.hidden = !d;
-    drops.innerHTML = d ? `可落字：<b>${d.char}</b> <span class="chiplink">点字匣里的它</span>` : "";
-  } else { drops.hidden = true; }
+    if (d) patchHTML(drops, `可落字：<b>${d.char}</b> <span class="chiplink">点字匣里的它</span>`);
+    else dropHTML(drops);
+  } else { drops.hidden = true; dropHTML(drops); }
   // 左右选项
   const ol = $("opt-left"), or = $("opt-right");
   const showOpts = document.body.dataset.view === "desktop" || document.body.dataset.view === "tablet-landscape";
@@ -400,11 +402,11 @@ function renderCoach() {
   el.style.fontSize = "";
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
   const step = card && isTutorialCard(card.id) ? tutorialStepOf(card.id) : null;
-  if (!step) { el.hidden = true; return; }
+  if (!step) { el.hidden = true; dropHTML(el); return; }
   el.hidden = false;
   const desktop = document.body.dataset.view === "desktop";
   const text = desktop && step.coach_desktop ? step.coach_desktop : step.coach;
-  el.innerHTML = text;
+  patchHTML(el, text);
   if (desktop && document.body.dataset.short) placeCoach(step);
 }
 // 矮屏教学气泡：放在卡外侧的空沟里（默认右侧），不压卡、不压字匣、不压目标。
@@ -446,12 +448,12 @@ function slideClearOfTargets(top, h, vx, w) {
   return top;
 }
 function renderWordbox() {
-  $("wordbox").innerHTML = st.wordBox.map((ch, i) => {
+  patchHTML($("wordbox"), st.wordBox.map((ch, i) => {
     const used = st.dropped.includes(ch);
     const card = (st.phase === "card") ? curCard() : null;
     const ok = card && !used && usable(ch) && card.drops.some((d) => d.char === ch);
     return `<button class="slot ${ok ? "ok" : ""} ${used ? "used" : ""}" data-slot="${i}" ${st.phase !== "card" ? "disabled" : ""}>${gimg(ch)}<span>${i + 1}·${ch}${used ? " · 已落" : ""}</span></button>`;
-  }).join("");
+  }).join(""));
 }
 function sideHTML() {
   const zl = st.zilu.map((c) => `<span class="zl ${st.newThisGen.includes(c) ? "new" : ""}">${gimg(c)}${c}${(st.clues[c] || []).map((x) => `<small>${x}</small>`).join("")}</span>`).join("");
@@ -464,8 +466,8 @@ function sideHTML() {
 }
 function renderSide() {
   const html = sideHTML();
-  $("sidebar-body").innerHTML = html;
-  $("drawer-body").innerHTML = `<h3 style="color:#8a6a2a">字录 / 骨片 / 日志</h3>` + html;
+  patchHTML($("sidebar-body"), html);
+  patchHTML($("drawer-body"), `<h3 style="color:#8a6a2a">字录 / 骨片 / 日志</h3>` + html);
 }
 
 // 生成结果没变就别重设 innerHTML：重设会把整块节点换掉，若恰落在「按下」与「抬起」之间，
@@ -623,7 +625,7 @@ function pickInfoHTML(ch) {
 function updatePickInfo() {
   const el = $("pick"); if (!el) return;
   const desc = el.querySelector("#pick-desc");
-  if (desc) desc.innerHTML = ui.pickFocus ? pickInfoHTML(ui.pickFocus) : "";
+  if (desc) patchHTML(desc, ui.pickFocus ? pickInfoHTML(ui.pickFocus) : "");
   el.querySelectorAll(".cand").forEach((c) => c.classList.toggle("focus", c.dataset.char === ui.pickFocus));
 }
 // gf5 ①②③：第一次点只看说明；同一字再点一次选中；已选字（或格内字）点一下放回。
@@ -786,10 +788,11 @@ function renderShort() {
   const wasHidden = pop.hidden;
   pop.hidden = !ui.keyhelpOpen || busy;
   if (ui.keyhelpOpen && !busy) {
-    pop.innerHTML = keyhelpHTML();
+    patchHTML(pop, keyhelpHTML());
     placeKeyhelp();
     if (wasHidden) scheduleKeyhelpClose();        // 重新显形：自收计时从可见这一刻起算
   } else {
+    dropHTML(pop);
     const coach = $("coach");
     if (coach) coach.style.visibility = "";        // 浮层收起（或入场中临时隐去）：还原被让位隐去的 #coach
     if (ui.keyhelpOpen) armKeyhelpReshow();        // 入场中：等卡稳住再显形
@@ -809,7 +812,7 @@ function render() {
   syncGoalEvents();
   renderTopbar();
   const d = dimsHTML();
-  $("dims").innerHTML = d; $("dims-desktop").innerHTML = d;
+  patchHTML($("dims"), d); patchHTML($("dims-desktop"), d);
   renderCard();
   renderWordbox();
   renderCoach();
@@ -847,7 +850,7 @@ function applyTilt() {
   const deg = Math.max(-15, Math.min(15, (ui.dx / r.width) * 15));
   cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg}deg)`;
 }
-function renderDimsOnly() { const d = dimsHTML(); $("dims").innerHTML = d; $("dims-desktop").innerHTML = d; const s = previewSide(); $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
+function renderDimsOnly() { const d = dimsHTML(); patchHTML($("dims"), d); patchHTML($("dims-desktop"), d); const s = previewSide(); $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
 function onUp() {
   if (!ui.dragging) return;
   clearTimeout(ui.holdT);
@@ -941,8 +944,8 @@ on($("keyhelp-btn"), () => { ui.keyhelpOpen = !ui.keyhelpOpen; renderShort(); })
 on($("menubtn"), () => { ui.menuOpen = !ui.menuOpen; renderMenu(); });
 function renderMenu() {
   const m = $("menu-pop"); m.hidden = !ui.menuOpen; $("menubtn").setAttribute("aria-expanded", String(ui.menuOpen));
-  if (!ui.menuOpen) return;
-  m.innerHTML =
+  if (!ui.menuOpen) { dropHTML(m); return; }
+  patchHTML(m,
     `<div class="grp">存档</div>` +
     `<button data-menu="export">导出存档码</button>` +
     `<button data-menu="import">导入存档码</button>` +
@@ -951,7 +954,7 @@ function renderMenu() {
     `<div class="grp">别的</div>` +
     `<a href="credits.html">字源与版权</a>` +
     `<button data-menu="new">重新开局</button>` +
-    `<div class="seed">种子 ${seed}</div>`;
+    `<div class="seed">种子 ${seed}</div>`);
 }
 on($("menu-pop"), (e) => {
   const b = e.target.closest("[data-menu]"); if (!b) return;
@@ -1071,7 +1074,13 @@ $("pick").addEventListener("pointerover", (e) => {
   ui.pickFocus = b.dataset.char; updatePickInfo();
 });
 on($("endseq"), (e) => { const b = e.target.closest("[data-do]"); if (b?.dataset.do === "elder") { ui.elderShown = true; sfx.genEnd(); render(); } });
-on($("elder"), (e) => { const b = e.target.closest("[data-do]"); if (b?.dataset.do === "heir") { dispatch({ type: "heir" }); } });
+on($("elder"), (e) => {
+  const b = e.target.closest("[data-do]"); if (b?.dataset.do !== "heir") return;
+  // 先人卡属于「这一代」：交棒就是进入下一代，必须复位每代一次的状态——
+  // 否则 ui.elderShown 会一直为 true，第 2 代结束时 renderEnded 被跳过、直接弹 #elder（E3）。
+  ui.elderShown = false; ui.winter = freshWinter();
+  dispatch({ type: "heir" });
+});
 on($("dlgcopy"), async () => { const t = $("dlgtext"); try { await navigator.clipboard.writeText(t.value); toast("已复制"); } catch { t.focus(); t.select(); toast("复制不了，请手动选中复制"); } });
 on($("dlgapply"), importCode);
 on($("dlgclose"), closeDlg);
