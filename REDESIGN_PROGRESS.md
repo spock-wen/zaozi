@@ -73,3 +73,4 @@
 43. Round 17: probe insets (tests only).
 44. Round 17 gate: 3× full e2e 235/235.
 45. Round 18: E2 rerender click swallow fix + T03 popover avoids #coach; VERSION c0fb55e86b41.
+46. Round 18 gate: 3× full e2e.
