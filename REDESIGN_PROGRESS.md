@@ -77,3 +77,4 @@
 47. Round 19: E2 whole-class patchHTML audit + E3 ending every generation; VERSION c84e0eb2102a.
 48. Round 19 gate: rr.mjs 0 swallowed; 3× full e2e.
 49. Round 20 (frozen): drawer mask pointer-capture fix + coach untransformed ref; VERSION 63bade20c0e3.
+50. Round 21: card <img> draggable=false (mouse drag from card art), e2e card_img_drag; VERSION 72e2a899e2b1; e2e 278/278.

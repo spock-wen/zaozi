@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`177929f5b1ef`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`72e2a899e2b1`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -194,3 +194,11 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - ② T03 #coach "moved after closing the popover": the popover never moved #coach. placeCoach used #bonecorner.getBoundingClientRect(), and #bonecorner is inside the transformed #card. If #coach was placed during the card entry transition (rotate/translate) it landed ~190px off (265 instead of 74 at 1024×513) until a later render, such as closing the popover, corrected it. Fix: targetRect() takes targets inside the card from the #cardwrap rect + offset*, i.e. the untransformed rect (#bonecorner/#card-drops; also used in slideClearOfTargets) (5a72257). keyhelp_coach adds: render() with the entry frozen at its midpoint gives #coach = its settled position; open/close '?' 5+ times with #coach identical (±0.5px) before and after each cycle; 1024×600/513/491 × 3 engines.
 - Known debt (PM): the fail endings cannot be reached in normal play (a balance issue). Numbers not changed this round.
 - Full 3-engine e2e (one run, per PM): 272/272.
+
+## Round 21 — 0759c65 review P1: mouse drag starting on the card image (VERSION 72e2a899e2b1)
+- P1 (engineering review + 测试 baseline 0/6, 3 engines × 1280/390): `<img>` is natively draggable by default. A mouse press-and-move on #card-art's img started a native image drag (dragstart → pointercancel), so the page stopped getting pointermove/pointerup: the card didn't follow (firefox translateX 0, chromium/webkit stopped at ~16–18px) and no swipe registered; on firefox 390 the card could stay in the dragging state. Keyboard and touch were unaffected, which is why earlier tests missed it.
+- Fix (4d8ec8c): `draggable="false"` on the card art `<img>` (the only img inside #card), plus CSS `#card img{-webkit-user-drag:none;user-select:none}`. No pointer-events:none: the img stays the hit target inside #card, so the 5a72257 target-in-#card onDown logic is unchanged.
+- Regression test card_img_drag (3 engines × 1280×800/390×844, mouse): press on the image centre, move half a card width (card follows mid-drag), release → the swipe commits; afterwards no `.dragging` and an idle mouse move doesn't move the card; img draggable=false; elementFromPoint at the image centre is inside #card. Fails 6/6 on the 0759c65 code, passes 6/6 with the fix.
+- Not fixed (debt, PM): firefox 390 mouse drag from the card centre 3/6; chromium leftover text selection cancelling the next drag; 390 touch overlay tests that also pass on old code.
+- Unit 28/28. Full 3-engine e2e (one run, per PM): 278/278.
+

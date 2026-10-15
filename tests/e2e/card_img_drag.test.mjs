@@ -8,7 +8,7 @@
 //
 // 本用例：三引擎 × 1280×800 / 390×844 鼠标。过教学后找一张带卡面图的卡，从图片中心
 // mouse.down → 分步横移半张卡宽（中途断言卡跟手：transform 有位移）→ mouse.up，
-// 断言这次拖拽被判定（卡换了 / 阶段推进）。另断言命中测试：图片中心 elementFromPoint 落在 #card 内。
+// 断言这次拖拽被判定（卡换了 / 阶段推进），且不残留拖拽态（无 .dragging、空移不跟手）。另断言命中测试：图片中心 elementFromPoint 落在 #card 内。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
@@ -78,6 +78,16 @@ for (const [engine] of Object.entries(ENGINES)) {
           const s = window.__zz.st;
           return !window.__zz.animating && (s.phase !== b.phase || s.current !== b.current);
         }, before, { timeout: 3000 });
+        // 不得卡在拖拽态（测试基线：firefox 390 首次失败后 #card 一直挂着 .dragging）：
+        // 松手后无 .dragging；再空移鼠标，卡不跟手。
+        await page.waitForTimeout(400);
+        assert.ok(!(await page.locator("#card").evaluate((el) => el.classList.contains("dragging"))), "松手后 #card 不应残留 .dragging");
+        await page.mouse.move(x + cardW * 0.4, y + 10, { steps: 4 });
+        const idleDx = await page.evaluate(() => {
+          const t = getComputedStyle(document.getElementById("card")).transform;
+          return t && t !== "none" ? Math.abs(new DOMMatrix(t).m41) : 0;
+        });
+        assert.ok(idleDx < 2, `松手后空移鼠标卡不应跟手（translateX=${idleDx}）`);
         // 行为断言之后再查属性（在旧代码上先由行为断言失败，证明用例抓得到问题本身）
         assert.equal(await img.getAttribute("draggable"), "false", "卡面 <img> 应 draggable=false");
         assert.deepEqual(errs, []);
