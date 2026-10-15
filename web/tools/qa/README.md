@@ -2,6 +2,8 @@
 
 2026-10-14 盒子回退后重建。每次交测试报告前两个脚本都必须 exit 0，并把输出贴进交件消息。
 
+合入 spock-wen/zaozi 后本目录位于 `web/tools/qa/`：在仓库根运行时写 `python3 web/tools/qa/verdict_gate.py …` / `python3 web/tools/qa/sticky_blocked.py …`（账本仍默认取脚本同目录）。
+
 ## verdict_gate.py
     python3 verdict_gate.py <matrix.csv> <report.md>
 - 矩阵：CSV（逗号或 `|` 分隔），必须有列 `判定`、`原因`、`证据路径`。

@@ -2,7 +2,7 @@
 # 92cf10a 串行全跑（可断点续：已有 done 标记的步骤跳过）
 Q=/workspace/qa-zaozi-web-92cf10a; cd $Q; export PATH=/home/box/.local/node22/bin:$PATH DIST=$Q/src/dist; mkdir -p run/done
 step() { local id=$1; shift; [ -f run/done/$id ] && return; "$@" && touch run/done/$id; }
-for i in 1 2 3; do step e2e$i bash -c "cd /workspace/qa-zaozi-web-repo && npm run e2e > $Q/logs/e2e_run$i.log 2>&1; true"; done
+for i in 1 2 3; do step e2e$i bash -c "cd ${REPO:-/workspace/qa-zaozi-web-repo} && npm run e2e > $Q/logs/e2e_run$i.log 2>&1; true"; done
 P=6400; for e in chromium firefox webkit; do P=$((P+10))
   step touch_$e bash -c "node qa/touch.mjs $e $P run 20 > run/touch_$e.log 2>&1"
   step short_$e bash -c "node qa/short.mjs $e $((P+1)) run > run/short_$e.log 2>&1"
