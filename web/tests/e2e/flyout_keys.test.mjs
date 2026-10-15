@@ -158,6 +158,21 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
+  test(`${engine} 1280: 飞出期间轻点 Space 不留下按住状态`, async () => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      const n0 = await actionsLen(page);
+      await press(page, ["ArrowLeft", "ArrowLeft", "Space"]);
+      await settle(page);
+      assert.deepEqual(await sidesFrom(page, n0), ["left"], "←← 只提交一次");
+      assert.equal(await optOn(page, "opt-left"), false, "Space 已松开，下一张不应停在按住预览（#opt-left 不带 on）");
+      assert.equal(await optOn(page, "opt-right"), false, "下一张不应有任何预览（#opt-right 不带 on）");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
+
   test(`${engine} 1280 reduce: 飞出期间按 ← 只预览下一张，不提交`, async () => {
     const { ctx, page, errs } = await setup(engine, { reducedMotion: "reduce" });
     try {

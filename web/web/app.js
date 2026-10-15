@@ -37,7 +37,7 @@ let lastHover = { x: NaN, y: NaN };   // 上一次鼠标位置：区分「真的
 let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
-  preview: false, kbDir: null, animating: false, floats: {},
+  preview: false, kbDir: null, animating: false, floats: {}, keyQueue: [],
   winter: freshWinter(),
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false,
@@ -893,23 +893,23 @@ function onUp() {
 }
 function rebound() {
   const from = ui.dx;
-  if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); return; }
+  if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); drainKeys(); return; }
   ui.animating = true; renderShort(); const t0 = performance.now(), dur = 320;
   const tick = (t) => {
     const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
     ui.dx = from * (1 - e); cardEl().style.transform = `translateX(${ui.dx}px)`; renderDimsOnly();
-    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; ui.dx = 0; cardEl().style.transform = ""; render(); }
+    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; ui.dx = 0; cardEl().style.transform = ""; render(); drainKeys(); }
   };
   requestAnimationFrame(tick);
 }
 function flyOut(targetX, done) {
-  if (reducedPref()) { cardEl().style.opacity = "0"; setTimeout(() => { cardEl().style.opacity = ""; done(); }, 120); return; }
+  if (reducedPref()) { ui.animating = true; cardEl().style.opacity = "0"; setTimeout(() => { cardEl().style.opacity = ""; ui.animating = false; done(); drainKeys(); }, 120); return; }
   ui.animating = true; renderShort(); const from = ui.dx, t0 = performance.now(), dur = 240, deg = Math.sign(targetX) * 18;
   const tick = (t) => {
     const k = Math.min(1, (t - t0) / dur), e = k * k;
     ui.dx = from + (targetX - from) * e;
     cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg * e}deg)`; cardEl().style.opacity = String(1 - e);
-    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; cardEl().style.transform = ""; cardEl().style.opacity = ""; done(); }
+    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; cardEl().style.transform = ""; cardEl().style.opacity = ""; done(); drainKeys(); }
   };
   requestAnimationFrame(tick);
 }
@@ -924,6 +924,14 @@ addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);
 
 addEventListener("keydown", (e) => {
+  if (ui.animating && e.key !== "Escape" && e.code !== "Space" && $("savedlg").hidden) {
+    if (!e.repeat) ui.keyQueue.push({ key: e.key, code: e.code });
+    e.preventDefault();
+    return;
+  }
+  handleKey(e);
+});
+function handleKey(e) {
   if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }
   if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; render(); return; }
   if (st.phase === "pick") {
@@ -962,7 +970,15 @@ addEventListener("keydown", (e) => {
     if (e.code === INPUT.engrave.key) { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
     else if (e.code === "KeyS") dispatch(INPUT.engrave.skip);
   } else if (st.phase === "winter" && e.key === "Enter") { e.preventDefault(); winterCarve(); }
-});
+}
+// 飞出期间按的键按顺序在下一张卡出现后各执行一次，不丢不重；长按的自动重复不排队。
+// Space 是「按住看」，松开的 keyup 不排队，所以它的 keydown 也不排队，否则重放后会停在按住状态。
+function drainKeys() {
+  while (!ui.animating && ui.keyQueue.length) {
+    const k = ui.keyQueue.shift();
+    handleKey({ key: k.key, code: k.code, repeat: false, preventDefault() {} });
+  }
+}
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
 function commitSide(dir) {
   const thr = threshold();
