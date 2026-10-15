@@ -64,7 +64,8 @@ const boneProbe = (page) =>
     const r = bc.getBoundingClientRect();
     // 探针点取「卡角矩形 ∩ 视口」内缩 1px 的中心：Chromium 的 elementFromPoint 会把 x 取整，
     // 卡角中心落在 [innerWidth-0.5, innerWidth) 时返回 null（见 QA ec61666 efp_probe）。
-    const safePt = (r) => { const L = Math.max(r.left, 0) + 1, R = Math.min(r.right, innerWidth) - 1, T = Math.max(r.top, 0) + 1, B = Math.min(r.bottom, innerHeight) - 1; return R > L && B > T ? [(L + R) / 2, (T + B) / 2] : null; };
+    const k = 1 + 2 * Math.max(0, r.width - bc.offsetWidth, r.height - bc.offsetHeight); // 入场中卡带旋转：包围盒比卡角本体宽出 ≈s·sinθ，内缩这么多才保证落在卡角本体内
+    const safePt = (r) => { const L = Math.max(r.left, 0) + k, R = Math.min(r.right, innerWidth) - k, T = Math.max(r.top, 0) + k, B = Math.min(r.bottom, innerHeight) - k; return R > L && B > T ? [(L + R) / 2, (T + B) / 2] : null; };
     const pt = r.width >= 1 ? safePt(r) : null;
     const onScreen = !!pt;
     const el = pt ? document.elementFromPoint(pt[0], pt[1]) : null;
@@ -103,13 +104,14 @@ for (const engine of Object.keys(ENGINES)) {
           const r = bc.getBoundingClientRect();
           // 探针点取「卡角矩形 ∩ 视口」内缩 1px 的中心：Chromium 的 elementFromPoint 会把 x 取整，
           // 卡角中心落在 [innerWidth-0.5, innerWidth) 时返回 null（见 QA ec61666 efp_probe）。
-          const safePt = (r) => { const L = Math.max(r.left, 0) + 1, R = Math.min(r.right, innerWidth) - 1, T = Math.max(r.top, 0) + 1, B = Math.min(r.bottom, innerHeight) - 1; return R > L && B > T ? [(L + R) / 2, (T + B) / 2] : null; };
+          const k = 1 + 2 * Math.max(0, r.width - bc.offsetWidth, r.height - bc.offsetHeight); // 入场中卡带旋转：包围盒比卡角本体宽出 ≈s·sinθ，内缩这么多才保证落在卡角本体内
+    const safePt = (r) => { const L = Math.max(r.left, 0) + k, R = Math.min(r.right, innerWidth) - k, T = Math.max(r.top, 0) + k, B = Math.min(r.bottom, innerHeight) - k; return R > L && B > T ? [(L + R) / 2, (T + B) / 2] : null; };
           const pt = r.width >= 1 ? safePt(r) : null;
           const onScreen = !!pt;
           const el = pt ? document.elementFromPoint(pt[0], pt[1]) : null;
           return {
             anims: anims.length, current: window.__zz.st.current, phase: window.__zz.st.phase,
-            w: r.width, onScreen, offRight: r.left >= innerWidth - 1, hitSelf: !!(el && el.closest("#bonecorner")),
+            w: r.width, onScreen, offRight: r.left >= innerWidth - 2 * k, diag: JSON.stringify({ r: [r.left, r.top, r.width, r.height].map((v) => +v.toFixed(2)), ow: bc.offsetWidth, k: +k.toFixed(2), pt, iw: innerWidth }), hitSelf: !!(el && el.closest("#bonecorner")),
             hit: el ? el.id || el.className || el.tagName : "none",
           };
         });
@@ -117,8 +119,8 @@ for (const engine of Object.keys(ENGINES)) {
         assert.equal(mid.current, "T03", "入场中途应已到 T03");
         assert.equal(mid.phase, "engrave", "入场中途应处于「刻」阶段");
         assert.ok(mid.w >= 1, "入场中途卡角应显形");
-        if (!mid.onScreen) assert.ok(mid.offRight, "入场中途卡角与视口交集为空时，只应是整块还在屏右外");
-        if (mid.onScreen) assert.ok(mid.hitSelf, `入场动画中卡角中心应命中 #bonecorner，实际命中：${mid.hit}`);
+        if (!mid.onScreen) assert.ok(mid.offRight, `入场中途卡角（内缩后）与视口交集为空时，只应是卡角几乎整块在屏右外：${mid.diag}`);
+        if (mid.onScreen) assert.ok(mid.hitSelf, `入场动画中卡角探针点应命中 #bonecorner，实际命中：${mid.hit} ${mid.diag}`);
 
         // finish() 掉卡动画 → 卡归位；跨过 650ms 重绘后再查稳态。
         await page.evaluate(() => { for (const a of document.querySelector("#card").getAnimations()) a.finish(); });
