@@ -168,3 +168,4 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - ②: bonecorner_hit is deterministic. The rAF sampling race is gone: it waits for the entry animation to start, pauses at the midpoint to probe elementFromPoint, then finish()es and probes again. No retries.
 - Removed a node_modules symlink that had been committed by mistake (a6f5a40).
 - Loops: bonecorner_hit + keyhelp_entry 30/30 on each of chromium/firefox/webkit (one worktree per engine; each e2e file runs buildDist() on load, so parallel runs in one checkout wipe dist mid-serve. That only affected my parallel loop; npm run e2e uses --test-concurrency=1).
+- Full 3-engine e2e, 3 consecutive runs (product = de92759, VERSION 55989b7737b8): 235/235, 235/235, 235/235. Unit 28/28.
