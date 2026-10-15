@@ -68,3 +68,4 @@
 38. D3 WebKit follow-up e51caf2; VERSION f243a91ccb14.
 39. Round 14: 刻 hit-test root cause + D3 two columns; VERSION b882984d66d7.
 40. Round 15: N-tier 字匣 64/52; VERSION 1d16af20f0f9.
+41. Round 16: popover waits for card entry + clears 刻/target; bonecorner_hit deterministic.
