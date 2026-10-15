@@ -162,8 +162,9 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 ## Round 15 — N-tier 字匣 (VERSION 1d16af20f0f9)
 - PM decision: at 1366×768 (N tier) the 字匣 is 64 with 52px cells (was 83); hit areas ≥44, no overlap with the top bar or card, A/B tiers unchanged (9de8f08). Test: tray_n_tier, 3 engines.
 
-## Round 16 — ca040c9 retest follow-ups
+## Round 16 — ca040c9 retest follow-ups (VERSION 55989b7737b8)
 - QA commit 821864b cherry-picked (9e140e3).
 - PM decision ①: the first B-tier auto-open '?' popover now waits for the card entry animation to finish (ui.animating plus card.getAnimations()[].finished, with a transitionend fallback). While the card is entering it is hidden and the 3s auto-close does not count down. Once open, placeKeyhelp checks the popover against 刻 and the current tutorial target and moves it down or left to clear them (2499499). New test keyhelp_entry: pause the card animation via getAnimations() and set it to the midpoint, then finish(); 1024×600/513/491, 3 engines.
 - ②: bonecorner_hit is deterministic. The rAF sampling race is gone: it waits for the entry animation to start, pauses at the midpoint to probe elementFromPoint, then finish()es and probes again. No retries.
 - Removed a node_modules symlink that had been committed by mistake (a6f5a40).
+- Loops: bonecorner_hit + keyhelp_entry 30/30 on each of chromium/firefox/webkit (one worktree per engine; each e2e file runs buildDist() on load, so parallel runs in one checkout wipe dist mid-serve. That only affected my parallel loop; npm run e2e uses --test-concurrency=1).
