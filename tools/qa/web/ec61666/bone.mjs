@@ -33,7 +33,7 @@ const arm = p => p.evaluate(() => { window.__bs = []; window.__bsOn = true; let 
     if (st.phase === "engrave" && bc) { const r = bc.getBoundingClientRect(); const cs = getComputedStyle(bc);
       if (r.width > 0 && cs.display !== "none" && cs.visibility !== "hidden") { if (t0 == null) t0 = performance.now();
         const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-        window.__bs.push({ t: Math.round(performance.now() - t0), hit: e === bc || bc.contains(e) ? "bc" : (e ? ((e.closest("[id]")?.id || "") + ">" + (e.className || e.tagName) + ":" + (e.textContent || "").trim().slice(0, 6)).toString().slice(0, 40) : (r.x + r.width / 2 > innerWidth || r.y + r.height / 2 > innerHeight || r.x < 0 ? "屏外" : "none")), cls: bc.className, pe: cs.pointerEvents, cur: st.current }); } }
+        window.__bs.push({ t: Math.round(performance.now() - t0), hit: e === bc || bc.contains(e) ? "bc" : (e ? ((e.closest("[id]")?.id || "") + ">" + (e.className || e.tagName) + ":" + (e.textContent || "").trim().slice(0, 6)).toString().slice(0, 40) : (r.x + r.width / 2 >= innerWidth - 0.5 || r.y + r.height / 2 >= innerHeight - 0.5 || r.x < 0 ? "屏外" : "none")), cls: bc.className, pe: cs.pointerEvents, cur: st.current }); } }
     else t0 = null;
     requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
 const collect = async p => { const s = await p.evaluate(() => { window.__bsOn = false; return window.__bs; }); return s; };
