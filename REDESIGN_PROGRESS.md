@@ -71,3 +71,4 @@
 41. Round 16: popover waits for card entry + clears 刻/target; bonecorner_hit deterministic.
 42. Round 16 gate: 3× full e2e 235/235.
 43. Round 17: probe insets (tests only).
+44. Round 17 gate: 3× full e2e 235/235.
