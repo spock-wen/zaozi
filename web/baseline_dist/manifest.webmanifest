@@ -1,0 +1,32 @@
+{
+ "id": "./",
+ "name": "造字人 · 一年里程碑",
+ "short_name": "造字人",
+ "description": "造字人 PC 网页版一年里程碑（离线可玩）",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#1d1a16",
+ "theme_color": "#2a251f",
+ "icons": [
+  {
+   "src": "icons/icon.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  },
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  }
+ ]
+}

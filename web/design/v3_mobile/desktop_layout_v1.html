@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box;margin:0;padding:0}
+body{width:1520px;background:#F3ECDD;font-family:"Noto Sans CJK SC",sans-serif;color:#2A241D}
+.nw{white-space:nowrap}
+.top{background:#15171F;color:#EEE7D8;padding:24px 40px;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-family:"Noto Serif CJK SC";font-size:24px}
+.tag{background:#B5432E;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px}
+.pad{padding:24px 40px}
+.lab{font-size:16px;font-weight:700;margin:16px 0 8px}.lab b{color:#B5432E}
+.scr{position:relative;border:8px solid #2A241D;border-radius:12px;background:linear-gradient(#1E2230,#15171F);overflow:hidden;color:#EEE7D8;box-sizing:content-box}
+.bar{height:56px;display:flex;align-items:center;gap:8px;padding:0 24px;border-bottom:1px solid #3A4057;font-size:14px;font-weight:500}
+.bar .g{font-family:"Noto Serif CJK SC";color:#D8B46A;font-size:15px;margin-right:8px}
+.s{background:#2B3042;border-radius:12px;padding:4px 8px}.sp{flex:1}
+.tb{height:44px;padding:0 16px;display:flex;align-items:center;border-radius:8px;border:1px solid #3A4057}
+.card{position:absolute;background:#FAF6EC;border-radius:20px;color:#2A241D;padding:24px;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.card .h{font-size:13px;color:#766C5E;font-weight:500}
+.card .t{font-family:"Noto Serif CJK SC";font-size:24px;font-weight:700;margin:8px 0 12px}
+.card .b{font-family:"Noto Serif CJK SC";font-size:16px;line-height:28px}
+.ill{margin:16px 0;border-radius:12px;background:linear-gradient(160deg,#E4D6B8,#CDBB94);border:1px dashed #CDBB94;display:flex;align-items:center;justify-content:center;font-size:12px;color:#766C5E}
+.hint{position:absolute;left:24px;right:24px;bottom:24px;max-height:64px;background:#F3ECDD;border:1px solid #D8CCB2;border-radius:12px;padding:8px 12px;font-family:"Noto Serif CJK SC";font-size:13px;line-height:20px;color:#5C5346}
+.hint .x{float:right;font-family:"Noto Sans CJK SC";font-size:12px;color:#766C5E}
+.bone,.bone2{position:absolute;top:8px;right:8px;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+.bone i,.bone2 i{width:36px;height:36px;border-radius:9px 12px 8px 13px;background:linear-gradient(145deg,#F1E8D4,#E4D6B8);border:1.5px solid #B9A57C;box-shadow:0 2px 4px rgba(42,36,29,.3);font-style:normal;font-family:"Noto Serif CJK SC";font-weight:700;font-size:18px;color:#6E2F1F;display:flex;align-items:center;justify-content:center}
+.card .bone.hv i{transform:translateY(-2px);box-shadow:0 6px 12px rgba(42,36,29,.35);border-color:#B5432E}
+.bone2{position:relative;top:0;right:0;transform:scale(1.6);margin:20px auto 24px;border:1px dashed rgba(181,67,46,.55);border-radius:10px}
+.bone2.h i{transform:translateY(-2px);box-shadow:0 6px 12px rgba(42,36,29,.35);border-color:#B5432E}
+.bone2.p i{transform:scale(.92);background:#E4D6B8;box-shadow:0 0 0 3px rgba(181,67,46,.45)}
+.bone2.d i{background:#B5432E;border-color:#B5432E;color:#fff;font-size:13px}
+.opt{position:absolute;width:192px;height:48px;display:flex;align-items:center;gap:8px;font-size:14px;color:#EEE7D8;justify-content:flex-end}
+.opt.r{justify-content:flex-start}
+.k{display:inline-flex;min-width:28px;height:24px;padding:0 6px;align-items:center;justify-content:center;border:1px solid #3A4057;border-bottom-width:2px;border-radius:6px;background:#2B3042;color:#EEE7D8;font-size:12px;font-weight:700;margin:0 2px}
+.tray{position:absolute;width:424px;height:76px;background:#1E2230;border:1px solid #3A4057;border-radius:16px;display:flex;align-items:center;gap:8px;padding:0 16px}
+.zt{font-size:12px;color:#A8A193;width:32px}
+.z{position:relative;width:52px;height:52px;border-radius:10px;background:#F1E8D4;color:#6E2F1F;font-family:"Noto Serif CJK SC";font-weight:700;font-size:28px;display:flex;align-items:center;justify-content:center}
+.z b{position:absolute;left:4px;top:2px;font:700 10px "Noto Sans CJK SC";color:#766C5E}
+.zc{font-size:12px;color:#A8A193;margin-left:8px}
+.keys{position:absolute;text-align:center;font-size:12px;color:#A8A193}
+.side{position:absolute;right:0;top:56px;bottom:0;background:#FAF6EC;color:#2A241D;padding:16px 24px;border-left:1px solid #3A4057}
+.tabs{display:flex;background:#E6DCC6;border-radius:10px;padding:4px;margin-bottom:16px}
+.tabs span{flex:1;text-align:center;font-size:14px;padding:8px 0;border-radius:8px;color:#5C5346;height:36px}
+.tabs .on{background:#FAF6EC;color:#2A241D;font-weight:700}
+.sec{font-size:12px;font-weight:700;letter-spacing:.12em;color:#766C5E;margin-bottom:8px}
+.grid{display:flex;flex-wrap:wrap;gap:8px}
+.cell{width:64px;height:80px;text-align:center;font-size:12px;color:#5C5346}
+.cell div{width:64px;height:64px;border-radius:8px;background:#F1E8D4;border:1px solid #CDBB94;font-family:"Noto Serif CJK SC";font-weight:700;font-size:32px;display:flex;align-items:center;justify-content:center}
+.cell.u div{background:#E6DCC6;color:#A99F8D;border-color:#E6DCC6}
+.log{font-size:13px;line-height:24px;color:#5C5346}
+.fold{position:absolute;bottom:24px;left:24px;right:24px;height:44px;border:1px solid #D8CCB2;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#5C5346}
+.sidetab{position:absolute;right:0;top:200px;width:44px;height:200px;background:#FAF6EC;color:#2A241D;border-radius:12px 0 0 12px;writing-mode:vertical-rl;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.cursor{position:absolute;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:20px solid #fff;transform:rotate(-30deg);filter:drop-shadow(0 1px 1px #000)}
+.tip{position:absolute;width:88px;height:28px;background:#2A241D;color:#EEE7D8;font-size:12px;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.row2{display:flex;gap:24px;margin-top:24px}
+.box{flex:1;background:#FAF6EC;border:1px solid #D8CCB2;border-radius:16px;padding:16px 24px 24px;font-size:13px;line-height:22px;color:#5C5346}
+.box .lab{margin-top:0}
+.st{display:flex;justify-content:space-around;text-align:center;font-size:12px}
+.dd{width:240px;background:#fff;border:1px solid #D8CCB2;border-radius:12px;padding:8px 0;margin:8px 0 16px;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+.mg{font-size:12px;font-weight:700;color:#766C5E;padding:4px 16px}
+.mi{height:44px;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#2A241D;border-bottom:1px solid #E6DCC6}
+.foot{padding:8px 40px 24px;font-size:12px;color:#766C5E;display:flex;justify-content:space-between}
+</style></head><body><div class="top"><h1>造字人 · 电脑宽屏 v1（配 mobile_layout_v2_1）</h1><span class="tag">设计稿，非玩法示意</span></div>
+<div class="pad"><div class="lab"><b>1440 × 900 · 侧栏展开（默认）· 鼠标悬停卡角骨片</b></div>
+<div class="scr" style="width:1440px;height:900px">
+<div class="bar"><span class="g">第 3 代记事人</span><span class="s">骨片 3</span><span class="s">春</span><span class="sp"></span><span class="tb">存档 ▾</span><span class="tb">字源与版权</span></div>
+<div class="card" style="left:336px;top:96px;width:432px;height:620px"><div class="bone hv"><i>刻</i></div><div class="h">春 · 采集的妇人</div><div class="t">北坡塌下去一块</div>
+<div class="b">一夜大雨，北坡塌下去一块。<span class="nw">坍处底下</span>露出了怪东西，没人敢过去看。</div>
+<div class="ill" style="height:356px;background:#F1E8D4 url(../v5_cardart/assets/gatherer_d@2x.png) center/contain no-repeat;border:0"></div>
+<div class="hint"><span class="x">收起 ▾</span>坡上的土被雨冲开，露出一团盘结的须。</div></div>
+<div class="opt" style="left:120px;top:382px"><span class="k">←</span>绕开北坡，别招惹</div>
+<div class="opt r" style="left:792px;top:382px">下去看个究竟<span class="k">→</span></div>
+<div class="tray" style="left:340px;top:740px"><span class="zt">字匣</span><div class="z"><b>1</b>水</div><div class="z"><b>2</b>火</div><div class="z"><b>3</b>日</div><span class="zc">点字或按 1–3 落在卡上</span></div>
+<div class="keys" style="left:0;width:1104px;top:860px"><span class="k">←</span><span class="k">→</span> 选 · <span class="k">1–3</span> 落字 · 按住 <span class="k">Space</span> 看分量 · <span class="k">K</span> 或点骨片刻 · <span class="k">Enter</span> 刻</div>
+<div class="side" style="width:336px"><div class="tabs"><span class="on">字录 6</span><span>骨片 3</span><span>日志</span></div>
+<div class="sec">已造</div><div class="grid"><div class="cell"><div>水</div>水</div><div class="cell"><div>日</div>日</div><div class="cell"><div>人</div>人</div><div class="cell"><div>木</div>木</div><div class="cell"><div>田</div>田</div><div class="cell"><div>火</div>火</div><div class="cell u"><div>？</div>未知</div><div class="cell u"><div>？</div>未知</div></div>
+<div class="sec" style="margin-top:16px">日志（最近）</div><div class="log">开局 · 第一张卡<br>向右 · 下去看个究竟<br>向右 · 再往前走</div>
+<div class="fold">收起侧栏 ⟩</div></div><div class="cursor" style="left:734px;top:130px"></div><div class="tip" style="left:776px;top:108px">刻字（K）</div></div>
+<div class="lab"><b>1280 × 800 · 侧栏收起态（点右侧标签或按钮展开）</b></div>
+<div class="scr" style="width:1280px;height:800px">
+<div class="bar"><span class="g">第 3 代记事人</span><span class="s">骨片 3</span><span class="s">春</span><span class="sp"></span><span class="tb">存档 ▾</span><span class="tb">字源与版权</span></div>
+<div class="card" style="left:458px;top:96px;width:364px;height:520px"><div class="bone"><i>刻</i></div><div class="h">春 · 采集的妇人</div><div class="t">北坡塌下去一块</div>
+<div class="b">一夜大雨，北坡塌下去一块。<span class="nw">坍处底下</span>露出了怪东西，没人敢过去看。</div>
+<div class="ill" style="height:256px;background:#F1E8D4 url(../v5_cardart/assets/gatherer_d@2x.png) center/contain no-repeat;border:0"></div>
+<div class="hint"><span class="x">收起 ▾</span>坡上的土被雨冲开，露出一团盘结的须。</div></div>
+<div class="opt" style="left:242px;top:332px"><span class="k">←</span>绕开北坡，别招惹</div>
+<div class="opt r" style="left:846px;top:332px">下去看个究竟<span class="k">→</span></div>
+<div class="tray" style="left:428px;top:640px"><span class="zt">字匣</span><div class="z"><b>1</b>水</div><div class="z"><b>2</b>火</div><div class="z"><b>3</b>日</div><span class="zc">点字或按 1–3 落在卡上</span></div>
+<div class="keys" style="left:0;width:1280px;top:760px"><span class="k">←</span><span class="k">→</span> 选 · <span class="k">1–3</span> 落字 · 按住 <span class="k">Space</span> 看分量 · <span class="k">K</span> 或点骨片刻 · <span class="k">Enter</span> 刻</div>
+<div class="sidetab">字录 · 骨片 · 日志 ⟨</div></div>
+<div class="row2">
+<div class="box"><div class="lab"><b>卡角骨片四态</b></div><div class="st">
+<div><div class="bone2"><i>刻</i></div>默认</div><div><div class="bone2 h"><i>刻</i></div>悬停</div><div><div class="bone2 p"><i>刻</i></div>按下</div><div><div class="bone2 d"><i>已刻</i></div>已刻</div></div>
+<p>悬停：上浮 2、加深阴影、1px 朱色描边、鼠标变手形，旁出小签「刻字（K）」放在卡外右侧，不压卡面。按下缩 0.92；已刻不可点、无悬停。触控区 44×44。</p></div>
+<div class="box"><div class="lab"><b>菜单（宽屏）</b></div>
+<div class="dd"><div class="mg">存档</div><div class="mi">导出存档码</div><div class="mi">导入存档码</div><div class="mi" style="border:0;color:#766C5E;font-size:13px">种子 20261012</div></div>
+<p>顶栏右侧两个文字按钮：「存档 ▾」下拉 240 宽（导出 / 导入 / 种子），「字源与版权」直接打开居中弹层。项高 44，Esc 关闭。</p></div>
+<div class="box"><div class="lab"><b>侧栏选择：可收起侧栏</b></div>
+<p>选可收起，不选常驻。理由：① 卡是主体，1280×800 时常驻 336 侧栏会把卡挤到中线偏左，收起后卡回正中；② 字录/日志不是每张卡都要看，收起时右缘留 44 宽标签一键展开；③ 与手机上拉抽屉同一套内容和分页，状态可记住。≥1440 默认展开，1024–1439 默认收起。快捷键不新增，用鼠标点。</p></div>
+</div></div>
+<div class="foot"><span>色板与字号沿用正式视觉 v1.1.1 · 间距 4/8 · 卡面文案为版式示意 · 卡面图用 v5_cardart</span><span>设计稿，非玩法示意</span></div></body></html>

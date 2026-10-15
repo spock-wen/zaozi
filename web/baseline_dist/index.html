@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>造字人 · 一年里程碑（PC 网页壳）</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2a251f">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+<header id="hud">
+  <div id="dims"></div>
+  <div id="meta"></div>
+</header>
+<main>
+  <section id="stage">
+    <canvas id="cv" width="720" height="520"></canvas>
+    <div id="winter" hidden></div>
+    <div id="ended" hidden></div>
+  </section>
+  <aside id="side">
+    <h3>字匣 <small>（1–3 或点字落字）</small></h3>
+    <div id="wordbox"></div>
+    <h3>事签 / 骨片</h3>
+    <div id="tallies"></div>
+    <h3>字录</h3>
+    <div id="zilu"></div>
+    <h3>日志</h3>
+    <ol id="log"></ol>
+  </aside>
+</main>
+<footer id="help">拖卡左右（过 35% 提交，不到回弹）· ← → 选 · 1–3 落字 · 按住 Space 或按住卡看分量 · K / 点骨片刻 · Enter 刻 ·
+  <button class="act" id="dlgexport">导出存档码</button><button class="act" id="dlgimport">导入存档码</button><span id="seedinfo"></span><a href="credits.html">字源与版权</a>
+</footer>
+<div id="savedlg">
+  <div id="dlgbox">
+    <h3 id="dlgtitle">存档码</h3>
+    <p id="dlgmsg" hidden></p>
+    <textarea id="dlgtext" rows="6" spellcheck="false"></textarea>
+    <div id="dlgbtns">
+      <button class="act" id="dlgcopy">复制</button>
+      <button class="act" id="dlgapply">导入</button>
+      <button class="act" id="dlgclose">关闭</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

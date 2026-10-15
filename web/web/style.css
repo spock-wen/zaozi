@@ -1,0 +1,517 @@
+/* 造字人 · 一年里程碑重做样式（v3_mobile BREAKPOINTS + v4_gamefeel 手感）。
+   色板取自任务书；间距 4/8 节奏；点击区 ≥44。判断输入方式用 (hover:hover) and (pointer:fine)。 */
+:root{
+  --night-800:#1E2230; --night-700:#2B3042; --night-line:#3A4057;
+  --paper-50:#FAF6EC; --paper-100:#F3ECDD; --paper-200:#E6DCC6; --paper-line:#D8CCB2;
+  --zhu-600:#B5432E; --gold-400:#D8B46A;
+  --bone-100:#F1E8D4; --bone-200:#E4D6B8; --bone-crack:#B9A57C;
+  --down:#E08A74; --up:#8FB8A8;
+  --ink:#3b2f20; --muted:#9a93a6;
+  --card-h: 468px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0;background:var(--night-800);color:var(--paper-50);
+  font-family:"Noto Serif CJK SC","Songti SC",serif;overscroll-behavior:none;
+}
+body[data-view="mobile"]{overflow:hidden;height:100dvh;}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+[hidden]{display:none !important;}
+:focus{outline:none;}
+:focus-visible{outline:2px solid var(--gold-400);outline-offset:2px;border-radius:6px;}
+
+#app{position:relative;height:100dvh;display:flex;flex-direction:column;}
+
+/* ---------- 顶栏 / 资源条 ---------- */
+#topbar{
+  flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  padding:4px 8px;min-height:44px;background:var(--night-700);
+  padding-top:calc(4px + env(safe-area-inset-top));
+}
+#gen-line{font-size:13px;color:var(--paper-200);white-space:nowrap;}
+#topright{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;}
+#season-chip,#bones-chip{color:var(--gold-400);white-space:nowrap;}
+#menubtn{
+  width:44px;height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;
+  font-size:24px;line-height:1;border-radius:8px;margin-right:-4px;/* 距右 4 */
+}
+#menubtn:active{background:var(--night-line);}
+
+/* 四维条：手机/平板单独一行（资源条下）；桌面在卡上方 */
+#dimrow{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:14px 16px 4px;}
+.dims{display:flex;gap:10px;align-items:flex-end;flex:1 1 auto;min-width:0;justify-content:space-between;}
+.dim{position:relative;flex:1 1 0;min-width:0;font-size:12px;}
+.dim .lbl{display:flex;justify-content:space-between;color:var(--paper-200);}
+.dim .bar{height:8px;border-radius:4px;background:var(--night-line);overflow:hidden;margin-top:2px;}
+.dim .fill{height:100%;width:100%;background:var(--gold-400);transform-origin:left center;transform:scaleX(.5);transition:transform 400ms cubic-bezier(.2,.8,.2,1);}
+.dim.danger .lbl,.dim.danger .fill{background:var(--down);color:var(--down);}
+.dim .dots{position:absolute;left:0;right:0;top:-14px;display:flex;gap:3px;height:12px;align-items:flex-end;opacity:0;transition:opacity 120ms ease-out;pointer-events:none;}
+.dim .dots.on{opacity:1;}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--gold-400);}
+.dot.s2{width:8px;height:8px;} .dot.s3{width:12px;height:12px;}
+#dims-desktop{display:none;}
+.float{position:absolute;left:0;top:-6px;font-size:13px;font-weight:700;animation:float 600ms ease-out forwards;pointer-events:none;}
+.float.up{color:var(--up);} .float.down{color:var(--down);}
+@keyframes float{0%{transform:translateY(0);opacity:1}66%{opacity:1}100%{transform:translateY(-16px);opacity:0}}
+
+/* ---------- 卡区 ---------- */
+#stage{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px;min-height:0;position:relative;}
+#cardcol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:0;}
+#cardwrap{width:min(100%,480px);perspective:1200px;}
+.card{
+  position:relative;width:100%;aspect-ratio:328/468;background:var(--paper-50);color:var(--ink);
+  border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:16px;overflow:hidden;
+  transition:transform 160ms ease-out,opacity 160ms ease-out;touch-action:none;
+}
+body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !important;}
+.card.dragging{transition:none;cursor:grabbing;}
+.card.tilting{cursor:grab;}
+.card-head{font-size:13px;color:#7a6a4e;margin-bottom:6px;}
+.dot-sep{margin:0 4px;}
+#card-title{font-size:22px;font-weight:700;margin:0 0 8px;}
+#card-text{font-size:15px;line-height:24px;margin:0;}
+.card-art{margin:0 0 10px;border-radius:8px;overflow:hidden;background:var(--paper-200);}
+.card-art picture{display:block;}
+.card-art img{display:block;width:100%;height:auto;aspect-ratio:296/216;object-fit:contain;}
+/* 卡内图片不许原生拖拽：否则鼠标从图上起拖会触发 dragstart→pointercancel，卡不跟手（工程审核 0759c65 P1） */
+#card img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
+/* 卡内文字不可选：从卡中心拖会顺手选中「卡头→图片」，选区残留时再拖，chromium 取消拖卡、webkit 卡粘手并误提交「选右」（工程审核 f96632f P1-1） */
+#card{user-select:none;-webkit-user-select:none;}
+.card-drops{
+  position:absolute;left:16px;right:16px;bottom:16px;height:56px;border:1px dashed var(--bone-crack);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#7a6a4e;
+}
+.card-drops .chiplink{color:var(--zhu-600);font-weight:700;margin-left:6px;}
+
+/* 卡角骨片四态。z-index 让它恒在卡内正文（含 .card-head）之上，命中测试优先。 */
+.bonecorner{
+  position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:10px;z-index:1;
+  display:none;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--ink);
+  background:linear-gradient(var(--bone-100),var(--bone-200));border:1px solid var(--bone-crack);
+  transition:transform 120ms ease-out,box-shadow 120ms ease-out;
+}
+.card.engrave .bonecorner{display:flex;}
+.bonecorner:active{transform:scale(.92);box-shadow:0 0 0 3px rgba(181,67,46,.45);}
+.bonecorner.done{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);pointer-events:none;}
+.card.engrave .bonecorner:not(.done):hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.3);border-color:var(--zhu-600);}
+.bone-hint{position:absolute;top:14px;right:58px;font-size:12px;color:var(--zhu-600);background:var(--paper-100);padding:2px 6px;border-radius:6px;display:none;}
+.card.engrave .bone-hint{display:block;}
+
+/* 左右选项 */
+.optbtn{
+  width:192px;min-height:44px;padding:10px 12px;border-radius:10px;background:var(--night-700);
+  color:var(--paper-50);font-size:15px;font-weight:700;text-align:center;border:1px solid var(--night-line);
+  transition:transform 160ms ease-out,opacity 160ms ease-out;opacity:.45;
+}
+.optbtn.on{opacity:1;border-color:var(--gold-400);}
+.optbtn:disabled{opacity:.15;}
+
+#gesture-hint{font-size:12px;color:var(--muted);text-align:center;min-height:16px;}
+
+/* 教学气泡 */
+#coachcol{display:none;}
+body[data-view="mobile"] #stage,body[data-view="tablet-portrait"] #stage{flex-direction:column;gap:8px;}
+body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;width:100%;max-width:480px;align-self:center;}
+body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-width:none;}
+#coach{
+  max-width:320px;background:var(--paper-100);color:var(--ink);border-radius:12px;padding:10px 12px;
+  font-size:14px;line-height:20px;box-shadow:0 4px 12px rgba(0,0,0,.3);pointer-events:none;
+}
+#coach .coach-keys{display:block;margin-top:4px;font-size:12px;color:#7a6a4e;}
+
+/* ---------- 字匣 ---------- */
+#wordbox-bar{
+  flex:0 0 auto;background:var(--night-800);border-top:1px solid var(--night-line);
+  border-radius:16px 16px 0 0;margin:0 8px;padding:6px 8px calc(10px + env(safe-area-inset-bottom));
+  min-height:110px;
+}
+.wb-handle{width:36px;height:4px;border-radius:2px;background:var(--night-line);margin:2px auto 8px;}
+#wordbox{display:flex;gap:8px;justify-content:center;align-items:center;min-height:52px;}
+.slot{
+  width:52px;height:52px;border-radius:10px;border:1px solid var(--night-line);background:var(--night-700);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--paper-200);
+}
+.slot img{width:30px;height:30px;background:var(--paper-100);border-radius:4px;}
+.slot.ok{border-color:var(--gold-400);box-shadow:0 0 0 2px rgba(216,180,106,.5);animation:breathe 1200ms ease-in-out 2;}
+.slot.used{opacity:.35;text-decoration:line-through;}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 2px rgba(216,180,106,.25)}50%{box-shadow:0 0 0 3px rgba(216,180,106,.8)}}
+
+/* ---------- 底部键位行（桌面；平板接了键鼠也显） ---------- */
+#keys{display:none;flex:0 0 auto;padding:6px 16px;font-size:12px;color:var(--muted);text-align:center;}
+/* BREAKPOINTS：平板竖屏「接了键盘（pointer:fine）才显键位行」、平板横屏「有键盘显键位」。
+   手机档（<600）设计上一律「不显键位」；触控设备（非 pointer:fine）也不显——两者都保持原样。 */
+@media (hover:hover) and (pointer:fine){
+  body[data-view="tablet-portrait"] #keys,
+  body[data-view="tablet-landscape"] #keys{display:block;}
+}
+
+/* ---------- 菜单 ---------- */
+#menu-pop{
+  position:absolute;top:calc(44px + env(safe-area-inset-top) + 4px);right:16px;width:220px;z-index:60;
+  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+#menu-pop .grp{font-size:12px;color:#9a8a6a;padding:4px 12px;}
+#menu-pop button,#menu-pop a{
+  display:flex;width:100%;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;
+  font-size:15px;color:var(--ink);text-decoration:none;text-align:left;
+}
+#menu-pop button:hover,#menu-pop a:hover{background:var(--paper-200);}
+#menu-pop .seed{font-size:12px;color:#9a8a6a;padding:4px 12px;word-break:break-all;}
+
+/* ---------- 侧栏 / 抽屉 ---------- */
+#sidebar{width:336px;flex:0 0 auto;background:var(--night-700);position:relative;overflow:auto;padding:12px;}
+#sidebar.collapsed{width:0;padding:0;overflow:visible;}
+#sidebar.collapsed #sidebar-body{display:none;}
+#sidebar-tab{
+  display:none;position:absolute;top:12px;left:-44px;width:44px;height:64px;border-radius:8px 0 0 8px;
+  background:var(--night-700);color:var(--paper-50);font-size:14px;writing-mode:vertical-rl;text-align:center;
+}
+#sidebar.collapsed #sidebar-tab{display:block;}
+.side-sec{margin-bottom:14px;}
+.side-sec h3{margin:0 0 6px;font-size:14px;color:var(--gold-400);}
+.zilu{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;}
+.zl{display:flex;flex-direction:column;align-items:center;font-size:12px;color:var(--paper-200);}
+.zl img{width:40px;height:40px;background:var(--paper-100);border-radius:6px;}
+.zl.new{color:var(--up);}
+.tally{border:1px solid var(--night-line);border-radius:8px;padding:6px;margin:4px 0;font-size:13px;cursor:pointer;}
+.tally.sel{border-color:var(--gold-400);}
+#log{max-height:180px;overflow:auto;font-size:12px;color:var(--muted);padding-left:18px;margin:0;}
+
+#drawer{position:fixed;inset:0;z-index:55;display:flex;flex-direction:column;justify-content:flex-end;}
+#drawer-mask{position:absolute;inset:0;background:rgba(10,11,16,.62);}
+#drawer-body{
+  position:relative;max-height:68dvh;overflow:auto;background:var(--paper-50);color:var(--ink);
+  border-radius:20px 20px 0 0;margin:0 16px 24px;padding:12px 16px;
+}
+
+/* ---------- 目标 ---------- */
+#goals-slip{
+  flex:0 0 auto;min-height:34px;padding:0 10px;border-radius:10px;background:var(--night-700);
+  border:1px solid var(--night-line);font-size:13px;color:var(--paper-200);white-space:nowrap;
+}
+body[data-view="desktop"] #goals-slip{
+  position:absolute;left:16px;top:calc(56px + 8px);z-index:40;min-height:44px;padding:0 12px;font-size:14px;
+}
+#goals-slip .gdot{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid var(--gold-400);margin:0 2px;}
+#goals-slip .gdot.on{background:var(--gold-400);}
+#goals-panel{
+  position:absolute;top:calc(44px + env(safe-area-inset-top) + 56px + 8px);left:16px;width:264px;z-index:60;
+  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+body[data-view="desktop"] #goals-panel{top:calc(56px + 8px + 52px);}
+#goals-panel .goal{display:flex;gap:8px;font-size:14px;line-height:20px;padding:4px 0;}
+#goals-panel .goal .mk{color:var(--bone-crack);}
+#goals-panel .goal.on .mk{color:var(--zhu-600);}
+#sprout,#banner{
+  position:absolute;left:50%;transform:translateX(-50%);z-index:58;max-width:320px;
+  background:var(--paper-100);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+#sprout{top:calc(44px + env(safe-area-inset-top) + 60px);}
+#banner{top:calc(44px + env(safe-area-inset-top) + 8px);font-size:15px;font-weight:700;color:var(--zhu-600);}
+body[data-view="desktop"] #sprout{top:calc(56px + 8px);}
+body[data-view="desktop"] #banner{top:calc(56px + 8px);}
+#banner .bdots{margin-left:6px;}
+
+/* ---------- 挑字 ---------- */
+#pick{position:fixed;inset:0;z-index:70;background:var(--night-800);padding:16px;overflow:auto;display:flex;flex-direction:column;}
+#pick h2{font-size:18px;color:var(--gold-400);margin:8px 0;}
+#pick .season-note{font-size:14px;color:var(--paper-200);}
+#pick .pickslots{display:flex;gap:10px;margin:12px 0;min-height:88px;}
+#pick .pickslot{width:72px;height:88px;border-radius:12px;border:1px dashed var(--night-line);display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;font-size:12px;color:var(--muted);}
+#pick .pickslot img{width:40px;height:40px;background:var(--paper-100);border-radius:6px;}
+#pick .pickslot span{font-size:11px;line-height:1;white-space:nowrap;}
+#pick .pool{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+#pick .cand{width:72px;height:88px;border-radius:12px;background:var(--night-700);border:1px solid var(--night-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--paper-200);}
+#pick .cand img{width:40px;height:40px;background:var(--paper-100);border-radius:6px;}
+#pick .cand .mng{font-size:11px;color:var(--muted);}
+#pick .cand.sel{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);}
+#pick .cand.dim{opacity:.4;}
+#pick .cand.focus{box-shadow:0 0 0 2px var(--gold-400);}
+#pick .cand .badge{position:absolute;}.gocenter{align-items:center;}
+#pick .pickfoot{margin-top:auto;display:flex;padding-top:12px;}
+#pick .go{width:100%;min-height:48px;border-radius:24px;background:var(--night-700);border:1px solid var(--night-line);font-weight:700;font-size:15px;color:var(--muted);}
+#pick .go.ready{background:var(--zhu-600);border-color:var(--zhu-600);color:#fff;}
+#pick .desc{font-size:13px;color:var(--paper-200);min-height:20px;margin-top:6px;}
+#pick .pickinfo{background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 14px;max-width:420px;}
+#pick .pickinfo .pi-h{font-weight:700;font-size:16px;margin-bottom:4px;}
+#pick .pickinfo .pi-h span{font-weight:400;font-size:12px;color:var(--bone-crack);margin-left:6px;}
+#pick .pickinfo .pi-row{display:flex;gap:8px;font-size:13px;line-height:22px;}
+#pick .pickinfo .pi-row b{flex:0 0 40px;color:var(--zhu-600);}
+
+/* 挑字 · 电脑端（design/v4_gamefeel/gf5_pick.html §11）：按 1280 设计稿绝对定位，
+   左挑右看——说明卡在字池网格右侧（不是下方）。
+   坐标帧 = getBoundingClientRect() 视口坐标；#pick 为 fixed inset:0，故与
+   「相对 #pick 边框盒」一致（QA logs/pick_geo.log 的 ov.mjs 取法）。
+   设计稿坐标（1280 宽，含其 56px 顶栏）：h2 x96 y96、挑字格 x96 y160、
+   字池 x96 y256 w560、说明卡 x820 y160 w360、出发键 x96 y640 w320、键位提示 x96 y720。
+
+   W7（1024 视口溢出）：说明卡右缘原为 820+360=1180 > 1024。改为按视口宽等比缩放 x/宽：
+   --pick-w = min(100vw, 1280px)（设计稿宽），各项 x/宽 = 设计稿值 × --pick-w/1280（写成小数）。
+   - 恰好 1280：--pick-w=1280px、--pick-x=0 → 与设计稿逐像素一致（96/160/256/560/820/360/320/640/720）。
+   - ≥1280：--pick-w 封顶 1280px、--pick-x=(100vw-1280)/2 整块水平居中（1440 → +80），y 不变。
+   - 1024–1279：--pick-w=100vw、--pick-x=0，整块随视口等比收窄，说明卡右缘
+     ≤ 0.921875×100vw ≤ 视口宽，全部落在视口内（左缘 ≥0、与字池不重叠）。
+   只缩 x/宽，不缩 y（PM 的 y 数字在 1280 保持不变）。 */
+body[data-view="desktop"] #pick{
+  display:block;
+  padding:0;
+  --pick-w:min(100vw, 1280px);
+  --pick-x:max(0px, calc((100vw - 1280px) / 2));
+}
+body[data-view="desktop"] #pick h2{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:96px;margin:0;}
+body[data-view="desktop"] #pick .pickslots{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:160px;margin:0;}
+body[data-view="desktop"] #pick .pool{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:256px;width:calc(var(--pick-w) * 0.4375);grid-template-columns:repeat(7,1fr);gap:8px;}
+body[data-view="desktop"] #pick .cand{width:auto;}
+body[data-view="desktop"] #pick .desc{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.640625);top:160px;width:calc(var(--pick-w) * 0.28125);margin:0;}
+body[data-view="desktop"] #pick .pickfoot{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:640px;margin:0;padding:0;}
+body[data-view="desktop"] #pick .go{width:calc(var(--pick-w) * 0.25);}
+body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:720px;margin:0;}
+
+/* ---------- 先人 / 结局 / 冬夜 ---------- */
+#elder,#endseq,#winter,#pick{text-align:left;}
+#elder,#endseq{position:fixed;inset:0;z-index:65;background:var(--night-800);padding:24px;overflow:auto;display:flex;flex-direction:column;justify-content:center;}
+#elder .card-e,#endseq .card-e{background:var(--paper-50);color:var(--ink);border-radius:16px;padding:20px;max-width:420px;margin:0 auto;}
+#elder h1,#endseq h1{font-size:22px;margin:0 0 12px;}
+#elder .btnrow,#endseq .btnrow{margin-top:16px;text-align:right;}
+.act{min-height:44px;padding:0 16px;border-radius:10px;background:var(--night-700);border:1px solid var(--night-line);color:var(--paper-50);font-weight:700;}
+.act.primary{background:var(--zhu-600);border-color:var(--zhu-600);color:#fff;}
+#winter{position:fixed;inset:0;z-index:60;background:var(--night-800);padding:16px;overflow:auto;}
+#winter h2{font-size:18px;color:var(--gold-400);}
+#winter .tally{background:var(--night-700);color:var(--paper-50);}
+#winter .comp{width:60px;height:60px;margin:4px;border-radius:8px;border:1px solid var(--night-line);background:var(--night-700);color:var(--paper-200);}
+#winter .comp img{width:34px;height:34px;background:var(--paper-100);border-radius:4px;display:block;margin:0 auto;}
+#winter .comp.sel{border-color:var(--gold-400);}
+#xcv{background:var(--paper-100);border-radius:8px;display:block;margin:8px 0;cursor:crosshair;touch-action:none;max-width:100%;height:auto;}
+
+/* ---------- 存档弹层 / toast ---------- */
+#savedlg{position:fixed;inset:0;z-index:80;background:rgba(10,11,16,.82);display:flex;align-items:center;justify-content:center;padding:12px;}
+#dlgbox{background:var(--night-700);border:1px solid var(--night-line);border-radius:12px;padding:16px;width:min(560px,100%);max-height:92dvh;overflow:auto;}
+#dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:12px/1.5 ui-monospace,Menlo,monospace;}
+#dlgbtns{text-align:right;margin-top:8px;}
+#toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
+  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;}
+#toast.on{opacity:1;}
+#rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
+
+/* ---------- 平板竖屏（600–1023 竖） ---------- */
+body[data-view="tablet-portrait"] #cardwrap{width:min(calc(100vw - 64px),480px);}
+
+/* ---------- 平板横屏（600–1023 横） ---------- */
+body[data-view="tablet-landscape"] #sidebar{display:block;}
+body[data-view="tablet-landscape"] #drawer{display:none;}
+/* #cardwrap 与 .card 同比例：卡槽宽由卡高（已定）经 aspect-ratio 得出。
+   否则 WebKit 对 `height:100%` 的卡在「卡槽宽 auto」收缩时不认 aspect-ratio，
+   拿卡内文字 max-content 当槽宽（实测 377 vs 卡 328），卡被左贴、槽心 ≠ 卡心，
+   字匣（居中在网格列）就不在卡下了（也把 #cardwrap 卡槽右缘算错，气泡偏右）。 */
+body[data-view="tablet-landscape"] #cardwrap{height:min(560px,calc(100dvh - 240px));width:auto;aspect-ratio:328/468;}
+body[data-view="tablet-landscape"] .card{height:100%;width:auto;aspect-ratio:328/468;}
+body[data-view="tablet-landscape"] #wordbox-bar{border-radius:16px;margin:8px 16px;min-height:0;}
+body[data-view="tablet-landscape"] #stage{flex-wrap:nowrap;}
+
+/* ---------- 桌面 ≥1024 ---------- */
+body[data-view="desktop"]{overflow:hidden;}
+body[data-view="desktop"] #app{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:56px 1fr auto;}
+body[data-view="desktop"] #topbar{grid-column:1/3;min-height:56px;padding:8px 16px;min-width:0;}
+body[data-view="desktop"] #dimrow{display:none;}
+body[data-view="desktop"] #stage{grid-column:1/2;min-width:0;}
+body[data-view="desktop"] #wordbox-bar{grid-column:1/2;border-radius:16px;margin:8px 16px;min-height:0;min-width:0;}
+body[data-view="desktop"] #keys{grid-column:1/2;display:block;min-width:0;}
+body[data-view="desktop"] #sidebar{grid-column:2/3;grid-row:2/4;display:block;width:336px;}
+body[data-view="desktop"] #sidebar.collapsed,body[data-view="tablet-landscape"] #sidebar.collapsed{width:0;}
+body[data-view="desktop"] #dims-desktop{display:flex;width:480px;max-width:100%;justify-content:space-between;margin-bottom:4px;}
+body[data-view="desktop"] #dims-desktop .dim{flex:0 0 auto;width:110px;}
+body[data-view="desktop"] #gesture-hint{color:var(--night-line);}
+/* 卡槽宽 = 卡高 × 328/468（同 tablet-landscape 注释）：让 #cardwrap 盒 = 卡盒，
+   卡在槽内居中、字匣（居中在网格列）正好在卡下，矮屏 A/B 也沿用此比例。 */
+body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;aspect-ratio:328/468;}
+body[data-view="desktop"] .card{height:100%;width:auto;aspect-ratio:328/468;}
+/* 桌面教学气泡沉到卡区底部右下：卡角「刻」在卡的右上，气泡在底部就不可能在
+   任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
+body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}
+body[data-view="desktop"] #wordbox{min-height:0;}
+body[data-view="desktop"] .optbtn{width:192px;flex:0 0 auto;}
+
+/* 手机横屏：提示转竖屏（由 JS 显示 #rotate-hint） */
+body[data-view="mobile"] #drawer-body{max-height:68dvh;}
+
+/* ---------- 矮屏分档（design/v3_mobile/BREAKPOINTS.md §矮屏（高度 ≤ 760）） ----------
+   按视口高（innerHeight）分档，只用于 desktop / tablet-landscape（JS 设 body[data-short]，
+   手机与平板竖屏恒为 N）。切换档位直接换尺寸，不加过渡（避免拖动中抖）。
+   档：N >760（原样）· A 601–760 · B ≤600 · 视口高 <492 另出「放大窗口」提示。
+   竖向预算（BREAKPOINTS 表）：
+     A = 顶栏48 + 卡上12 + 卡 + 卡下12 + 字匣60 + 键位(8+28) + 底20 = 188
+     B = 顶栏48 + 卡上16 + 卡 + 卡下16 + 字匣56 + 键位0 + 底36 = 172
+   A/B 把四维资源条并入 48 顶栏（JS 把 #dimrow / #dims-desktop 移进顶栏），
+   卡高因此取「视口高 − 188 / − 172」，卡宽由 .card 的 aspect-ratio 328/468（≈0.7）自动得。 */
+
+/* 顶栏 48：生成行、目标、四维、骨片/季节、☰ 同一行 */
+body[data-short="A"] #topbar,
+body[data-short="B"] #topbar{min-height:48px;padding:2px 8px;}
+body[data-short="A"] #gen-line,
+body[data-short="B"] #gen-line{font-size:12px;}
+/* 矮屏「目标」点击区抬到 ≥44×44（BREAKPOINTS 硬规则），视觉不变：
+   按钮自身 44 高、透明无边框；可见胶囊改由 ::before 居中画出（高 = 44 − 6 − 6 = 32），
+   与原来 81×32 的胶囊逐像素一致。isolation 建层，让 z-index:-1 的胶囊落在文字之后、
+   顶栏背景之上。 */
+body[data-short="A"] #goals-slip,
+body[data-short="B"] #goals-slip{
+  position:relative;isolation:isolate;left:auto;top:auto;
+  /* 去掉 1px 边框后左右各补 1px 内边距（0 8→0 9），盒宽与文字位置与原样一致 */
+  min-height:44px;padding:0 9px;font-size:12px;background:none;border:none;
+}
+body[data-short="A"] #goals-slip::before,
+body[data-short="B"] #goals-slip::before{
+  content:"";position:absolute;left:0;right:0;top:6px;bottom:6px;z-index:-1;
+  border-radius:10px;background:var(--night-700);border:1px solid var(--night-line);
+}
+body[data-short="A"] #topright,
+body[data-short="B"] #topright{gap:6px;font-size:12px;}
+body[data-short="A"] #menubtn,
+body[data-short="B"] #menubtn{width:44px;height:44px;min-width:44px;font-size:22px;}
+/* 资源条并入顶栏后的紧凑样式（desktop 用 #dims-desktop，平板横屏用 #dimrow 里的 .dims） */
+body[data-short="A"] #topbar #dimrow,
+body[data-short="B"] #topbar #dimrow{padding:0;margin:0;flex:1 1 auto;min-width:0;}
+body[data-short="A"] #topbar .dims,
+body[data-short="B"] #topbar .dims{flex:1 1 auto;min-width:0;max-width:340px;gap:8px;margin:0;align-items:center;}
+body[data-short="A"] #topbar .dim,
+body[data-short="B"] #topbar .dim{font-size:10px;}
+body[data-short="A"] #topbar .dim .bar,
+body[data-short="B"] #topbar .dim .bar{height:4px;margin-top:1px;}
+/* 飘字/预览圆点原本画在资源条上方，顶栏里改成画在下方，避免出屏 */
+body[data-short="A"] #topbar .dim .dots,
+body[data-short="B"] #topbar .dim .dots{top:auto;bottom:-9px;height:8px;}
+body[data-short="A"] #topbar .float,
+body[data-short="B"] #topbar .float{top:calc(100% + 2px);}
+
+/* 卡高（宽由 aspect-ratio 得）；#stage 内边距与左右选项宽度按档收窄 */
+body[data-short="A"] #cardwrap{height:clamp(380px,calc(100dvh - 188px),468px);}
+body[data-short="B"] #cardwrap{height:clamp(320px,calc(100dvh - 172px),428px);}
+body[data-short="A"] #stage{padding:12px;gap:8px;}   /* 卡上/下距 12 */
+body[data-short="B"] #stage{padding:16px 12px;gap:8px;} /* 卡上/下距 16 */
+body[data-short="A"] #stage .optbtn{width:160px;}
+body[data-short="B"] #stage .optbtn{width:140px;}
+/* 矮屏不显手势行：设计稿 short_screen_720/600 面板 1 卡下只有卡→字匣→键位；
+   键位提示已由 A 的键位行 / B 顶栏「?」承担，旧整句手势文案在矮屏是重复噪声。 */
+body[data-short] #gesture-hint{display:none;}
+
+/* 字匣：常规 N 64（格 52）/ A 60（格 48）/ B 56（格 48）。
+   N 与 A/B 同理：border-box 下顶边框 1px 会把 64 撑到 65，故去顶边框；
+   把手只服务手机/平板上拉抽屉，桌面 N 与矮屏一样收起（设计稿桌面字匣无把手）。
+   N = 格 52 + 上下内边距 12（BREAKPOINTS §矮屏 表：N 字匣 64（格 52））。 */
+body[data-view="desktop"]:not([data-short]) .wb-handle{display:none;}
+body[data-view="desktop"]:not([data-short]) #wordbox-bar{border-top:0;padding:6px 8px;min-height:64px;}
+
+/* 字匣：A 60（格 48）/ B 56（格 48） */
+body[data-short="A"] #wordbox-bar,
+body[data-short="B"] #wordbox-bar{margin:0 16px;}
+body[data-short="A"] #wordbox-bar{padding:6px 8px;min-height:60px;}
+body[data-short="B"] #wordbox-bar{padding:4px 8px;min-height:56px;}
+body[data-short="A"] .slot,
+body[data-short="B"] .slot{width:48px;height:48px;}
+body[data-short="A"] .slot img,
+body[data-short="B"] .slot img{width:28px;height:28px;}
+
+/* 键位行：A 缩成一行 28；B 收进顶栏「?」浮层（JS 隐藏 #keys） */
+body[data-short="A"] #keys{height:28px;margin:8px 0 20px;padding:0 16px;font-size:12px;line-height:28px;white-space:nowrap;}
+body[data-short="B"] #keys{display:none;}
+body[data-short="B"] #app{padding-bottom:36px;}   /* 底边留白：飘字 / 达成条 */
+
+/* 卡下落字框：矮屏压成一行，别把卡内文挤成两行 */
+body[data-short="A"] .card-drops,
+body[data-short="B"] .card-drops{height:auto;min-height:0;padding:4px 8px;font-size:12px;white-space:nowrap;overflow:hidden;}
+
+/* 桌面矮屏：顶栏行 56→48；四维条（JS 移进顶栏的 #dims-desktop）自适应收窄；
+   字匣按设计稿收成居中胶囊（背景不再整行铺满，教学气泡才有空沟不压它）。 */
+body[data-view="desktop"][data-short] #app{grid-template-rows:48px auto auto auto;align-content:start;}
+body[data-short] .wb-handle{display:none;}   /* 矮屏字匣不带把手：A 高 60 / B 高 56 */
+body[data-short] #topbar #dims-desktop{width:auto;flex:1 1 auto;min-width:0;margin:0;}
+body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
+/* 字匣在矮屏是居中胶囊：去掉顶边框（border-box 下 1px 会把 A/B 撑到 61/57，
+   设计要 60/56 = 格 48 + 上下内边距 12/8），四角同半径。 */
+body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
+
+/* 顶栏「?」键位浮层（B 档；键盘模式才显示）。
+   6 条键位排成两列网格（3 行 × 2 列），高度由内容撑开、不封顶不滚动。
+   选项按钮竖向跟卡中线：选项顶边 = 32 + 卡高/2。矮屏最紧的 491（卡到 320 下限）时
+   选项顶边 = 191.5，浮层顶边固定 52，可用高度 = 139.5。浮层用 12 号字（与 A 档键位行同号）、
+   两列各 3 行，自然高约 100（长句最多两行），492–600 全程 6 行全见、scrollHeight = clientHeight，
+   底边不触选项顶边。宽度 344 贴右：1024 时左缘 = 1024 − 8 − 344 = 672 > 最宽卡右缘 662，不压卡。
+   （不靠宽度避开选项：WebKit 对 #cardwrap 的 auto 宽不认 aspect-ratio，回落 max-content
+   把卡槽撑到 ~377、选项右缘推到 848.5；Chromium 选项右缘 810。靠「两列压高度」两引擎都成立。） */
+#keyhelp-btn{
+  width:44px;height:44px;min-width:44px;display:none;align-items:center;justify-content:center;
+  font-size:18px;font-weight:700;border-radius:8px;color:var(--paper-50);
+  border:1px solid var(--night-line);background:var(--night-700);margin-right:-4px;
+}
+#keyhelp-btn[data-show="1"]{display:flex;}
+#keyhelp-btn:active{background:var(--night-line);}
+#keyhelp-pop{
+  position:absolute;top:calc(48px + 4px);right:8px;width:344px;z-index:61;
+  background:var(--paper-50);color:var(--ink);border-radius:12px;padding:8px 12px;
+  font-size:12px;line-height:16px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+  display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
+}
+#keyhelp-pop .kh-row{display:flex;gap:8px;}
+#keyhelp-pop .kh-row b{flex:0 0 52px;color:var(--zhu-600);}
+
+/* 视口高 <492：顶栏下出一行提示（桌面/平板横屏；点不到东西之前先说清）。
+   左对齐贴住舞台左缘：卡在 320 下限时恒为 224 宽、水平居中，1024 起卡左缘 = (vw−224)/2 ≥ 400，
+   提示右缘 ≤ 285，故与卡（含卡头）不交叠；居中摆放会压住卡头。 */
+#too-short{
+  position:fixed;left:12px;top:calc(48px + 4px);z-index:58;max-width:90vw;
+  background:var(--paper-100);color:var(--ink);border-radius:10px;padding:6px 14px;font-size:13px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;
+}
+
+/* 甲/B 档的面板与浮层贴住 48 顶栏 */
+body[data-short="A"] #menu-pop,
+body[data-short="B"] #menu-pop{top:calc(48px + 4px);}
+body[data-short="A"] #goals-panel,
+body[data-short="B"] #goals-panel{top:calc(48px + 40px);}
+body[data-short="A"] #sprout,
+body[data-short="B"] #sprout{top:calc(48px + 8px);}
+body[data-short="A"] #banner,
+body[data-short="B"] #banner{top:calc(48px + 8px);}
+
+/* 跳档（视口高变化导致 N/A/B 切换）时不加过渡：body 上挂 no-anim 两帧（JS 加/摘），
+   这期间所有过渡禁用，卡/字匣/键位行直接换尺寸，不逐帧补间（避免拖动中抖）。
+   比 prefers-reduced-motion 的 `*{transition-duration:120ms!important}` 具体度高，故能压过它。 */
+body.no-anim, body.no-anim *, body.no-anim *::before, body.no-anim *::after{transition:none !important;}
+
+/* 矮屏挑字：固定 7×2、不滚动（说明卡在网格右侧，不盖格子）。
+   N 档仍是 gf5 §11 的绝对定位稿（见上），A/B 换成网格流式布局并按档收窄。 */
+body[data-view="desktop"][data-short="A"] #pick,
+body[data-view="desktop"][data-short="B"] #pick{
+  display:grid;padding:24px 16px;overflow:hidden;
+  grid-template-areas:"h2 desc" "note desc" "slots desc" "pool desc" "foot desc";
+  align-content:start;justify-content:center;gap:8px 24px;
+}
+body[data-view="desktop"][data-short="A"] #pick{grid-template-columns:496px 280px;}
+body[data-view="desktop"][data-short="B"] #pick{grid-template-columns:440px 260px;padding:16px;}
+body[data-short="A"] #pick h2,
+body[data-short="B"] #pick h2{grid-area:h2;position:static;left:auto;top:auto;margin:0;font-size:16px;}
+body[data-short="A"] #pick .season-note,
+body[data-short="B"] #pick .season-note{grid-area:note;position:static;left:auto;top:auto;margin:0;font-size:13px;}
+body[data-short="A"] #pick .pickslots,
+body[data-short="B"] #pick .pickslots{grid-area:slots;position:static;left:auto;top:auto;margin:0;min-height:0;}
+body[data-short="A"] #pick .pool,
+body[data-short="B"] #pick .pool{grid-area:pool;position:static;left:auto;top:auto;margin:0;width:100%;grid-template-columns:repeat(7,1fr);gap:8px;}
+body[data-short="A"] #pick .desc,
+body[data-short="B"] #pick .desc{grid-area:desc;position:static;left:auto;top:auto;margin:0;width:auto;align-self:start;}
+body[data-short="A"] #pick .pickfoot,
+body[data-short="B"] #pick .pickfoot{grid-area:foot;position:static;left:auto;top:auto;margin:0;padding:0;}
+body[data-short="A"] #pick .pickinfo{max-width:280px;}
+body[data-short="B"] #pick .pickinfo{max-width:260px;}
+/* 格子按档收窄：A 64×76、B 56×64；字 26/22，释义 12/11 */
+body[data-short="A"] #pick .cand{height:76px;font-size:26px;}
+body[data-short="B"] #pick .cand{height:64px;font-size:22px;}
+body[data-short="A"] #pick .pickslot{width:64px;height:62px;font-size:26px;}
+body[data-short="B"] #pick .pickslot{width:56px;height:56px;font-size:22px;}
+body[data-short="A"] #pick .cand .mng{font-size:12px;}
+body[data-short="B"] #pick .cand .mng{font-size:11px;}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:1ms !important;transition-duration:120ms !important;}
+}

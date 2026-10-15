@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>造字人 · 一年里程碑</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1E2230">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body data-view="mobile" data-orient="portrait">
+<div id="app">
+
+  <header id="topbar">
+    <div id="gen-line">第 <span id="gennum">1</span> 代 · 记事人</div>
+    <button id="goals-slip" hidden aria-label="目标"></button>
+    <div id="topright">
+      <span id="bones-chip" title="空骨片">骨片 <b id="bonesnum">3</b></span>
+      <span id="season-chip">春</span>
+      <button id="keyhelp-btn" aria-label="键位说明" aria-haspopup="true" aria-expanded="false">?</button>
+      <button id="menubtn" aria-label="菜单" aria-haspopup="true" aria-expanded="false">☰</button>
+    </div>
+  </header>
+
+  <div id="dimrow">
+    <div id="dims" class="dims"></div>
+  </div>
+
+  <main id="stage">
+    <button id="opt-left" class="optbtn" hidden></button>
+    <div id="cardcol">
+      <div id="dims-desktop" class="dims"></div>
+      <div id="cardwrap">
+        <article id="card" class="card" tabindex="0">
+          <button id="bonecorner" class="bonecorner" aria-label="刻字">刻</button>
+          <div id="card-art" class="card-art" hidden></div>
+          <div class="card-head"><span id="card-season"></span><span class="dot-sep">·</span><span id="card-speaker"></span></div>
+          <h2 id="card-title"></h2>
+          <p id="card-text"></p>
+          <div id="card-drops" class="card-drops" hidden></div>
+        </article>
+      </div>
+      <div id="gesture-hint"></div>
+    </div>
+    <button id="opt-right" class="optbtn" hidden></button>
+    <div id="coachcol"><div id="coach" hidden></div></div>
+  </main>
+
+  <div id="wordbox-bar">
+    <div class="wb-handle" id="wb-handle"></div>
+    <div id="wordbox"></div>
+  </div>
+
+  <footer id="keys"></footer>
+
+  <aside id="sidebar" hidden>
+    <button id="sidebar-tab" aria-label="展开侧栏">字录</button>
+    <div id="sidebar-body"></div>
+  </aside>
+
+  <div id="drawer" hidden><div id="drawer-mask"></div><div id="drawer-body"></div></div>
+
+  <div id="goals-panel" hidden></div>
+  <div id="sprout" hidden></div>
+  <div id="banner" hidden></div>
+
+  <div id="menu-pop" hidden></div>
+  <div id="keyhelp-pop" hidden></div>
+  <div id="too-short" hidden>窗口太矮，放大窗口或全屏（F11）更好玩</div>
+
+  <section id="pick" hidden></section>
+  <section id="elder" hidden></section>
+  <section id="endseq" hidden></section>
+  <section id="winter" hidden></section>
+
+  <div id="savedlg" hidden>
+    <div id="dlgbox">
+      <h3 id="dlgtitle">存档码</h3>
+      <p id="dlgmsg" hidden></p>
+      <textarea id="dlgtext" rows="6" spellcheck="false"></textarea>
+      <div id="dlgbtns">
+        <button class="act" id="dlgcopy">复制</button>
+        <button class="act" id="dlgapply">导入</button>
+        <button class="act" id="dlgclose">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotate-hint" hidden>把手机横过来不如转回竖屏——这一版先只做竖屏。</div>
+  <div id="toast" aria-live="polite"></div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

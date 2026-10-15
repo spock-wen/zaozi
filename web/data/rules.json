@@ -1,0 +1,107 @@
+{
+  "schema_version": "1",
+  "_说明": "一年里程碑用到的玩法规则（机读）。数值取自 GAMEPLAY_B_ZAOZI.md，节号写在 source 里。标「占位」的是玩法稿还没给数字、为了能跑先放的值，改玩法稿时同步改这里。",
+  "version": "m1-2026-10-12",
+  "dims": {
+    "keys": ["food", "faith", "memory", "outsider"],
+    "names": { "food": "粮", "faith": "信", "memory": "记", "outsider": "外" },
+    "start": 50,
+    "min": 0,
+    "max": 100,
+    "option_moves_dims": [1, 3],
+    "option_delta_abs": [4, 12],
+    "source": "§3 四维；§1.3 开始"
+  },
+  "endings_fail": {
+    "food":     { "low": "饥年",   "high": "仓满招寇" },
+    "faith":    { "low": "失祀",   "high": "封骨" },
+    "memory":   { "low": "旧水重来", "high": "宿怨" },
+    "outsider": { "low": "兵祸",   "high": "并族" },
+    "trigger": "任一维 <= 0 或 >= 100；每张卡结算后、冬夜刻完后各判一次",
+    "source": "§3.2；§1 流程图"
+  },
+  "endings_good": {
+    "years_used_up": "寿终传笔",
+    "middle_range": [1, 99],
+    "middle_range_note": "占位：玩法稿只写「四维都在中间」，没给数字。里程碑里只要没触发失败结局即判寿终传笔；主线、隐藏线结局不在一年里程碑范围内",
+    "source": "§3.3"
+  },
+  "year": {
+    "seasons": ["spring", "summer", "autumn", "winter"],
+    "season_names": { "spring": "春", "summer": "夏", "autumn": "秋", "winter": "冬" },
+    "cards_per_season": [2, 3],
+    "winter_night_after_last_winter_card": true,
+    "card_order": "同一季内的卡按种子洗牌；季与季按春夏秋冬顺序",
+    "source": "§1.1"
+  },
+  "generation": {
+    "years_left_range": [3, 5],
+    "milestone_years_override": 1,
+    "milestone_note": "一年里程碑把余年固定为 1，只为验收；不是玩法改动",
+    "heir_choice": 2,
+    "reset_on_new_generation": ["dims", "bones", "characters_attitude"],
+    "carry_over": ["zilu", "mainline", "hidden_markers", "family_tree", "one_tally"],
+    "max_tally_carry": 1,
+    "source": "§1.3；§4.2"
+  },
+  "bones": {
+    "start": 3,
+    "max_per_generation": 5,
+    "source": "§1.3；§2.2"
+  },
+  "engrave_tally": {
+    "bone_cost": 1,
+    "delta": { "faith": -3, "memory": 3 },
+    "one_trace_per_card": true,
+    "needs_empty_bone": true,
+    "source": "§1.2 刻；§3"
+  },
+  "word_box": {
+    "slots": 3,
+    "inherited_tally_takes_slot": true,
+    "source": "§1.3；§2.4"
+  },
+  "drop_char": {
+    "once_per_char_per_generation": true,
+    "dropped_char_not_component_this_generation": true,
+    "third_option_needs_negative": true,
+    "source": "§1.2 落字；§2.2；§2.4"
+  },
+  "winter_night": {
+    "component_pool": "字录里所有已造的字 − 这一代落过的字",
+    "component_not_consumed": true,
+    "same_component_twice_allowed": true,
+    "new_char_usable_from": "next_generation",
+    "correct_delta": { "memory": 6 },
+    "wrong_delta": { "memory": -4 },
+    "wrong_breaks_bone": true,
+    "wrong_voids_tally": true,
+    "other_real_char_counts_wrong": true,
+    "can_defer": true,
+    "deferred_tally_keeps_bone": true,
+    "low_memory_threshold": 30,
+    "low_memory_effect": "事签缺几个词（只影响显示）",
+    "methods": {
+      "huiyi":  { "name": "会意", "input": "从部件里挑两个", "check": "两个部件与目标拆法相同（不计顺序）" },
+      "zhishi": { "name": "指事", "input": "挑一个底字 + 上/中/下一处", "positions": ["top", "middle", "bottom"], "check": "底字和位置都对" },
+      "xiangxing": { "name": "象形", "input": "依次点三个亮点（描迹的退路）", "check": "三点顺序与目标一致" }
+    },
+    "clues": {
+      "half_right": "两个部件对一个：对的那个记进字录这个字的格子（残片线索）",
+      "other_real_char": "拼出别的真字：在那个字的格子记一条「A + B 是一个字」"
+    },
+    "source": "§1.2；§2.1；§2.2；§3"
+  },
+  "bone_requests": {
+    "only_empty_bone": true,
+    "if_no_empty_bone": "改为交出一张事签的骨片，那张事签作废",
+    "source": "§2.2 骨片给不给"
+  },
+  "validator_rules": [
+    { "id": "V1", "text": "每个字至少有落字或解锁之一", "status": "stub" },
+    { "id": "V2", "text": "每个落字选项的数值变化里至少有一项是负数", "status": "implemented" },
+    { "id": "V3", "text": "事签文案不能出现部件字、部件同义词、目标字和目标字同义词（按禁用词表）", "status": "implemented" },
+    { "id": "V4", "text": "每个会意字的事签能出现时，部件里至少已有 2 个近似字", "status": "stub" },
+    { "id": "V5", "text": "指事字的底字必须在首版字表里", "status": "implemented" }
+  ]
+}
