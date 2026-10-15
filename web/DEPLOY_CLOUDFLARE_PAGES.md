@@ -40,4 +40,3 @@ git log c249971^2 -- <去掉 web/ 前缀的路径>
 #     现在的 web/REDESIGN_REPORT.md → git log c249971^2 -- REDESIGN_REPORT.md
 ```
 （在 `web/` 子目录里执行时，git 会把路径当成相对当前目录，查不到；要在仓库根执行。）合入之后的改动照常用 `git log -- web/<路径>` 查看。
-
