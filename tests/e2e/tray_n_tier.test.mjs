@@ -40,7 +40,9 @@ const tray = (page) =>
     const Q = (s) => { const e = document.querySelector(s); return e ? R(e) : null; };
     const slots = [...document.querySelectorAll("#wordbox .slot")].map((e) => {
       const r = R(e);
-      const t = document.elementFromPoint(r.x + r.w / 2, r.y + r.h / 2);
+      const safePt = (r) => { const L = Math.max(r.x, 0) + 1, R = Math.min(r.right, innerWidth) - 1, T = Math.max(r.y, 0) + 1, B = Math.min(r.bottom, innerHeight) - 1; return R > L && B > T ? [(L + R) / 2, (T + B) / 2] : null; };
+      const p = safePt(r);
+      const t = p ? document.elementFromPoint(p[0], p[1]) : null;
       return { ...r, covered: !(t && t.closest(".slot") === e) };
     });
     return {

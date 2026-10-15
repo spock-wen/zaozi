@@ -47,7 +47,9 @@ const snap = (page) =>
       const e = document.querySelector(s);
       if (!e) return "none";
       const r = e.getBoundingClientRect();
-      const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      const safePt = (r) => { const L = Math.max(r.left, 0) + 1, R = Math.min(r.right, innerWidth) - 1, T = Math.max(r.top, 0) + 1, B = Math.min(r.bottom, innerHeight) - 1; return R > L && B > T ? [(L + R) / 2, (T + B) / 2] : null; };
+      const p = safePt(r);
+      const t = p ? document.elementFromPoint(p[0], p[1]) : null;
       return t ? (t.closest(s) ? "self" : t.id || t.className) : "none";
     };
     return {
