@@ -76,6 +76,8 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 .card-art img{display:block;width:100%;height:auto;aspect-ratio:296/216;object-fit:contain;}
 /* 卡内图片不许原生拖拽：否则鼠标从图上起拖会触发 dragstart→pointercancel，卡不跟手（工程审核 0759c65 P1） */
 #card img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
+/* 卡内文字不可选：从卡中心拖会顺手选中「卡头→图片」，选区残留时再拖，chromium 取消拖卡、webkit 卡粘手并误提交「选右」（工程审核 f96632f P1-1） */
+#card{user-select:none;-webkit-user-select:none;}
 .card-drops{
   position:absolute;left:16px;right:16px;bottom:16px;height:56px;border:1px dashed var(--bone-crack);
   border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#7a6a4e;
