@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>造字人 · 字源与版权</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* 窄屏（390px 竖屏）不能让这张宽表把页面横向撑开：表格自己横向滚动，长网址在格子里折断。 */
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tablewrap table { width: 100%; }
+.tablewrap th, .tablewrap td { word-break: break-word; overflow-wrap: anywhere; }
+.url { word-break: break-all; overflow-wrap: anywhere; }
+@media (max-width: 430px) {
+  .tablewrap table { min-width: 0; }
+  .tablewrap th, .tablewrap td { padding: 4px 6px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<main id="credits">
+  <h1>造字人 · 字源与版权</h1>
+  <p>本页列出游戏里用到的全部字形及其出处，共 __COUNT__ 条，每条列出字、阶段、来源、许可、署名、原始链接。下面这些链接只是文字，页面不会去访问它们。</p>
+  <p>本游戏所用字形中，取自维基共享资源（Wikimedia Commons）的属公有领域，取自小学堂的以 CC0 发布。</p>
+  <p>部分字形取自 Richard Sears 的汉字字源（Chinese Etymology）资料，特此致谢。</p>
+  <p><a href="index.html">返回游戏</a></p>
+  <h2>字形出处</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>字</th><th>阶段</th><th>来源</th><th>许可</th><th>署名</th><th>原始链接</th></tr></thead>
+      <tbody>
+__ROWS__
+      </tbody>
+    </table>
+  </div>
+  <p class="team">造字人 团队</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,12 @@
+[
+{"id":"C01","season":"spring","speaker":"族长","text":"春汛退了，河滩露出一大片软泥。族长想趁早全族下滩抢种。"},
+{"id":"C02","season":"spring","speaker":"采集的妇人","text":"一夜大雨，北坡塌下去一块。她说坡下露出了怪东西，没人敢过去看。"},
+{"id":"C03","season":"spring","speaker":"巫","text":"播种前，巫要拿一头小牲口祭河。"},
+{"id":"C04","season":"summer","speaker":"东岸的使者","text":"东岸的猎手趁水浅过了河，在我们的猎场上下了套。"},
+{"id":"C05","season":"summer","speaker":"北山来的赶路者","text":"一个北山来的赶路者走到村口，热得走不动了。"},
+{"id":"C06","season":"summer","speaker":"守堤的老汉","text":"夜里河水涨过了第二道土坎，再涨就要漫进粟地。"},
+{"id":"C07","season":"autumn","speaker":"族里最壮的汉子","text":"满满一车粟陷进了泥里，几个后生推不动。"},
+{"id":"C08","season":"autumn","speaker":"北山的人","text":"北山的人赶着两头牛来，想拿牛骨换我们的粟种。"},
+{"id":"C09","season":"winter","speaker":"巫","text":"冬祭到了。巫要一片骨片去占来年的收成。"},
+{"id":"C10","season":"winter","speaker":"族长","text":"雪下了三天，族长要清点过冬的粮，看够不够撑到开春。"}
+]

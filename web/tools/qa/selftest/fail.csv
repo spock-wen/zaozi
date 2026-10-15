@@ -1,0 +1,3 @@
+用例,判定,原因,证据路径
+A,PASS,,a.png
+B,FAIL,白屏,shots/b.png
