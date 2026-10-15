@@ -3,3 +3,4 @@ node_modules/
 *.log
 .commandcode/
 dist/
+node_modules
