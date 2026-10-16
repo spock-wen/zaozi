@@ -173,6 +173,47 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
+  test(`${engine} 1280: 飞出期间的带修饰键和非游戏键不排队、不拦浏览器默认`, async () => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      await page.evaluate(() => {
+        window.__prevented = [];
+        addEventListener("keydown", (e) => { if (window.__zz.animating && ((e.ctrlKey && e.key === "ArrowLeft") || e.key === "Tab")) window.__prevented.push(`${e.ctrlKey ? "Ctrl+" : ""}${e.key}:${e.defaultPrevented}`); });
+      });
+      const n0 = await actionsLen(page);
+      await press(page, ["ArrowLeft", "ArrowLeft", "Control+ArrowLeft", "Tab"]);
+      await settle(page);
+      assert.deepEqual(await sidesFrom(page, n0), ["left"], "Ctrl+← 不能被当成裸 ← 重放去提交下一张");
+      assert.equal(await optOn(page, "opt-left"), false, "Ctrl+← 不应在下一张上留下预览");
+      assert.deepEqual(await page.evaluate(() => window.__prevented), ["Ctrl+ArrowLeft:false", "Tab:false"], "飞出期间 Ctrl+← 和 Tab 不应被 preventDefault");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test(`${engine} 1280: 飞出后进入刻字时，飞出期间按的键不带进刻字界面`, async () => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      let reached = false;
+      for (let i = 0; i < 40 && !reached; i++) {
+        const ph = await page.evaluate(() => window.__zz.st.phase);
+        if (ph === "engrave") { await page.keyboard.press("s"); await settle(page); continue; }
+        assert.equal(ph, "card", `应在出卡阶段（实为 ${ph}）`);
+        const n0 = await actionsLen(page);
+        await press(page, ["ArrowLeft", "ArrowLeft", "s"]);
+        await settle(page);
+        const r = await page.evaluate((n) => ({ phase: window.__zz.st.phase, types: window.__zz.actions.slice(n).map((a) => a.type) }), n0);
+        if (r.types.length === 1 && r.phase === "engrave") reached = true;
+        else assert.deepEqual(r.types, ["choose"], `飞出期间的 s 不应在出卡阶段产生动作：${JSON.stringify(r)}`);
+      }
+      assert.ok(reached, "←← 后应停在刻字界面，飞出期间按的 s 不能替玩家跳过刻字");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
+
   test(`${engine} 1280 reduce: 飞出期间按 ← 只预览下一张，不提交`, async () => {
     const { ctx, page, errs } = await setup(engine, { reducedMotion: "reduce" });
     try {
