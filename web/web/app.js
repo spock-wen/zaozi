@@ -854,19 +854,30 @@ function render() {
 const cardEl = () => $("card");
 function threshold() { return DRAG_RATIO * cardEl().getBoundingClientRect().width; }
 
+// 试着在 #card 上捕获指针：真实指针成功，合成指针（e2e 触屏 PointerEvent）会抛，吞掉即可。
+const captureCard = (id) => { try { cardEl().setPointerCapture?.(id); } catch { /* 合成指针会抛 */ } };
+// 起拖：onDown 与「排队 press 的重放」共用同一段（round 4 A5）。置拖拽态、加 .dragging、挂长按计时。
+function beginDrag(x, pointerId) {
+  ui.dragging = true; ui.dragged = false; ui.startX = x;
+  cardEl().classList.add("dragging");
+  captureCard(pointerId);
+  ui.holdT = setTimeout(() => { if (ui.dragging && Math.abs(ui.dx) < 8) { ui.hold = true; render(); } }, 300);
+}
+const queuedPress = (id) => ui.keyQueue.find((it) => it.kind === "press" && it.id === id);
 function onDown(e) {
   if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
   if (st.phase !== "card" || inputBusy()) return;
   // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
   // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
   if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
-  ui.dragging = true; ui.dragged = false; ui.startX = e.clientX;
-  cardEl().classList.add("dragging");
-  cardEl().setPointerCapture?.(e.pointerId);
-  ui.holdT = setTimeout(() => { if (ui.dragging && Math.abs(ui.dx) < 8) { ui.hold = true; render(); } }, 300);
+  beginDrag(e.clientX, e.pointerId);
 }
 function onMove(e) {
-  if (!ui.dragging) return;
+  if (!ui.dragging) {
+    const p = queuedPress(e.pointerId);        // 排队中的 press：先把位置记上，重放起拖时用它当起点
+    if (p && p.down) p.x = e.clientX;
+    return;
+  }
   ui.dx = e.clientX - ui.startX;
   if (Math.abs(ui.dx) > 8) { ui.dragged = true; clearTimeout(ui.holdT); ui.hold = false; }
   if (Math.abs(ui.dx) >= threshold() && !ui._thr) { ui._thr = true; sfx.threshold(); }
@@ -880,8 +891,17 @@ function applyTilt() {
   cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg}deg)`;
 }
 function renderDimsOnly() { const d = dimsHTML(); patchHTML($("dims"), d); patchHTML($("dims-desktop"), d); const s = previewSide(); $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
-function onUp() {
-  if (!ui.dragging) return;
+function onUp(e) {
+  if (!ui.dragging) {
+    // 排队中的 press 松手：按抬起时的位移决定「在队列原位变成一次 side 提交」还是整项丢弃。
+    const it = queuedPress(e.pointerId);
+    if (!it) return;
+    it.x = e.clientX; it.down = false;
+    const i = ui.keyQueue.indexOf(it), dx = it.x - it.startX;
+    if (e.type === "pointerup" && Math.abs(dx) >= threshold()) ui.keyQueue[i] = { kind: "side", dir: dx < 0 ? "left" : "right" };
+    else ui.keyQueue.splice(i, 1);
+    return;
+  }
   clearTimeout(ui.holdT);
   ui.dragging = false; cardEl().classList.remove("dragging");
   const thr = threshold(), dx = ui.dx;
@@ -920,7 +940,17 @@ function flyOut(targetX, done) {
 // 只在按下点真的落在 #card 内才起拖：按坐标判定会在「浮层盖住卡」时（#drawer-mask / #savedlg /
 // 菜单 / 目标面板…）也在卡上方起拖，onDown 的 setPointerCapture 把随后的 click 重定向到 #card，
 // 浮层自身的关闭点击就永远不触发（Firefox 390 触屏 6/6）。改用命中目标判定。
-addEventListener("pointerdown", (e) => { if (e.target.closest("#card") && !e.target.closest("button")) onDown(e); });
+// 不忙时：按下点在 #card 内（非按钮）才起拖。忙时（飞出/入场/有排队项）：#cardwrap 内也算——
+// 此刻不能立即起拖，就把它当成排队的一次 press，等卡落定后由重放起成实拖（round 4 A1）。
+addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button")) return;
+  if (inputBusy()) {
+    if (e.isPrimary && e.target.closest("#cardwrap")) {
+      captureCard(e.pointerId);
+      enqueueInput({ kind: "press", id: e.pointerId, pointerType: e.pointerType, startX: e.clientX, x: e.clientX, down: true });
+    }
+  } else if (e.target.closest("#card")) onDown(e);
+});
 // 卡上不许原生拖拽（图片 / 选中内容）：dragstart 一律拦掉，否则 webkit 丢 pointerup 粘卡、其他引擎 pointercancel。
 cardEl().addEventListener("dragstart", (e) => e.preventDefault());
 addEventListener("pointermove", onMove);
@@ -992,10 +1022,28 @@ function enqueueInput(item) {
   armDrain();
 }
 const drainStep = () => {
-  whenCardEntryDone().then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (st.phase !== "card" || !$("savedlg").hidden || ui.menuOpen) { ui.keyQueue.length = 0; ui.drainArmed = false; return; }
+  // 触屏窗口（round 4 A4）：等飞出结束；若队列头是一次仍按住的 press，就把卡的入场过渡直接结束，
+  // 让卡立刻落定——「拖不动」的窗口只剩飞出 + 两帧，否则还要再等 ~400ms 的入场过渡。
+  const settle = new Promise((resolve) => {
+    const step = () => {
+      if (ui.animating) { requestAnimationFrame(step); return; }
+      const head = ui.keyQueue[0];
+      if (head && head.kind === "press" && head.down) cardEl().getAnimations().forEach((a) => a.finish());
+      resolve();
+    };
+    step();
+  });
+  settle.then(() => whenCardEntryDone()).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (st.phase !== "card" || !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden) { ui.keyQueue.length = 0; ui.drainArmed = false; return; }
+    if (ui.dragging) { ui.drainArmed = false; armDrain(); return; }   // 拖拽中：本帧不重放，下一帧再试
     const item = ui.keyQueue.shift();
     if (!item) { ui.drainArmed = false; return; }
+    if (item.kind === "press") {                                      // 排队的按下：仍按住就起成实拖（round 4 A3）
+      ui.drainArmed = false;
+      if (item.down) beginDrag(item.x, item.id);
+      if (ui.keyQueue.length) armDrain();
+      return;
+    }
     applyQueued(item);
     if (ui.keyQueue.length) { ui.drainArmed = false; armDrain(); }
     else ui.drainArmed = false;

@@ -171,7 +171,8 @@ for (const [engine] of Object.entries(ENGINES)) {
           const c = document.getElementById("card");
           return !window.__zz.animating && c.classList.contains("dragging");
         }, null, { timeout: 3000 });                         // 等重放把这次 press 起成实拖
-        for (let i = 1; i <= 6; i++) await p.move(box.cx + box.w * 0.1 * i, box.cy);
+        // 每步隔一帧以上：真手指的移动跨越多帧；否则 webkit/firefox 里 6 次 move+up 会挤进同一帧，录帧器看不到 .dragging。
+        for (let i = 1; i <= 6; i++) { await p.move(box.cx + box.w * 0.1 * i, box.cy); await page.waitForTimeout(20); }
         await p.up(box.cx + box.w * 0.6, box.cy);
         await settle(page);
 
