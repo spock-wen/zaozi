@@ -54,7 +54,8 @@ async function press(page, keys) {
 async function settle(page) {
   await page.evaluate(() => { window.__settleFrom = 0; });
   await page.waitForFunction(() => {
-    if (window.__zz.animating) { window.__settleFrom = 0; return false; }
+    // 动画停了还不算稳：排队输入要等队列清空、重放完（queued = 待重放项 + 已挂起的 drain）。
+    if (window.__zz.animating || (window.__zz.queued ?? 0) !== 0) { window.__settleFrom = 0; return false; }
     const now = performance.now();
     if (!window.__settleFrom) window.__settleFrom = now;
     return now - window.__settleFrom >= 400;
