@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`493fc288fb26`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`d2d3ab13b273`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -223,9 +223,9 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - Docs: corrected the round 23 description of when the selection is cleared (see above).
 - D1/H14 (P1, 测试 35/35 repro): the engrave-phase lock hint toast 「先点卡角骨片刻下这件事」 was only dismissed by its 1800 ms timer, so after carving it stayed (plus a .3s fade) over T04's #coach; now `dispatch` hides the toast immediately whenever the card or phase changes (`hideToast`), and a hidden `#toast` is `visibility:hidden` so it no longer paints or hit-tests. Regression test toast_coach (3 engines × 360×640/390×844/1280×800/1280×600): after carving, #toast not shown and the #coach center hits #coach. Fails 12/12 on 00f7e5a.
 
-## 飞出期间按键（branch fix/web-flyout-keys，基于 #8 tip ab448a2；VERSION 493fc288fb26）
-- 问题：卡片飞出（240ms）期间按的键被吞或误执行：不同方向的一下只设了 kbDir，被飞出结束的 dispatch 清掉（丢键）；同方向再按一下会开出第二段重叠飞出，一下就盲提交了只显示约 34ms 的下一张，并让 animating 提前变 false；减少动态效果的飞出不设 animating。
-- 修复（web/app.js）：动画期间按下的出卡键（←/→/Enter/Digit1–3，不带 Ctrl/⌘/Alt，长按重复除外）进 FIFO 队列，每个动画出口 drainKeys() 用同一 handleKey 按序各执行一次；飞出后或重放的数字键落子后不再是出卡阶段就清空队列（每重放一个键前都检查）（不替玩家在刻字/冬夜上按 S/K/Enter）；其它键动画期间不入队、不 preventDefault；Space/Escape 不入队；减少动态飞出补上 animating。
-- 设计取舍：与第 11 轮「飞出期间按键丢弃」的裁定不同，需 PM 确认；单独一个方向键只预览，不提交。
-- 测试 flyout_keys（3 引擎 × 7 例）：→ 只预览 / ← 不提交 / →→ 按序两次提交不重叠 / 轻点 Space 不留按住 / Ctrl+← 与 Tab 不排队不拦默认 / 刻字边界不带键 / 减少动态 ← 不提交。旧代码上对应例全挂。等价性脚本：快按与慢按 60/60 一致（旧代码 chromium 5/20）。
-
+## 飞出期间按键（branch fix/web-flyout-keys，基于 #8 tip 9462842；VERSION d2d3ab13b273）
+- 问题：卡片飞出（240ms）期间的输入被吞或误执行：不同方向的一下被飞出结束的 dispatch 清掉（丢键）；同方向再按一下开出第二段重叠飞出，盲提交下一张；飞出期间点字格会先在飞走的卡上落字、再盲提交下一张（F2，main 上就有）。
+- 规则（用户裁定：排队；键盘、鼠标、触摸同一条）：出卡阶段里卡在飞出、入场过渡没停稳、或队列里还有没回放完的项时，离散输入（出卡键 ←/→/Enter/1–3、点字格、点左右选项）一律按顺序入队；拖拽手势无法排队，此时不起手。回放一次只放一项：等当前卡入场停稳（whenCardEntryDone）再过两帧 rAF（停稳的卡至少画出一帧）才执行，放完一项若还有，再等一次。换阶段或存档框/菜单打开时整队作废。
+- 其它：存档框/菜单开着时键不动卡；出卡阶段焦点在牌桌外按钮（如 ☰）上时 Enter 归按钮；按住方向键的自动重复只预览一次、不提交；Esc 能关 ☰ 菜单（F4）；带修饰键/非出卡键动画期间不拦不排；删掉 commitSide 里的死代码 thr。
+- 结构：唯一入队口 enqueueInput、唯一启动口 armDrain，动画出口不再各自调用 drain；由单测 tests/flyout_queue_static.test.mjs 锁住。
+- 测试：flyout_keys（3 引擎 × 7 例）+ flyout_settle（3 引擎 × 12 例：回放前卡已停稳并画出 ≥2 帧、数字键不落在没上屏的卡、鼠标/触摸点字格、点选项、菜单/存档框、焦点按钮 Enter、自动重复、Esc 关菜单），在 a217560 上 36/36 失败。自测脚本：每个回放输入作用前目标卡已停稳 ≥2 帧（3 引擎 min 29–32ms）。
