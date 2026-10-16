@@ -102,6 +102,35 @@ test("drainStep 先等入场落定再走两帧 rAF，并在换阶段/浮层打�
   assert.match(body, /drawer/, "drainStep 应在抽屉打开时清空队列");
 });
 
+test("handleKey 的 Escape 分支：通用分支清空整个队列，存档框分支不清", () => {
+  assert.match(src, /function\s+clearQueue\s*\(/, "应有 function clearQueue");
+  const body = bodyOf("handleKey");
+  const escLines = body.split("\n").filter((l) => /e\.key\s*===\s*"Escape"/.test(l));
+  assert.equal(escLines.length, 2, `handleKey 应有两个 Escape 分支，实为 ${escLines.length}`);
+  const generic = escLines.find((l) => !/savedlg/.test(l));
+  const dlg = escLines.find((l) => /savedlg/.test(l));
+  assert.ok(generic, "应有不涉及 savedlg 的通用 Escape 分支");
+  assert.ok(dlg, "应有 savedlg Escape 分支");
+  assert.match(generic, /clearQueue\s*\(/, `通用 Escape 分支应先调用 clearQueue()：${generic.trim()}`);
+  assert.ok(!/clearQueue\s*\(/.test(dlg), `存档框 Escape 分支不应调用 clearQueue()：${dlg.trim()}`);
+});
+
+test("浮层键盘：keydown 先判 modalOpen，再 Enter 守卫、再 inputBusy；Esc 关浮层不清队列", () => {
+  assert.match(src, /function\s+modalOpen\s*\(/, "应有 function modalOpen");
+  assert.match(src, /function\s+closeOverlay\s*\(/, "应有 function closeOverlay");
+  assert.ok(!/clearQueue\s*\(/.test(bodyOf("closeOverlay")), "closeOverlay 不应调用 clearQueue（Esc 关浮层不清队列）");
+
+  const kd = handlers.find((h) => h.name === 'addEventListener("keydown")');
+  assert.ok(kd, '应有 addEventListener("keydown") 监听');
+  const body = src.slice(kd.start, kd.end);
+  const iModal = body.indexOf("modalOpen()");
+  const iEnter = body.indexOf('e.key === "Enter"');
+  const iBusy = body.indexOf("inputBusy()");
+  assert.ok(iModal >= 0, "keydown 开头应先判 modalOpen()");
+  assert.ok(iEnter > iModal, "modalOpen() 判定应在 Enter 守卫之前");
+  assert.ok(iBusy > iModal, "modalOpen() 判定应在 inputBusy() 之前");
+});
+
 test("动画出口 flyOut / rebound 不再调用任何 drain", () => {
   assert.match(
     bodyOf("flyOut"),

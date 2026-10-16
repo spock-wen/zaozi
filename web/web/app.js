@@ -17,6 +17,7 @@ const DIMS = RULES.dims.keys, DIMNAME = RULES.dims.names, SEASON = RULES.year.se
 const METHOD = Object.fromEntries(Object.entries(RULES.winter_night.methods).map(([k, v]) => [k, v.name]));
 const POSNAME = { top: "上", middle: "中", bottom: "下" };
 const DRAG_RATIO = INPUT.card.drag.commit_threshold_ratio;   // 0.35
+const DWELL_MS = 250;   // 排队输入生效前，目标卡「落定并绘制」后还要多留的最短停留（round 5 A）
 const SIDEBAR_KEY = "zaozi.sidebar.open";
 const MUTE_KEY = "zaozi.mute";
 const MOTION_KEY = "zaozi.motion";
@@ -38,6 +39,7 @@ let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
   preview: false, kbDir: null, animating: false, floats: {}, keyQueue: [], drainArmed: false,
+  settleKey: null, settledAt: 0, dwellT: 0, commitNotBefore: 0, heldCommitT: 0,   // round 5：最短停留 / 提交不早于
   winter: freshWinter(),
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false,
@@ -871,6 +873,7 @@ function onDown(e) {
   // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
   if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
   beginDrag(e.clientX, e.pointerId);
+  ui.commitNotBefore = 0;                                 // 现场起拖：松手即可提交，不受最短停留约束
 }
 function onMove(e) {
   if (!ui.dragging) {
@@ -907,8 +910,18 @@ function onUp(e) {
   const thr = threshold(), dx = ui.dx;
   const wasHold = ui.hold; ui.hold = false;
   if (Math.abs(dx) >= thr) {
-    sfx.commit();
-    flyOut(Math.sign(dx) * 620, () => dispatch(dx < 0 ? INPUT.card.drag.left_action : INPUT.card.drag.right_action));
+    const target = Math.sign(dx) * 620, act = dx < 0 ? INPUT.card.drag.left_action : INPUT.card.drag.right_action;
+    if (performance.now() < ui.commitNotBefore) {
+      // 还在最短停留窗口内：卡停在松手处不动，等窗口结束再飞出提交（round 5 A）；期间 animating 让后续输入继续排队。
+      ui.animating = true;
+      ui.heldCommitT = setTimeout(() => {
+        ui.heldCommitT = 0; ui.animating = false; sfx.commit();
+        flyOut(target, () => dispatch(act));
+      }, ui.commitNotBefore - performance.now());
+    } else {
+      sfx.commit();
+      flyOut(target, () => dispatch(act));
+    }
   } else {
     if (wasHold) sfx.rebound();
     else if (ui.dragged) sfx.rebound();
@@ -957,7 +970,18 @@ addEventListener("pointermove", onMove);
 addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);
 
+// 模态浮层：存档框 / ☰ 菜单 / 目标面板 / 移动抽屉（键位浮层不是模态）。
+function modalOpen() { return !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden; }
+// 关掉「最上面」的浮层：存档框最后开、最先关；否则关菜单/目标面板/抽屉。只关浮层，不动输入队列。
+function closeOverlay() {
+  if (!$("savedlg").hidden) { closeDlg(); return; }
+  ui.menuOpen = false; ui.panelOpen = false; $("drawer").hidden = true;
+  renderMenu(); render();                              // render() 内含 renderGoalPanel()，目标面板随之收起
+}
 addEventListener("keydown", (e) => {
+  // 浮层打开时键盘属于它：Esc 只关浮层；出卡阶段其它键（方向/落字/Enter…）既不排队也不处理，
+  // 也不拦默认（存档框里打字、菜单按钮上的 Enter 等原生行为照旧）。其它阶段落入下方原有逻辑。
+  if (modalOpen()) { if (e.key === "Escape") { closeOverlay(); return; } if (st.phase === "card") return; }
   // 出卡阶段焦点在牌桌外的按钮/输入控件上（如 ☰）时，Enter 归该控件：不拦默认、不入队、不处理游戏。
   // 牌桌内的卡、字匣格、左右选项不算：点过它们焦点会留在上面，Enter 仍是「提交预览」。
   if (e.key === "Enter" && st.phase === "card" && e.target?.closest?.("button, a[href], input, textarea, select")
@@ -973,8 +997,8 @@ addEventListener("keydown", (e) => {
   handleKey(e);
 });
 function handleKey(e) {
-  if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }
-  if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; renderMenu(); render(); return; }
+  if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }   // 关存档框不清队列（keydown 的 modalOpen 分支已先接管）
+  if (e.key === "Escape") { clearQueue(); ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; renderMenu(); render(); return; }
   if (st.phase === "pick") {
     // 键盘光标、金色焦点框和鼠标悬停是同一个状态 ui.pickFocus（P1-2）：
     // 移动光标时同步重绘焦点框和说明卡；Space 选中的就是框里的字。
@@ -1034,13 +1058,21 @@ const drainStep = () => {
     step();
   });
   settle.then(() => whenCardEntryDone()).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (st.phase !== "card" || !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden) { ui.keyQueue.length = 0; ui.drainArmed = false; return; }
+    if (st.phase !== "card" || !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden) { clearQueue(); ui.drainArmed = false; return; }
     if (ui.dragging) { ui.drainArmed = false; armDrain(); return; }   // 拖拽中：本帧不重放，下一帧再试
+    const key = st.current + "|" + actions.length;                     // 这张卡「落定并绘制」的时刻（第 5 轮）：同卡保留，
+    if (ui.settleKey !== key) { ui.settleKey = key; ui.settledAt = performance.now(); }   // 预览、提交共用同一个时间戳。
+    const head = ui.keyQueue[0];
+    if (head && !(head.kind === "press" && head.down) && performance.now() < ui.settledAt + DWELL_MS) {
+      ui.drainArmed = false;                                           // 除了仍按住的 press（起拖不等停留），其它都要多留 DWELL_MS
+      clearTimeout(ui.dwellT); ui.dwellT = setTimeout(armDrain, ui.settledAt + DWELL_MS - performance.now());
+      return;
+    }
     const item = ui.keyQueue.shift();
     if (!item) { ui.drainArmed = false; return; }
     if (item.kind === "press") {                                      // 排队的按下：仍按住就起成实拖（round 4 A3）
       ui.drainArmed = false;
-      if (item.down) beginDrag(item.x, item.id);
+      if (item.down) { beginDrag(item.x, item.id); ui.commitNotBefore = ui.settledAt + DWELL_MS; }   // 重放起拖：提交不早于最短停留
       if (ui.keyQueue.length) armDrain();
       return;
     }
@@ -1053,6 +1085,12 @@ function armDrain() {
   if (ui.drainArmed) return;
   ui.drainArmed = true;
   drainStep();
+}
+// 整队作废（Esc / 换阶段 / 弹层打开）：清空队列、取消停留计时；若正挂在「等最短停留后再提交」的实拖上，取消它并弹回原位。
+function clearQueue() {
+  ui.keyQueue.length = 0;
+  clearTimeout(ui.dwellT);
+  if (ui.heldCommitT) { clearTimeout(ui.heldCommitT); ui.heldCommitT = 0; ui.animating = false; rebound(); }
 }
 function applyQueued(item) {
   if (item.kind === "key") handleKey({ key: item.key, code: item.code, repeat: false, preventDefault() {} });
