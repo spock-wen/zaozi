@@ -362,6 +362,27 @@ for (const [engine] of Object.entries(ENGINES)) {
   });
 
   // F4：handleKey 的 Escape 分支只把 ui.menuOpen 置 false，没调 renderMenu()，☰ 菜单不收起。
+  test(`${engine} 1280: 飞出期间点卡角「刻」不替玩家刻字（飞出后进入刻字也一样）`, async () => {
+    const { ctx, page, errs } = await setupFresh(engine);
+    try {
+      let reached = false;
+      for (let i = 0; i < 40 && !reached; i++) {
+        const ph = await page.evaluate(() => window.__zz.st.phase);
+        if (ph === "engrave") { await press(page, ["s"]); await settle(page); continue; }
+        assert.equal(ph, "card", `应在出卡阶段（实为 ${ph}）`);
+        const n0 = await actionsLen(page);
+        await press(page, ["ArrowLeft", "ArrowLeft"]);
+        await page.evaluate(() => document.getElementById("bonecorner").click());   // 飞出中点「刻」（不论是否可见）
+        await settle(page);
+        const r = await page.evaluate((n) => ({ phase: window.__zz.st.phase, types: window.__zz.actions.slice(n).map((a) => a.type) }), n0);
+        assert.ok(!r.types.includes("engrave"), `飞出期间点「刻」不得刻字：${JSON.stringify(r)}`);
+        if (r.phase === "engrave") reached = true;
+      }
+      assert.ok(reached, "应走到一次「飞出后进入刻字」并停在刻字界面");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
   test(`${engine} 1280: Esc 关掉 ☰ 菜单`, async () => {
     const { ctx, page, errs } = await setupFresh(engine);
     try {
