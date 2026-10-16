@@ -110,3 +110,34 @@ export async function dragCard(page) {
 
 // 当前可见文本（[hidden] 走 display:none，innerText 会自动排除）。
 export const visibleText = (page) => page.evaluate(() => document.body.innerText);
+
+// 第 2 代存档码：教学 → 冬夜 → 天亮了 → 先人 → 交给第 2 代 → 挑「水/日/人」各两下 → 出发；
+// 然后一直 ←←，找到第一张有可落字格（#wordbox .slot.ok）的卡：返回它前一张的码 prevCode 和它自己的码 okCode。
+export async function gen2Codes(browser, origin, seed) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${origin}/?seed=${seed}`, { waitUntil: "load" });
+    await page.waitForFunction(() => !!window.__zz);
+    await clearTutorial(page);
+    await playToWinter(page);
+    await page.locator("#winter-end").click();
+    await page.locator("#endseq").waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('#endseq [data-do="elder"]').click();
+    await page.locator("#elder").waitFor({ state: "visible" });
+    await page.locator('#elder [data-do="heir"]').click();
+    await page.locator("#pick").waitFor({ state: "visible" });
+    for (const ch of ["水", "日", "人"]) { const c = page.locator(`#pick .cand[data-char="${ch}"]`); await c.click(); await c.click(); }
+    await page.locator("#pick .go").click();
+    await page.waitForTimeout(2500);
+    let prevCode = null;
+    for (let i = 0; i < 80; i++) {
+      const code = await page.evaluate(() => window.__zz.code());
+      if (prevCode && (await page.locator("#wordbox .slot.ok").count()) > 0) return { prevCode, okCode: code };
+      prevCode = code;
+      await commit(page, "left");
+      await page.waitForFunction(() => !window.__zz.animating && (window.__zz.queued ?? 0) === 0, null, { timeout: 5000 });
+    }
+    throw new Error("没找到带落字位的卡");
+  } finally { await ctx.close(); }
+}
