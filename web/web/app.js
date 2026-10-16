@@ -713,8 +713,9 @@ function keyhelpHTML() {
 }
 // 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
 // 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。
+let cardSettling = false;
 function cardEntryBusy() {
-  return ui.animating || $("card").getAnimations().some((a) => a.playState === "running");
+  return ui.animating || cardSettling || $("card").getAnimations().some((a) => a.playState === "running");
 }
 // 等卡入场动画结束：先等 rAF 阶段，再等 CSS 过渡跑完（Promise.all(finished)），
 // 过渡对象还没建好的一帧用一次 transitionend 兜底。
@@ -942,10 +943,12 @@ function flyOut(targetX, done) {
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   if (reducedPref()) {
     cardEl().style.opacity = "0";
+    cardSettling = true;
     setTimeout(() => {
       cardEl().style.opacity = "";
       done();
-      whenCardEntryDone().then(() => { ui.animating = false; renderShort(); });
+      cardSettling = false;
+      renderShort();
     }, 120);
     return;
   }
@@ -956,9 +959,16 @@ function flyOut(targetX, done) {
     cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg * e}deg)`; cardEl().style.opacity = String(1 - e);
     if (k < 1) requestAnimationFrame(tick);
     else {
+      ui.animating = false;
       cardEl().style.transform = ""; cardEl().style.opacity = "";
+      cardSettling = true;
       done();
-      whenCardEntryDone().then(() => { ui.animating = false; renderShort(); });
+      requestAnimationFrame(() => {
+        whenCardEntryDone().then(() => {
+          cardSettling = false;
+          renderShort();
+        });
+      });
     }
   };
   requestAnimationFrame(tick);
