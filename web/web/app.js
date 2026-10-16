@@ -198,6 +198,11 @@ function toast(m) {
   const t = $("toast"); t.textContent = m; t.classList.add("on");
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 1800);
 }
+function hideToast() {                          // D1：切卡/换阶段时立刻收起，别让 toast 盖住下一张卡的 #coach
+  const t = $("toast"); clearTimeout(toast._t);
+  t.classList.remove("on");
+  t.style.transition = "none"; void t.offsetWidth; t.style.transition = "";  // 跳过 .3s 淡出，立即变透明
+}
 function deferInteract(el, ms = 350) {         // 防「天亮了」穿透到下一屏的按钮
   el.style.pointerEvents = "none";
   setTimeout(() => { el.style.pointerEvents = ""; }, ms);
@@ -207,10 +212,12 @@ function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closes
 // ---------- 派发 / 存档 ----------
 function dispatch(a) {
   try {
+    const prevCurrent = st.current, prevPhase = st.phase;   // D1
     st = step(st, a);
     actions.push(a);
     afterAction(a);
     saveNow();
+    if (st.current !== prevCurrent || st.phase !== prevPhase) hideToast();  // D1：换卡/换阶段即收起 toast
   } catch (e) { toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();

@@ -293,8 +293,8 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:12px/1.5 ui-monospace,Menlo,monospace;}
 #dlgbtns{text-align:right;margin-top:8px;}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
-  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;}
-#toast.on{opacity:1;}
+  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s;pointer-events:none;max-width:90vw;}
+#toast.on{opacity:1;visibility:visible;transition:opacity .3s,visibility 0s;}  /* D1：收起后连命中/绘制一起退出，不在 #coach 上留透明盒 */
 #rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
 
 /* ---------- 平板竖屏（600–1023 竖） ---------- */
