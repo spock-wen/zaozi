@@ -974,11 +974,11 @@ function handleKey(e) {
   } else if (st.phase === "winter" && e.key === "Enter") { e.preventDefault(); winterCarve(); }
 }
 // 飞出期间按的出卡键按顺序在下一张卡出现后各执行一次，不丢不重；长按的自动重复、带修饰键的组合不排队。
-// 飞出后不再是出卡（刻字 / 冬夜 / 结局）就清空：那是玩家还没看到的界面，不替他按。
+// 飞出后（或重放的数字键直接落子后）不再是出卡（刻字 / 冬夜 / 结局）就清空：那是玩家还没看到的界面，不替他按。
 // Space 是「按住看」，松开的 keyup 不排队，所以它的 keydown 也不排队，否则重放后会停在按住状态。
 function drainKeys() {
-  if (st.phase !== "card") ui.keyQueue.length = 0;
   while (!ui.animating && ui.keyQueue.length) {
+    if (st.phase !== "card") { ui.keyQueue.length = 0; return; }
     const k = ui.keyQueue.shift();
     handleKey({ key: k.key, code: k.code, repeat: false, preventDefault() {} });
   }
