@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`a72b54407e58`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`493fc288fb26`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -223,9 +223,9 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - Docs: corrected the round 23 description of when the selection is cleared (see above).
 - D1/H14 (P1, 测试 35/35 repro): the engrave-phase lock hint toast 「先点卡角骨片刻下这件事」 was only dismissed by its 1800 ms timer, so after carving it stayed (plus a .3s fade) over T04's #coach; now `dispatch` hides the toast immediately whenever the card or phase changes (`hideToast`), and a hidden `#toast` is `visibility:hidden` so it no longer paints or hit-tests. Regression test toast_coach (3 engines × 360×640/390×844/1280×800/1280×600): after carving, #toast not shown and the #coach center hits #coach. Fails 12/12 on 00f7e5a.
 
-## 飞出期间按键（branch fix/web-flyout-keys，基于 #8 tip ab448a2；VERSION a72b54407e58）
+## 飞出期间按键（branch fix/web-flyout-keys，基于 #8 tip ab448a2；VERSION 493fc288fb26）
 - 问题：卡片飞出（240ms）期间按的键被吞或误执行：不同方向的一下只设了 kbDir，被飞出结束的 dispatch 清掉（丢键）；同方向再按一下会开出第二段重叠飞出，一下就盲提交了只显示约 34ms 的下一张，并让 animating 提前变 false；减少动态效果的飞出不设 animating。
-- 修复（web/app.js）：动画期间按下的出卡键（←/→/Enter/Digit1–3，不带 Ctrl/⌘/Alt，长按重复除外）进 FIFO 队列，每个动画出口 drainKeys() 用同一 handleKey 按序各执行一次；飞出后不再是出卡阶段就清空队列（不替玩家在刻字/冬夜上按 S/K/Enter）；其它键动画期间不入队、不 preventDefault；Space/Escape 不入队；减少动态飞出补上 animating。
+- 修复（web/app.js）：动画期间按下的出卡键（←/→/Enter/Digit1–3，不带 Ctrl/⌘/Alt，长按重复除外）进 FIFO 队列，每个动画出口 drainKeys() 用同一 handleKey 按序各执行一次；飞出后或重放的数字键落子后不再是出卡阶段就清空队列（每重放一个键前都检查）（不替玩家在刻字/冬夜上按 S/K/Enter）；其它键动画期间不入队、不 preventDefault；Space/Escape 不入队；减少动态飞出补上 animating。
 - 设计取舍：与第 11 轮「飞出期间按键丢弃」的裁定不同，需 PM 确认；单独一个方向键只预览，不提交。
 - 测试 flyout_keys（3 引擎 × 7 例）：→ 只预览 / ← 不提交 / →→ 按序两次提交不重叠 / 轻点 Space 不留按住 / Ctrl+← 与 Tab 不排队不拦默认 / 刻字边界不带键 / 减少动态 ← 不提交。旧代码上对应例全挂。等价性脚本：快按与慢按 60/60 一致（旧代码 chromium 5/20）。
 
