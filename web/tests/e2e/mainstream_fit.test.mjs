@@ -1,10 +1,17 @@
 // e2e 主流视口适配与交叠回归（TASK B / C / D / E / F / R1 / R2 / R3）。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { ENGINES, SEED, DIST, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
 import { commit } from "./helpers/flow.mjs";
 
 buildDist();
+
+const CARDS_DATA = JSON.parse(
+  fs.readFileSync(path.join(DIST, "data", "year1_cards.json"), "utf8"),
+).cards;
+const cardById = (id) => CARDS_DATA.find((c) => c.id === id);
 
 const MAINSTREAM_VIEWPORTS = [
   { name: "375x667", width: 375, height: 667, view: "mobile" },
@@ -478,20 +485,18 @@ for (const [engine] of Object.entries(ENGINES)) {
           const lbl = document.querySelector("#card-drag-label");
           const bar = document.querySelector("#card-drag-bar");
           const fill = document.querySelector("#card-drag-fill");
-          const cur = window.__zz.curCard();
           const lblCs = getComputedStyle(lbl);
           const barR = bar.getBoundingClientRect();
           const fillR = fill.getBoundingClientRect();
           return {
             labelText: lbl.textContent.trim(),
-            expectedRightLabel: cur.right.label,
             color: lblCs.color,
             isHot: lbl.classList.contains("hot"),
             fillRatio: fillR.width / barR.width,
           };
         });
 
-        assert.equal(state20.labelText, state20.expectedRightLabel, "拖拽方向标签文案正确");
+        assert.equal(state20.labelText, cardById("T01").right.label, "拖拽方向标签文案正确");
         assert.equal(state20.isHot, false, "未达阈值时 hot 为 false");
         assert.equal(state20.color, "rgb(107, 90, 62)", "未达阈值标签颜色为 #6b5a3e");
         assert.ok(

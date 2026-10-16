@@ -715,7 +715,7 @@ function keyhelpHTML() {
 // 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。
 let cardSettling = false;
 function cardEntryBusy() {
-  return ui.animating || cardSettling || $("card").getAnimations().some((a) => a.playState === "running");
+  return ui.animating || cardSettling;
 }
 // 等卡入场动画结束：先等 rAF 阶段，再等 CSS 过渡跑完（Promise.all(finished)），
 // 过渡对象还没建好的一帧用一次 transitionend 兜底。
@@ -941,6 +941,7 @@ function rebound() {
 }
 function flyOut(targetX, done) {
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
+  cardSettling = true;
   if (reducedPref()) {
     cardEl().style.opacity = "0";
     cardSettling = true;
