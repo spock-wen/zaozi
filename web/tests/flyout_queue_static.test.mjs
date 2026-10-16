@@ -95,11 +95,8 @@ test("drainStep 先等入场落定再走两帧 rAF，并在换阶段/浮层打�
   const body = bodyOf("drainStep");
   assert.match(body, /whenCardEntryDone\s*\(/, "drainStep 应先等 whenCardEntryDone()");
   assert.match(body, /requestAnimationFrame\s*\([\s\S]*?requestAnimationFrame\s*\(/, "drainStep 应再等两帧嵌套 requestAnimationFrame");
-  assert.match(body, /phase\s*!==\s*"card"/, `drainStep 应在 phase !== "card" 时清空队列`);
-  assert.match(body, /savedlg/, "drainStep 应在存档框打开时清空队列");
-  assert.match(body, /menuOpen/, "drainStep 应在菜单打开时清空队列");
-  assert.match(body, /panelOpen/, "drainStep 应在目标面板打开时清空队列");
-  assert.match(body, /drawer/, "drainStep 应在抽屉打开时清空队列");
+  // 浮层检查：使用 modalOpen() 统领模态浮层
+  assert.match(body, /modalOpen\s*\(/, "drainStep 应使用 modalOpen() 检查浮层");
 });
 
 test("handleKey 的 Escape 分支：通用分支清空整个队列，存档框分支不清", () => {
@@ -146,36 +143,72 @@ test("动画出口 flyOut / rebound 不再调用任何 drain", () => {
 });
 
 // 出卡阶段能直接改状态的入口只有四个：commitSide（经 flyOut 回调）、onUp（拖拽松手）、
-// handleKey 的出卡分支、dropSlot。其余 dispatch( 调用点必须落在非出卡阶段的白名单里；
-// 有新的调用点没被归类就报出来（可能是新开的绕过队列的直达入口）。
-const CARD_CHANGERS = new Set(["commitSide", "onUp", "handleKey", "dropSlot"]);
-const NON_CARD_ALLOW = [
-  "winterCarve", "pickClick", "pickToggle", "pickAction", "restore", "newGame",
-  'on($("winter")', 'on($("card")', 'on($("bonecorner")', 'on($("pick")',
-  'on($("elder")', 'on($("endseq")', 'on($("menu-pop")',
-];
+// handleKey 的出卡分支、dropSlot。每个入口及非出卡阶段的 dispatch( 调用点必须按调用处
+// 严格匹配白名单及次数，防止通过白名单处理器偷偷新增绕过队列的直达调用（M3/M4）。
+const EXPECTED_COMMITSIDE = {
+  handleKey: 2,
+  applyQueued: 1,
+  'on($("opt-left")': 1,
+  'on($("opt-right")': 1,
+};
 
-test("出卡阶段只有四个状态变动入口，没有新的直达 dispatch", () => {
+const EXPECTED_DISPATCH = {
+  onUp: 2,
+  commitSide: 1,
+  handleKey: 5,
+  dropSlot: 1,
+  winterCarve: 1,
+  pickClick: 1,
+  pickToggle: 2,
+  pickAction: 1,
+  'on($("winter")': 2,
+  'on($("card")': 1,
+  'on($("bonecorner")': 1,
+  'on($("elder")': 1,
+};
+
+const EXPECTED_DROPSLOT = {
+  applyQueued: 1,
+  'on($("wordbox")': 1,
+};
+
+test("出卡阶段只有四个状态变动入口，没有新的直达 dispatch（严格次数白名单）", () => {
+  const commitCounts = new Map();
   for (const i of callSites("commitSide")) {
     const c = contextOf(i);
-    const ok = c.name === "handleKey" || c.name === "applyQueued" || (c.kind === "handler" && c.text.includes("inputBusy()"));
-    assert.ok(ok, `commitSide( 出现在未许可的入口 ${c.name}（应只在 handleKey / applyQueued 或含 inputBusy() 的处理器里）`);
+    commitCounts.set(c.name, (commitCounts.get(c.name) || 0) + 1);
   }
+  assert.deepEqual(
+    Object.fromEntries(commitCounts),
+    EXPECTED_COMMITSIDE,
+    "commitSide 调用点及次数必须完全匹配白名单（M4 守卫）"
+  );
+
+  const dropCounts = new Map();
   for (const i of callSites("dropSlot")) {
     const c = contextOf(i);
-    const ok = c.name === "applyQueued" || (c.kind === "handler" && c.text.includes("inputBusy()"));
-    assert.ok(ok, `dropSlot( 出现在未许可的入口 ${c.name}（应只在 applyQueued 或含 inputBusy() 的处理器里）`);
+    dropCounts.set(c.name, (dropCounts.get(c.name) || 0) + 1);
   }
+  assert.deepEqual(
+    Object.fromEntries(dropCounts),
+    EXPECTED_DROPSLOT,
+    "dropSlot 调用点及次数必须完全匹配白名单"
+  );
   for (const i of callSites("handleKey")) {
     const c = contextOf(i);
-    const ok = c.name === "applyQueued" || (c.kind === "handler" && c.text.includes("inputBusy()"));
-    assert.ok(ok, `handleKey( 出现在未许可的入口 ${c.name}（应只在含 inputBusy() 的 keydown 监听里，或 applyQueued）`);
+    const ok = c.name === "applyQueued" || (c.kind === "handler" && c.name === 'addEventListener("keydown")');
+    assert.ok(ok, `handleKey( 出现在未许可的入口 ${c.name}（应只在 keydown 监听里，或 applyQueued）`);
   }
-  const unclassified = [];
+
+  const dispatchCounts = new Map();
   for (const i of callSites("dispatch")) {
     const c = contextOf(i);
-    if (CARD_CHANGERS.has(c.name) || NON_CARD_ALLOW.includes(c.name)) continue;
-    unclassified.push(`${c.name}@${src.slice(0, i).split("\n").length}`);
+    dispatchCounts.set(c.name, (dispatchCounts.get(c.name) || 0) + 1);
   }
-  assert.deepEqual(unclassified, [], `有 dispatch( 调用点没被归类，可能是新开的直达入口：${unclassified.join(" ; ")}`);
+  assert.deepEqual(
+    Object.fromEntries(dispatchCounts),
+    EXPECTED_DISPATCH,
+    "dispatch( 调用点及次数必须完全匹配白名单（M3 守卫）"
+  );
 });
+

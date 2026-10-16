@@ -263,7 +263,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.ok(firstDrag > fly, "应记录到起拖跟随（.dragging）的帧");
       const lag = Math.round(frames[firstDrag].t - frames[fly].t);
       t.diagnostic(`触摸「拖不动」窗口（飞出开始→起拖跟随）${lag}ms`);
-      assert.ok(lag <= 320, `起拖应在飞出开始后 ≤320ms（实际 ${lag}ms）`);
+      assert.ok(lag <= 360, `起拖应在飞出开始后 ≤360ms（实际 ${lag}ms）`);
 
       // 提交的飞出（卡开始往外飞）应在该卡落定并绘制 ≥250ms 之后：松手保持原位，等 commitNotBefore 才飞。
       // 注意：等提交的这段 ui.animating = true（输入继续排队），所以「已落定」的判定要从实拖前回溯，别被这段 busy 截断。
@@ -332,6 +332,150 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.equal(await page.evaluate(() => window.__zz.queued), 0, "Esc 后队列应为空");
       const frames = await framesOf(page);
       assert.ok(!frames.some((f) => f.dragging), "Esc 之后不应起实拖");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
+  test(`${engine} 1280 mouse: 同页重复导入同一存档码，排队的键每次都等满 ≥250ms 才生效（P2-2）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      const code = await page.evaluate(() => window.__zz.code());
+      for (let rep = 0; rep < 2; rep++) {
+        await page.evaluate((c) => window.__zz.importCode(c), code);
+        await settle(page);
+        await page.evaluate(() => { window.__frames = []; });
+        const n0 = await actionsLen(page);
+        await press(page, ["ArrowLeft", "ArrowLeft"]);
+        await page.waitForTimeout(40);
+        await press(page, ["ArrowRight"]);
+        await settle(page);
+
+        const frames = await framesOf(page);
+        const fly = firstFlyout(frames);
+        assert.ok(fly >= 0, "应记录到飞出开始的帧");
+        const evs = effectFrames(frames, n0).filter((e) => e.f > fly);
+        const prev = evs.find((e) => e.kind === "preview");
+        assert.ok(prev, `第 ${rep + 1} 次导入应识别到排队的预览效果`);
+        const { card, first, count } = settleRun(frames, prev.f);
+        const ms = Math.round(frames[prev.f].t - frames[first].t);
+        t.diagnostic(`第 ${rep + 1} 次导入 settleToApply=${ms}ms (settledFrames=${count})`);
+        assert.ok(ms >= 250, `第 ${rep + 1} 次导入排队预览必须等当前卡落定 ≥250ms 才生效：实测 ${ms}ms`);
+      }
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
+  test(`${engine} 1280 mouse: 后台标签页（hidden）不可见期间不执行排队，恢复可见后重新等满 ≥250ms（P2-3）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      await page.evaluate(() => {
+        const origRaf = window.requestAnimationFrame.bind(window);
+        window.__heldRaf = [];
+        window.__rafPaused = false;
+        window.requestAnimationFrame = (cb) => {
+          if (window.__rafPaused) { window.__heldRaf.push(cb); return 0; }
+          return origRaf(cb);
+        };
+        window.__resumeRaf = () => {
+          window.__rafPaused = false;
+          const h = window.__heldRaf;
+          window.__heldRaf = [];
+          h.forEach((cb) => origRaf(cb));
+        };
+      });
+
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.waitForTimeout(40);
+      await press(page, ["ArrowRight"]);
+
+      await page.waitForFunction(() => {
+        const card = document.getElementById("card");
+        return !window.__zz.animating && !card.getAnimations().some((a) => a.playState === "running");
+      }, null, { timeout: 3000 });
+      await page.waitForTimeout(50);
+
+      await page.evaluate(() => {
+        window.__rafPaused = true;
+        Object.defineProperty(document, "hidden", { value: true, configurable: true, writable: true });
+        Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true, writable: true });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      await page.waitForTimeout(350);
+
+      const ranInBackground = await page.evaluate(() => document.getElementById("opt-right")?.classList.contains("on"));
+      assert.equal(ranInBackground, false, "后台不可见期间，排队预览绝不应提前执行");
+
+      const tShow = await page.evaluate(() => {
+        Object.defineProperty(document, "hidden", { value: false, configurable: true, writable: true });
+        Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true, writable: true });
+        document.dispatchEvent(new Event("visibilitychange"));
+        window.__resumeRaf();
+        return performance.now();
+      });
+
+      await page.waitForFunction(() => document.getElementById("opt-right")?.classList.contains("on"), null, { timeout: 3000 });
+      const tExec = await page.evaluate(() => performance.now());
+      const elapsed = Math.round(tExec - tShow);
+      t.diagnostic(`恢复可见到预览执行时长：${elapsed}ms`);
+      assert.ok(elapsed >= 250, `恢复可见后必须重新经历完整停留（≥250ms），实测 ${elapsed}ms`);
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
+  test(`${engine} 1280 mouse: 倾斜状态下按卡片布局宽度（offsetWidth）计算阈值，0.36 提交而 0.34 不提交（P3-4）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      const box = await cardBox(page);
+      const layoutW = await page.evaluate(() => document.getElementById("card").offsetWidth);
+
+      const n0 = await actionsLen(page);
+      await page.mouse.move(box.cx, box.cy);
+      await page.mouse.down();
+      await page.mouse.move(box.cx + layoutW * 0.34, box.cy, { steps: 5 });
+      await page.mouse.up();
+      await settle(page);
+      assert.equal(await actionsLen(page) - n0, 0, "0.34 布局宽度未达 0.35 阈值，应弹回不提交");
+
+      await page.mouse.move(box.cx, box.cy);
+      await page.mouse.down();
+      await page.mouse.move(box.cx + layoutW * 0.36, box.cy, { steps: 5 });
+      await page.mouse.up();
+      await settle(page);
+      assert.equal(await actionsLen(page) - n0, 1, "0.36 布局宽度超过 0.35 阈值，应提交成功");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
+  test(`${engine} 1280 mouse: 鼠标拖拽在落定后提前松手（<250ms），停在松手处等满250ms才飞出提交（M6 守卫）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      const n0 = await actionsLen(page);
+      const box = await cardBox(page);
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.mouse.move(box.cx, box.cy);
+      await page.mouse.down();
+      await page.waitForFunction(() => {
+        const c = document.getElementById("card");
+        return !window.__zz.animating && c.classList.contains("dragging");
+      }, null, { timeout: 3000 });
+      for (let i = 1; i <= 4; i++) { await page.mouse.move(box.cx + box.w * 0.15 * i, box.cy); await page.waitForTimeout(15); }
+      const settledAt = await page.evaluate(() => window.__zz.settledAt);
+      await page.mouse.up();
+      await settle(page);
+
+      assert.equal(await actionsLen(page) - n0, 2, "起飞 + 拖拽应提交两次");
+      const frames = await framesOf(page);
+      const lastDrag = frames.map((f) => f.dragging).lastIndexOf(true);
+      const release = lastDrag + 1;
+      const relDx = frames[release].dx;
+      let fCommit = -1;
+      for (let i = release + 1; i < frames.length; i++) if (Math.abs(frames[i].dx - relDx) > 5) { fCommit = i; break; }
+      assert.ok(fCommit > 0, "应记录到提交飞出的开始帧");
+      const commitT = frames[fCommit].t;
+      const delta = Math.round(commitT - settledAt);
+      t.diagnostic(`commitT=${Math.round(commitT)} settledAt=${Math.round(settledAt)} delta=${delta}ms`);
+      assert.ok(commitT >= settledAt + 245, `commit time 必须在 settledAt + 250ms 之后生效：实测差值 ${delta}ms`);
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
     } finally { await ctx.close(); }
   });

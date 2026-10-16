@@ -97,8 +97,9 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.waitForFunction(() => !document.getElementById("menu-pop").hidden);
       await press(page, ["ArrowRight", "ArrowRight"]);                        // 菜单开着时按的键：不入队、不处理
       await press(page, ["Escape"]);                                          // Esc 关菜单（不清队列）
-      await page.waitForFunction(() => document.getElementById("menu-pop").hidden);
+      await page.waitForFunction(() => document.getElementById("menu-pop").hidden, null, { timeout: 1500 }).catch(() => {});
       t.diagnostic(`菜单已关：${await hiddenEl(page, "menu-pop")}`);
+      assert.equal(await hiddenEl(page, "menu-pop"), true, "Esc 应关闭菜单（#menu-pop hidden）");
       await settle(page);
       await page.waitForTimeout(1000);
 
@@ -123,7 +124,8 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.locator("#menubtn").click({ force: true });                  // 再打开菜单
       await page.waitForFunction(() => !document.getElementById("menu-pop").hidden);
       await press(page, ["Escape"]);                                          // Esc 只关菜单，不清队列
-      await page.waitForFunction(() => document.getElementById("menu-pop").hidden);
+      await page.waitForFunction(() => document.getElementById("menu-pop").hidden, null, { timeout: 1500 }).catch(() => {});
+      assert.equal(await hiddenEl(page, "menu-pop"), true, "Esc 应关闭菜单（#menu-pop hidden）");
       await settle(page);
 
       assert.equal(await actionsLen(page) - n0, 2, `Esc 关浮层不应清掉更早入队的输入，实为 ${await actionsLen(page) - n0}`);
@@ -139,7 +141,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.locator("#wb-handle").click({ force: true });                // 飞出期间打开抽屉
       await page.waitForFunction(() => !document.getElementById("drawer").hidden);
       await press(page, ["Escape"]);                                          // Esc 关抽屉
-      await page.waitForFunction(() => document.getElementById("drawer").hidden);
+      await page.waitForFunction(() => document.getElementById("drawer").hidden, null, { timeout: 1500 }).catch(() => {});
       t.diagnostic(`抽屉 hidden=${await hiddenEl(page, "drawer")}`);
       assert.equal(await hiddenEl(page, "drawer"), true, "Esc 应关闭移动抽屉（#drawer 置 hidden）");
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
@@ -159,9 +161,101 @@ for (const [engine] of Object.entries(ENGINES)) {
         "菜单开着时按 → 不应在卡上留下预览（#opt-right 不带 on）");
       assert.equal(await actionsLen(page) - n0, 0, "菜单开着时按 → 不应产生任何动作");
       await press(page, ["Escape"]);
-      await page.waitForFunction(() => document.getElementById("menu-pop").hidden);
+      await page.waitForFunction(() => document.getElementById("menu-pop").hidden, null, { timeout: 1500 }).catch(() => {});
       assert.equal(await hiddenEl(page, "menu-pop"), true, "Esc 应关闭菜单");
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
     } finally { await ctx.close(); }
   });
+
+  test(`${engine} 1280 mouse: 最短停留内提前松手的拖拽，松手后打开菜单不应在菜单下提交（P2-1）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      const n0 = await actionsLen(page);
+      const box = await page.evaluate(() => {
+        const r = document.getElementById("card").getBoundingClientRect();
+        return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, w: r.width };
+      });
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.waitForTimeout(40);
+      await page.mouse.move(box.cx, box.cy);
+      await page.mouse.down();
+      // 等卡落定起拖（进入 dragging），此时处于 dwell 窗口内
+      await page.waitForFunction(() => {
+        const c = document.getElementById("card");
+        return !window.__zz.animating && c.classList.contains("dragging");
+      }, null, { timeout: 3000 });
+      // 在 dwell 窗口内迅速移动超过阈值并立即松手
+      await page.mouse.move(box.cx + box.w * 0.6, box.cy, { steps: 2 });
+      await page.mouse.up();
+      // 立即点开菜单
+      await page.locator("#menubtn").click({ force: true });
+      await page.waitForFunction(() => !document.getElementById("menu-pop").hidden, null, { timeout: 1500 });
+      assert.equal(await hiddenEl(page, "menu-pop"), false, "菜单应已打开");
+      const aAtMenu = await actionsLen(page);
+      // 等待 600ms（heldCommitT 延时约 200ms，600ms 足以触发）
+      await page.waitForTimeout(600);
+      const aAfter = await actionsLen(page);
+      assert.equal(aAfter, aAtMenu, "菜单打开期间不应发生提交（actions 不变）");
+      assert.equal(aAfter - n0, 1, "只应有起飞那一次提交，拖拽不应在菜单下提交");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
+  test(`${engine} 1024x600: 键位说明浮层开着时按 Esc 只关浮层并保留队列（P2-4）`, async (t) => {
+    const ctx = await browsers[engine].newContext({ viewport: { width: 1024, height: 600 } });
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+    await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+    await page.waitForFunction(() => !!window.__zz);
+    await clearTutorial(page);
+    await page.waitForFunction(() => window.__zz.st.phase === "card" && !window.__zz.animating, null, { timeout: 5000 });
+    try {
+      const isKh = await page.evaluate(() => !document.getElementById("keyhelp-pop").hidden);
+      if (!isKh) {
+        await page.locator("#keyhelp-btn").click();
+        await page.waitForFunction(() => !document.getElementById("keyhelp-pop").hidden);
+      }
+      const n0 = await actionsLen(page);
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.waitForTimeout(40);
+      await press(page, ["ArrowRight", "ArrowRight"]);
+      // 卡入场完成、落定后，键位说明浮层重新显形
+      await page.waitForFunction(() => {
+        const c = document.getElementById("card");
+        return !window.__zz.animating && !c.getAnimations().some((a) => a.playState === "running") && !document.getElementById("keyhelp-pop").hidden;
+      }, null, { timeout: 3000 });
+      assert.equal(await page.evaluate(() => !document.getElementById("keyhelp-pop").hidden), true, "按 Esc 前 keyhelp 应开着");
+      await press(page, ["Escape"]);
+      await page.waitForFunction(() => document.getElementById("keyhelp-pop").hidden, null, { timeout: 1500 });
+      assert.equal(await page.evaluate(() => document.getElementById("keyhelp-pop").hidden), true, "Esc 应关闭 keyhelp 浮层");
+      await page.waitForTimeout(1000);
+      assert.equal(await actionsLen(page) - n0, 2, "Esc 关 keyhelp 后，排队的 →→ 仍应正常执行");
+      assert.deepEqual(await sidesFrom(page, n0), ["left", "right"], "提交顺序应为 left, right");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
+
+  test(`${engine} 1280 mouse: 飞出期间开菜单重新开局，新局停在T01且为0动作（P3-1/P3-5）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.waitForTimeout(20);
+      await page.locator("#menubtn").click({ force: true });
+      await page.waitForFunction(() => !document.getElementById("menu-pop").hidden, null, { timeout: 1500 });
+      await page.locator('#menu-pop [data-menu="new"]').click({ force: true });
+      await page.waitForTimeout(1000);
+      const st = await page.evaluate(() => ({
+        cur: window.__zz.st.current,
+        actions: window.__zz.actions.length,
+        anim: window.__zz.animating,
+        queued: window.__zz.queued,
+      }));
+      assert.equal(st.cur, "T01", `新局应留在 T01，实为 ${st.cur}`);
+      assert.equal(st.actions, 0, `新局 actions 应为 0，实为 ${st.actions}`);
+      assert.equal(st.queued, 0, `新局队列应为空，实为 ${st.queued}`);
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally { await ctx.close(); }
+  });
 }
+

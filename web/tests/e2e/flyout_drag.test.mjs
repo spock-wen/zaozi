@@ -153,6 +153,20 @@ function appliedOnSettled(t, frames, n0, total, label) {
   assert.deepEqual(problems, [], `[${label}] 排队输入必须先等当前卡落定并绘制才生效：${problems.join(" ; ")}`);
 }
 
+// P3-2：锁定提示何时出现，不能靠固定 sleep 猜。装上 MutationObserver，
+// 记录 #toast 变 on 的那一刻的 performance.now() 与当时的 window.__zz.settledAt（卡落定的时刻）。
+const watchToast = (page) => page.evaluate(() => {
+  window.__toastHits = [];
+  const el = document.getElementById("toast");
+  const rec = () => {
+    if (el.classList.contains("on") && /骨片/.test(el.textContent || "")) {
+      window.__toastHits.push({ t: performance.now(), settledAt: window.__zz.settledAt, text: el.textContent });
+    }
+  };
+  new MutationObserver(rec).observe(el, { attributes: true, attributeFilter: ["class"], childList: true, characterData: true, subtree: true });
+});
+const toastHits = (page) => page.evaluate(() => window.__toastHits || []);
+
 for (const [engine] of Object.entries(ENGINES)) {
   for (const mode of ["mouse", "touch"]) {
     const touch = mode === "touch";
@@ -219,7 +233,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       } finally { await ctx.close(); }
     });
 
-    test(`${engine} ${label}: 落定前松手但未到阈值，该项被丢弃`, async (t) => {
+    test(`[guard] ${engine} ${label}: 落定前松手但未到阈值，该项被丢弃`, async (t) => {
       const { ctx, page, errs } = await setup(engine, { touch });
       try {
         const n0 = await actionsLen(page);
@@ -230,15 +244,18 @@ for (const [engine] of Object.entries(ENGINES)) {
         await p.down(box.cx, box.cy);
         await p.move(box.cx + 10, box.cy);
         await p.up(box.cx + 10, box.cy);                     // 落定前松手，未到阈值 → 整项丢弃
+        await press(page, ["ArrowRight", "ArrowRight"]);     // 随后的排队键应正常生效
 
         await settle(page);
-        assert.equal(await actionsLen(page) - n0, 1, "未到阈值的按下应被丢弃，只留下起飞那一次提交");
+        const total = await actionsLen(page);
+        assert.equal(total - n0, 2, "未到阈值的按下应被丢弃，随后的排队键正常提交（共2次提交）");
+        assert.deepEqual(await sidesFrom(page, n0), ["left", "right"], "提交应为起飞的 left 与随后的 right");
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally { await ctx.close(); }
     });
   }
 
-  test(`${engine} 1280: 飞出期间开目标面板，队列整体作废`, async (t) => {
+  test(`[guard] ${engine} 1280: 飞出期间开目标面板，队列整体作废`, async (t) => {
     const { ctx, page, errs } = await setup(engine);
     try {
       const n0 = await actionsLen(page);
@@ -253,7 +270,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     } finally { await ctx.close(); }
   });
 
-  test(`${engine} 390 touch: 飞出期间开抽屉，队列整体作废`, async (t) => {
+  test(`[guard] ${engine} 390 touch: 飞出期间开抽屉，队列整体作废`, async (t) => {
     // prevCode：←← 后翻出的下一张有可落字格，排队的落字若不作废就会真的落在抽屉底下（审核 r3 P2-2 复现）。
     const { ctx, page, errs } = await setup(engine, { touch: true, code: codes.prevCode });
     try {
@@ -271,5 +288,83 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.deepEqual(await sidesFrom(page, n0), ["left"], "只应有第一次 ← 的提交");
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
     } finally { await ctx.close(); }
+  });
+
+  // P3-2：飞出期间排队进 T03（phase "engrave"）的输入不能再被静默丢弃：press/side 弹锁定骨片提示，
+  // key 按空闲行为交给 handleKey。提示必须等目标卡「落定并绘制」再满 DWELL_MS 才出现，所以不猜固定时长，
+  // 而是等 #toast.on 且文案含「骨片」，并用 MutationObserver 量它离落定（__zz.settledAt）有多久。
+  test(`${engine} 1280 mouse: 飞出进教学T03（刻字卡）时排队的拖拽，落定后满 250ms 才弹出锁定骨片提示（P3-2）`, async (t) => {
+    const ctx = await browsers[engine].newContext({ viewport: VP_DESK });
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+    await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+    await page.waitForFunction(() => !!window.__zz);
+    await settle(page);
+
+    await press(page, ["ArrowLeft", "ArrowLeft"]);
+    await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+    await settle(page);
+
+    const box = await cardBox(page);
+    await watchToast(page);                       // 起飞前装好：要量的是「落定 → 提示」这段
+    await press(page, ["ArrowRight", "ArrowRight"]);
+    await page.waitForTimeout(30);
+
+    await page.mouse.move(box.cx, box.cy);
+    await page.mouse.down();
+    await page.mouse.move(box.cx + 60, box.cy);   // 未到阈值，整项作为「松过手的 press」留在队列里
+    await page.mouse.up();
+
+    await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
+    await page.waitForFunction(() => {
+      const el = document.getElementById("toast");
+      return !!el && el.classList.contains("on") && /骨片/.test(el.textContent || "");
+    }, null, { timeout: 3000 });
+    await settle(page);
+
+    const hits = await toastHits(page);
+    t.diagnostic(`T03 落定后锁定提示：${JSON.stringify(hits)}`);
+    assert.ok(hits.length >= 1, "排队拖入刻字卡应弹出包含「骨片」的锁定提示");
+    const gap = hits[0].t - hits[0].settledAt;
+    assert.ok(hits[0].settledAt > 0, "落定时应记下 settledAt，否则证明不了等满了最短停留");
+    assert.ok(gap >= 250, `锁定提示必须等卡落定 ≥250ms 才出现（settledAt=${hits[0].settledAt.toFixed(1)}，提示=${hits[0].t.toFixed(1)}，实测 ${gap.toFixed(1)}ms）`);
+    assert.ok(gap < 2500, `锁定提示不该拖到落定 2.5s 以后（实测 ${gap.toFixed(1)}ms，settledAt 可能没被更新）`);
+    assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    await ctx.close();
+  });
+
+  // P3-2 键位变体：能入队的只有方向/Enter/字匣键（input_map 的 card.keys），它们在刻字阶段都没有对应行为，
+  // 所以 handleKey 的空闲行为就是「什么都不做」：不报错、不推进教学、不弹锁定提示（那是 press/side 的待遇）。
+  test(`${engine} 1280 mouse: 飞出进教学T03（刻字卡）时排队的按键按空闲行为处理，不报错也不推进（P3-2 键位变体）`, async (t) => {
+    const ctx = await browsers[engine].newContext({ viewport: VP_DESK });
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+    await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+    await page.waitForFunction(() => !!window.__zz);
+    await settle(page);
+
+    await press(page, ["ArrowLeft", "ArrowLeft"]);
+    await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+    await settle(page);
+
+    const n0 = await actionsLen(page);
+    await watchToast(page);
+    await press(page, ["ArrowRight", "ArrowRight", "ArrowRight"]);   // 第 3 次按在飞出期间 → 入队
+    const queued = await page.evaluate(() => window.__zz.queued);
+    t.diagnostic(`飞出期间排队项：${queued}`);
+
+    await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
+    await settle(page);
+
+    const st = await page.evaluate(() => ({ cur: window.__zz.st.current, phase: window.__zz.st.phase, n: window.__zz.actions.length }));
+    t.diagnostic(`T03 落定后：current=${st.cur} phase=${st.phase} 新增动作=${st.n - n0}`);
+    assert.equal(st.cur, "T03", "排队的 → 在刻字阶段没有对应行为，教学应停在 T03");
+    assert.equal(st.phase, "engrave", "T03 应仍是刻字阶段");
+    assert.equal(st.n - n0, 0, "排队的 → 不应产生任何动作");
+    assert.deepEqual(await toastHits(page), [], "按键走 handleKey 的空闲行为，不该弹锁定骨片提示");
+    assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    await ctx.close();
   });
 }
