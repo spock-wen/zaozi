@@ -119,7 +119,7 @@ function computeLayout() {
   else view = "mobile";
   const orient = h >= w ? "portrait" : "landscape";
   const tier = shortTier(view);
-  const key = view + ":" + orient + ":" + tier + ":" + (h < 492 ? "s" : "");
+  const key = view + ":" + orient + ":" + tier + ":" + (h < 600 || w < 360 ? "s" : "");
   if (key === lastLayout) return;
   const prevTier = document.body.dataset.short || "";
   lastLayout = key;
@@ -812,7 +812,7 @@ function renderShort() {
     if (coach) coach.style.visibility = "";        // 浮层收起（或入场中临时隐去）：还原被让位隐去的 #coach
     if (ui.keyhelpOpen) armKeyhelpReshow();        // 入场中：等卡稳住再显形
   }
-  $("too-short").hidden = !(document.body.dataset.view === "desktop" && innerHeight < 492);
+  $("too-short").hidden = !(innerHeight < 600 || innerWidth < 360);
 }
 function maybeAutoKeyhelp() {
   if (document.body.dataset.short !== "B" || !keyboardMode()) return;

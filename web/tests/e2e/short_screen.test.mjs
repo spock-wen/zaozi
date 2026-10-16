@@ -1,5 +1,5 @@
 // e2e 矮屏分档（design/v3_mobile/BREAKPOINTS.md §矮屏（高度 ≤ 760））。
-// 只适用于宽 ≥1024 的桌面档；按视口高（innerHeight）分：N >760 · A 601–760 · B ≤600 · 视口高 <492 出提示。
+// 只适用于宽 ≥1024 的桌面档；按视口高（innerHeight）分：N >760 · A 601–760 · B ≤600 · 视口高 <600 出提示。
 // 数值全部对照 BREAKPOINTS §矮屏 表与 `short_screen_720.png` / `short_screen_600.png` 示意页。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -148,10 +148,10 @@ for (const engine of Object.keys(ENGINES)) {
   }
 }
 
-// ---------- 3. 视口高 <492：卡到 320 下限不再缩，顶栏下出「窗口太矮…」提示，侧栏强制收起 ----------
+// ---------- 3. 视口高 <600：顶栏下出「窗口太小…」提示，侧栏强制收起（600 不出） ----------
 for (const engine of Object.keys(ENGINES)) {
-  test(`${engine} 视口高 488: 出「窗口太矮」提示 + 侧栏强制收起（492 不出）`, async () => {
-    const short = await open(engine, { width: 1024, height: 488 });
+  test(`${engine} 视口高 599: 出「窗口太小」提示 + 侧栏强制收起（600 不出）`, async () => {
+    const short = await open(engine, { width: 1024, height: 599 });
     try {
       const s = await short.page.evaluate(() => {
         const el = document.querySelector("#too-short");
@@ -163,19 +163,19 @@ for (const engine of Object.keys(ENGINES)) {
           sideCollapsed: document.body.classList.contains("side-collapsed"),
         };
       });
-      assert.equal(s.hidden, false, "视口高 <492 应显示「窗口太矮」提示");
-      assert.ok(s.text.includes("窗口太矮"), `提示文案应为「窗口太矮…」，实际：${s.text}`);
+      assert.equal(s.hidden, false, "视口高 <600 应显示「窗口太小」提示");
+      assert.ok(s.text.includes("窗口太小"), `提示文案应为「窗口太小…」，实际：${s.text}`);
       assert.ok(s.y >= 0 && s.bottom <= s.vh + 1, "提示应在视口内");
-      assert.equal(Math.round(s.cardH), 320, "视口高 <492 卡到 320 下限，不再缩");
-      assert.equal(s.sideCollapsed, true, "视口高 <492 侧栏强制收起");
+      assert.equal(Math.round(s.cardH), 427, "视口高 599 卡高 clamp(320, 599-172, 428) 为 427");
+      assert.equal(s.sideCollapsed, true, "视口高 599 侧栏强制收起");
       assert.deepEqual(short.errs, [], "页面不应有报错：" + short.errs.join(" | "));
     } finally {
       await short.ctx.close();
     }
 
-    const just = await open(engine, { width: 1024, height: 492 });
+    const just = await open(engine, { width: 1024, height: 600 });
     try {
-      assert.equal(await just.page.locator("#too-short").isHidden(), true, "视口高 492 不应出提示（<492 才出）");
+      assert.equal(await just.page.locator("#too-short").isHidden(), true, "视口高 600 不应出提示（<600 才出）");
       assert.deepEqual(just.errs, [], "页面不应有报错：" + just.errs.join(" | "));
     } finally {
       await just.ctx.close();

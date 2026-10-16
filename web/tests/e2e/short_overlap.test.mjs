@@ -1,5 +1,5 @@
 // e2e 矮屏交叠回归（QA FINAL_REPORT 92cf10a 缺陷 D2 / D3）。
-// D2：视口高 <492 时「窗口太矮」提示（#too-short）不得压住卡（含卡头 #card .card-head）。
+// D2：视口高 <600 时「窗口太小」提示（#too-short）不得压住卡（含卡头 #card .card-head）。
 // D3：B 档键位浮层（#keyhelp-pop，首进自动弹 / 点「?」手动开）不得压住左右选项（#opt-right/#opt-left），
 //     且 6 条键位在 492–600 全程全部可见、浮层不滚动。
 // BREAKPOINTS §矮屏「硬规则」：所有点击目标 ≥44×44 且没被别的元素盖住。
@@ -78,15 +78,15 @@ function inside(a, b) {
   return a.x >= b.x - 1 && a.y >= b.y - 1 && a.right <= b.right + 1 && a.bottom <= b.bottom + 1;
 }
 
-// ---------- D2：视口高 <492「窗口太矮」提示不压卡/卡头 ----------
+// ---------- D2：视口高 <600「窗口太小」提示不压卡/卡头 ----------
 for (const engine of Object.keys(ENGINES)) {
   for (const vp of [{ w: 1024, h: 491 }, { w: 1280, h: 491 }]) {
-    test(`${engine} D2 ${vp.w}×${vp.h}: 「窗口太矮」提示不压卡头`, async () => {
+    test(`${engine} D2 ${vp.w}×${vp.h}: 「窗口太小」提示不压卡头`, async () => {
       const { ctx, page, errs } = await open(engine, { width: vp.w, height: vp.h });
       try {
         const g = await snap(page);
         assert.equal(g.short, "B", "491 应落 B 档");
-        assert.equal(g.tooShort.hidden, false, "视口高 <492 应显示「窗口太矮」提示");
+        assert.equal(g.tooShort.hidden, false, "视口高 <600 应显示「窗口太小」提示");
         assert.ok(inViewport(g.tooShort, g.vw, g.vh), `提示应在视口内：${box(g.tooShort)}`);
         assert.ok(
           !intersects(g.tooShort, g.cardHead),

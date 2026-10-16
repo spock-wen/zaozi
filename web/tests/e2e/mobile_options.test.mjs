@@ -1,5 +1,5 @@
 // e2e: 移动端与平板竖屏选项按钮覆盖（TASK A）。
-// 视口：360×640 (mobile), 390×844 (mobile), 390×664 (mobile), 768×1024 (tablet-portrait), 1280×800 (desktop)。
+// 视口：主流清单（手机 375–430 · 平板竖屏 768/820 · 桌面 1024–1920）。
 // 三引擎全跑：验证左右选项按钮可见、在视口内、未被遮挡、文字正确、位于卡片下方（移动端与平板竖屏）、
 // 点击提交推进卡片、拖拽预览高亮。
 import { test, before, after } from "node:test";
@@ -16,12 +16,24 @@ const CARDS_DATA = JSON.parse(
 const cardById = (id) => CARDS_DATA.find((c) => c.id === id);
 
 const VIEWPORTS = [
-  { name: "360x640", width: 360, height: 640, view: "mobile" },
+  { name: "375x667", width: 375, height: 667, view: "mobile" },
+  { name: "360x800", width: 360, height: 800, view: "mobile" },
   { name: "390x844", width: 390, height: 844, view: "mobile" },
+  { name: "393x852", width: 393, height: 852, view: "mobile" },
+  { name: "412x915", width: 412, height: 915, view: "mobile" },
+  { name: "430x932", width: 430, height: 932, view: "mobile" },
   { name: "390x664", width: 390, height: 664, view: "mobile" },
   { name: "768x1024", width: 768, height: 1024, view: "tablet-portrait" },
+  { name: "820x1180", width: 820, height: 1180, view: "tablet-portrait" },
+  { name: "1024x768", width: 1024, height: 768, view: "desktop" },
+  { name: "1280x720", width: 1280, height: 720, view: "desktop" },
   { name: "1280x800", width: 1280, height: 800, view: "desktop" },
+  { name: "1366x768", width: 1366, height: 768, view: "desktop" },
+  { name: "1440x900", width: 1440, height: 900, view: "desktop" },
+  { name: "1920x1080", width: 1920, height: 1080, view: "desktop" },
 ];
+
+const COMMIT_VIEWPORTS = new Set(["375x667", "390x664", "390x844", "430x932", "768x1024", "820x1180", "1280x720"]);
 
 let server, browsers = {};
 before(async () => {
@@ -122,8 +134,8 @@ for (const [engine] of Object.entries(ENGINES)) {
           );
         }
 
-        // 6. 拖拽高亮检查（针对 390×844 和 360×640）
-        if (vp.name === "360x640" || vp.name === "390x844") {
+        // 6. 拖拽高亮检查（针对 375×667 和 390×844）
+        if (vp.name === "375x667" || vp.name === "390x844") {
           const cardBox = await page.locator("#card").boundingBox();
           assert.ok(cardBox, "#card 必须有包围盒");
           const cx = cardBox.x + cardBox.width / 2;
@@ -172,57 +184,59 @@ for (const [engine] of Object.entries(ENGINES)) {
           );
         }
 
-        // 5. 点击 #opt-left（真实 click）-> 飞出结算后 st.current 变为 T02，选项更新为 T02 文本
-        await optL.click();
-        await page.waitForFunction(() => window.__zz.st.current === "T02", null, { timeout: 5000 });
-        await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
+        if (COMMIT_VIEWPORTS.has(vp.name)) {
+          // 5. 点击 #opt-left（真实 click）-> 飞出结算后 st.current 变为 T02，选项更新为 T02 文本
+          await optL.click();
+          await page.waitForFunction(() => window.__zz.st.current === "T02", null, { timeout: 5000 });
+          await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
 
-        const stAfterLeft = await page.evaluate(() => ({
-          dims: window.__zz.st.dims,
-          log: window.__zz.st.log,
-        }));
-        assert.equal(stAfterLeft.dims.faith, 56, "T01 左选后 faith 应增加到 56");
-        assert.ok(
-          stAfterLeft.log[stAfterLeft.log.length - 1].includes("左"),
-          `st.log 应包含向左提交记录: ${stAfterLeft.log}`,
-        );
-
-        const cardT02 = cardById("T02");
-        const t02TextL = await optL.innerText();
-        const t02TextR = await optR.innerText();
-        assert.ok(
-          t02TextL.includes(cardT02.left.label),
-          `T02 #opt-left 应显示 "${cardT02.left.label}"，实际为 "${t02TextL}"`,
-        );
-        assert.ok(
-          t02TextR.includes(cardT02.right.label),
-          `T02 #opt-right 应显示 "${cardT02.right.label}"，实际为 "${t02TextR}"`,
-        );
-
-        // 5 (续). 新独立上下文测试：点击 #opt-right on T01 -> 验证右选项提交推进与数值变化（memory 变为 56）
-        const ctxR = await browsers[engine].newContext({
-          viewport: { width: vp.width, height: vp.height },
-        });
-        const pageR = await ctxR.newPage();
-        collectErrors(pageR, errs);
-        try {
-          await pageR.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
-          await pageR.waitForFunction(() => !!window.__zz && window.__zz.st?.current === "T01");
-          await pageR.locator("#opt-right").click();
-          await pageR.waitForFunction(() => window.__zz.st.current === "T02", null, { timeout: 5000 });
-          await pageR.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
-
-          const stAfterRight = await pageR.evaluate(() => ({
+          const stAfterLeft = await page.evaluate(() => ({
             dims: window.__zz.st.dims,
             log: window.__zz.st.log,
           }));
-          assert.equal(stAfterRight.dims.memory, 56, "T01 右选后 memory 应增加到 56");
+          assert.equal(stAfterLeft.dims.faith, 56, "T01 左选后 faith 应增加到 56");
           assert.ok(
-            stAfterRight.log[stAfterRight.log.length - 1].includes("右"),
-            `st.log 应包含向右提交记录: ${stAfterRight.log}`,
+            stAfterLeft.log[stAfterLeft.log.length - 1].includes("左"),
+            `st.log 应包含向左提交记录: ${stAfterLeft.log}`,
           );
-        } finally {
-          await ctxR.close();
+
+          const cardT02 = cardById("T02");
+          const t02TextL = await optL.innerText();
+          const t02TextR = await optR.innerText();
+          assert.ok(
+            t02TextL.includes(cardT02.left.label),
+            `T02 #opt-left 应显示 "${cardT02.left.label}"，实际为 "${t02TextL}"`,
+          );
+          assert.ok(
+            t02TextR.includes(cardT02.right.label),
+            `T02 #opt-right 应显示 "${cardT02.right.label}"，实际为 "${t02TextR}"`,
+          );
+
+          // 5 (续). 新独立上下文测试：点击 #opt-right on T01 -> 验证右选项提交推进与数值变化（memory 变为 56）
+          const ctxR = await browsers[engine].newContext({
+            viewport: { width: vp.width, height: vp.height },
+          });
+          const pageR = await ctxR.newPage();
+          collectErrors(pageR, errs);
+          try {
+            await pageR.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+            await pageR.waitForFunction(() => !!window.__zz && window.__zz.st?.current === "T01");
+            await pageR.locator("#opt-right").click();
+            await pageR.waitForFunction(() => window.__zz.st.current === "T02", null, { timeout: 5000 });
+            await pageR.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
+
+            const stAfterRight = await pageR.evaluate(() => ({
+              dims: window.__zz.st.dims,
+              log: window.__zz.st.log,
+            }));
+            assert.equal(stAfterRight.dims.memory, 56, "T01 右选后 memory 应增加到 56");
+            assert.ok(
+              stAfterRight.log[stAfterRight.log.length - 1].includes("右"),
+              `st.log 应包含向右提交记录: ${stAfterRight.log}`,
+            );
+          } finally {
+            await ctxR.close();
+          }
         }
 
         // 7. 无页面报错
@@ -236,14 +250,16 @@ for (const [engine] of Object.entries(ENGINES)) {
 
 // ---------- TOUCH 测试覆盖（手机真实触控场景） ----------
 const TOUCH_TAP_VIEWPORTS = [
-  { name: "360x640", width: 360, height: 640, view: "mobile" },
-  { name: "390x844", width: 390, height: 844, view: "mobile" },
+  { name: "375x667", width: 375, height: 667, view: "mobile" },
   { name: "390x664", width: 390, height: 664, view: "mobile" },
+  { name: "390x844", width: 390, height: 844, view: "mobile" },
+  { name: "430x932", width: 430, height: 932, view: "mobile" },
   { name: "768x1024", width: 768, height: 1024, view: "tablet-portrait" },
+  { name: "820x1180", width: 820, height: 1180, view: "tablet-portrait" },
 ];
 
 const TOUCH_DRAG_VIEWPORTS = [
-  { name: "360x640", width: 360, height: 640 },
+  { name: "375x667", width: 375, height: 667 },
   { name: "390x844", width: 390, height: 844 },
 ];
 
