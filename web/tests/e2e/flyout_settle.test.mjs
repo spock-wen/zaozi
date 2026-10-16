@@ -174,7 +174,7 @@ function appliedOnSettled(t, frames, n0, total, label) {
     }
     const ms = first >= 0 ? Math.round(frames[f].t - frames[first].t) : -1;
     notes.push(`#${k}→${card} settledFrames=${count} settleToApply=${ms}ms`);
-    if (count < 2) problems.push(`动作 #${k} 落在卡 ${card}，但该卡落定并绘制的帧只有 ${count} 帧（settleToApply=${ms}ms）`);
+    if (count < 2) problems.push(`动作 #${k} 落在卡 ${card}，但该卡落定并绘制的帧只有 ${count} 帧（需 ≥2 个采样 = ≥1 个已绘制出来的落定帧；settleToApply=${ms}ms）`);
   }
   t.diagnostic(`${label} 重放时机：${notes.join(" | ")}`);
   assert.deepEqual(problems, [], `[${label}] 排队输入必须先等当前卡落定并绘制才生效：${problems.join(" ; ")}`);
