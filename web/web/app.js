@@ -384,7 +384,8 @@ function renderCard() {
   const showOpts = true;
   ol.hidden = !showOpts; or.hidden = !showOpts;
   if (showOpts) { setText(ol, "← " + c.left.label); setText(or, c.right.label + " →"); }
-  const side = previewSide();
+  ol.disabled = or.disabled = st.phase !== "card";
+  const side = ui.dragged || ui.kbDir ? previewSide() : null;   // X3 长按看分量不亮选项
   ol.classList.toggle("on", side === "left"); or.classList.toggle("on", side === "right");
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
   setText($("gesture-hint"), keyboardMode()
@@ -867,7 +868,7 @@ function applyTilt() {
   const deg = Math.max(-15, Math.min(15, (ui.dx / r.width) * 15));
   cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg}deg)`;
 }
-function renderDimsOnly() { const d = dimsHTML(); patchHTML($("dims"), d); patchHTML($("dims-desktop"), d); const s = previewSide(); $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
+function renderDimsOnly() { const d = dimsHTML(); patchHTML($("dims"), d); patchHTML($("dims-desktop"), d); const s = ui.dragged || ui.kbDir ? previewSide() : null; $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
 function onUp() {
   if (!ui.dragging) return;
   clearTimeout(ui.holdT);
@@ -958,7 +959,9 @@ addEventListener("keydown", (e) => {
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
 function commitSide(dir) {
   const thr = threshold();
-  flyOut((dir === "left" ? -1 : 1) * 620, () => dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action));
+  if (st.phase !== "card" || ui.animating || ui.dragging) return;
+  ui.animating = true;
+  flyOut((dir === "left" ? -1 : 1) * 620, () => { ui.animating = false; dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action); });
 }
 
 // ---------- 事件绑定 ----------
