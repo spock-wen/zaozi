@@ -47,7 +47,12 @@ after(async () => {
 
 for (const [engine] of Object.entries(ENGINES)) {
   for (const vp of VIEWPORTS) {
-    test(`${engine} ${vp.name}: mobile / tablet options buttons & commit flow`, async () => {
+    const isDesktop = vp.view === "desktop";
+    const testTitle = isDesktop
+      ? `${engine} ${vp.name} [regression guard]: mobile / tablet options buttons & commit flow`
+      : `${engine} ${vp.name}: mobile / tablet options buttons & commit flow`;
+
+    test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({
         viewport: { width: vp.width, height: vp.height },
       });
@@ -62,7 +67,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.equal(await page.evaluate(() => window.__zz.st.phase), "card", "开局应在 card 阶段");
         assert.equal(await page.evaluate(() => document.body.dataset.view), vp.view, "布局档位应与预期一致");
 
-        // 2. #opt-left 与 #opt-right：可见、包围盒在视口内、尺寸 ≥ 44×44、未被其他元素覆盖
+        // 2. #opt-left 与 #opt-right：可见、包围盒在视口内、尺寸 ≥ 44×44、未被其他元素覆盖（5x3 elementFromPoint）
         const optL = page.locator("#opt-left");
         const optR = page.locator("#opt-right");
         assert.ok(await optL.isVisible(), "#opt-left 必须可见");
@@ -85,21 +90,29 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.ok(boxL.width >= 44 && boxL.height >= 44, `#opt-left 尺寸 ${boxL.width}×${boxL.height} < 44`);
         assert.ok(boxR.width >= 44 && boxR.height >= 44, `#opt-right 尺寸 ${boxR.width}×${boxR.height} < 44`);
 
-        const hitL = await page.evaluate(() => {
-          const el = document.querySelector("#opt-left");
-          const r = el.getBoundingClientRect();
-          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-          return top ? (top === el || el.contains(top) ? "self" : (top.id || top.className || top.tagName)) : "none";
-        });
-        assert.equal(hitL, "self", `#opt-left 中心点不应被其他元素覆盖，实际命中: ${hitL}`);
+        const check5x3Coverage = async (sel, label) => {
+          return await page.evaluate(({ sel, label }) => {
+            const el = document.querySelector(sel);
+            if (!el) return { ok: false, msg: `${label} 不存在` };
+            const r = el.getBoundingClientRect();
+            for (let xi = 0; xi < 5; xi++) {
+              for (let yi = 0; yi < 3; yi++) {
+                const px = r.left + (r.width * (xi + 0.5)) / 5;
+                const py = r.top + (r.height * (yi + 0.5)) / 3;
+                const top = document.elementFromPoint(px, py);
+                if (!top || (top !== el && !el.contains(top))) {
+                  return { ok: false, msg: `${label} 5x3 采样点 (${px.toFixed(1)}, ${py.toFixed(1)}) 被 ${top ? (top.id || top.className || top.tagName) : "none"} 覆盖` };
+                }
+              }
+            }
+            return { ok: true };
+          }, { sel, label });
+        };
 
-        const hitR = await page.evaluate(() => {
-          const el = document.querySelector("#opt-right");
-          const r = el.getBoundingClientRect();
-          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-          return top ? (top === el || el.contains(top) ? "self" : (top.id || top.className || top.tagName)) : "none";
-        });
-        assert.equal(hitR, "self", `#opt-right 中心点不应被其他元素覆盖，实际命中: ${hitR}`);
+        const covL = await check5x3Coverage("#opt-left", "#opt-left");
+        assert.ok(covL.ok, covL.msg);
+        const covR = await check5x3Coverage("#opt-right", "#opt-right");
+        assert.ok(covR.ok, covR.msg);
 
         // 3. 按钮文字匹配当前卡片数据（T01）
         const curId = await page.evaluate(() => window.__zz.st.current);
@@ -347,13 +360,18 @@ for (const [engine] of Object.entries(ENGINES)) {
   }
 }
 
-// 2. 触控拖拽高亮检查（360×640 与 390×844，hasTouch: true）
+// 2. 触控拖拽高亮检查（375×667 与 390×844，真实指针输入）
 for (const [engine] of Object.entries(ENGINES)) {
   for (const vp of TOUCH_DRAG_VIEWPORTS) {
-    test(`${engine} ${vp.name}: touch drag highlight & release on #card`, async () => {
+    const isChromium = engine === "chromium";
+    const label = isChromium
+      ? `${engine} ${vp.name}: touch drag highlight (chromium CDP Input.dispatchTouchEvent) on #card`
+      : `${engine} ${vp.name}: touch drag highlight (firefox/webkit fallback to mouse with hasTouch:false) on #card`;
+
+    test(label, async () => {
       const ctx = await browsers[engine].newContext({
         viewport: { width: vp.width, height: vp.height },
-        hasTouch: true,
+        hasTouch: isChromium,
       });
       const page = await ctx.newPage();
       const errs = [];
@@ -363,127 +381,108 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
         await page.waitForFunction(() => !!window.__zz && window.__zz.st?.current === "T01");
 
-        // 若 app 处理器内 setPointerCapture 在合成事件下抛错（例如 Firefox 无效 pointerId），在此安全包装
-        await page.evaluate(() => {
-          const orig = Element.prototype.setPointerCapture;
-          Element.prototype.setPointerCapture = function (...args) {
-            try {
-              return orig.apply(this, args);
-            } catch {
-              // 忽略合成指针捕获异常
-            }
-          };
-        });
-
         const cardLocator = page.locator("#card");
         const cardBox = await cardLocator.boundingBox();
         assert.ok(cardBox, "#card 必须有包围盒");
         const cx = cardBox.x + cardBox.width / 2;
         const cy = cardBox.y + cardBox.height / 2;
         const cardWidth = cardBox.width;
+        const dragDist = cardWidth * 0.25;
         const optL = page.locator("#opt-left");
         const optR = page.locator("#opt-right");
 
-        // pointerdown at card centre on #card
-        await page.evaluate(({ cx, cy }) => {
-          const card = document.querySelector("#card");
-          card.dispatchEvent(new PointerEvent("pointerdown", {
-            pointerId: 1,
-            pointerType: "touch",
-            isPrimary: true,
-            clientX: cx,
-            clientY: cy,
-            bubbles: true,
-            cancelable: true,
-          }));
-        }, { cx, cy });
+        if (isChromium) {
+          const cdp = await ctx.newCDPSession(page);
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [{ x: Math.round(cx), y: Math.round(cy) }],
+          });
 
-        // several pointermove to cx - 0.25*cardWidth (app.js 在 window 上监听 pointermove)
-        await page.evaluate(({ cx, cy, cardWidth }) => {
-          const targetX = cx - 0.25 * cardWidth;
           for (let i = 1; i <= 5; i++) {
-            const curX = cx + (targetX - cx) * (i / 5);
-            window.dispatchEvent(new PointerEvent("pointermove", {
-              pointerId: 1,
-              pointerType: "touch",
-              isPrimary: true,
-              clientX: curX,
-              clientY: cy,
-              bubbles: true,
-              cancelable: true,
-            }));
+            const x = Math.round(cx - dragDist * (i / 5));
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [{ x, y: Math.round(cy) }],
+            });
           }
-        }, { cx, cy, cardWidth });
 
-        // assert #opt-left has class "on" and #opt-right not and both visible
-        await page.waitForFunction(() => document.querySelector("#opt-left")?.classList.contains("on"));
-        assert.ok(
-          await page.evaluate(() => document.querySelector("#opt-left")?.classList.contains("on")),
-          "向左触控拖动时 #opt-left 应有 on 高亮类",
-        );
-        assert.ok(
-          !(await page.evaluate(() => document.querySelector("#opt-right")?.classList.contains("on"))),
-          "向左触控拖动时 #opt-right 不应有 on 高亮类",
-        );
-        assert.ok(await optL.isVisible(), "触控拖动中 #opt-left 保持可见");
-        assert.ok(await optR.isVisible(), "触控拖动中 #opt-right 保持可见");
+          await page.waitForFunction(() => document.querySelector("#opt-left")?.classList.contains("on"));
+          assert.ok(
+            await page.evaluate(() => document.querySelector("#opt-left")?.classList.contains("on")),
+            "向左触控拖动时 #opt-left 应有 on 高亮类",
+          );
+          assert.ok(
+            !(await page.evaluate(() => document.querySelector("#opt-right")?.classList.contains("on"))),
+            "向左触控拖动时 #opt-right 不应有 on 高亮类",
+          );
+          assert.ok(await optL.isVisible(), "触控拖动中 #opt-left 保持可见");
+          assert.ok(await optR.isVisible(), "触控拖动中 #opt-right 保持可见");
 
-        // pointermove to cx + 0.25*cardWidth (app.js 在 window 上监听 pointermove)
-        await page.evaluate(({ cx, cy, cardWidth }) => {
-          const startX = cx - 0.25 * cardWidth;
-          const targetX = cx + 0.25 * cardWidth;
           for (let i = 1; i <= 10; i++) {
-            const curX = startX + (targetX - startX) * (i / 10);
-            window.dispatchEvent(new PointerEvent("pointermove", {
-              pointerId: 1,
-              pointerType: "touch",
-              isPrimary: true,
-              clientX: curX,
-              clientY: cy,
-              bubbles: true,
-              cancelable: true,
-            }));
+            const x = Math.round((cx - dragDist) + (2 * dragDist) * (i / 10));
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [{ x, y: Math.round(cy) }],
+            });
           }
-        }, { cx, cy, cardWidth });
 
-        // assert the opposite
-        await page.waitForFunction(() => document.querySelector("#opt-right")?.classList.contains("on"));
-        assert.ok(
-          !(await page.evaluate(() => document.querySelector("#opt-left")?.classList.contains("on"))),
-          "向右触控拖动时 #opt-left 不应有 on 高亮类",
-        );
-        assert.ok(
-          await page.evaluate(() => document.querySelector("#opt-right")?.classList.contains("on")),
-          "向右触控拖动时 #opt-right 应有 on 高亮类",
-        );
-        assert.ok(await optL.isVisible(), "触控拖动中 #opt-left 保持可见");
-        assert.ok(await optR.isVisible(), "触控拖动中 #opt-right 保持可见");
+          await page.waitForFunction(() => document.querySelector("#opt-right")?.classList.contains("on"));
+          assert.ok(
+            !(await page.evaluate(() => document.querySelector("#opt-left")?.classList.contains("on"))),
+            "向右触控拖动时 #opt-left 不应有 on 高亮类",
+          );
+          assert.ok(
+            await page.evaluate(() => document.querySelector("#opt-right")?.classList.contains("on")),
+            "向右触控拖动时 #opt-right 应有 on 高亮类",
+          );
+          assert.ok(await optL.isVisible(), "触控拖动中 #opt-left 保持可见");
+          assert.ok(await optR.isVisible(), "触控拖动中 #opt-right 保持可见");
 
-        // pointermove back to cx, pointerup (app.js 在 window 上监听 pointermove 与 pointerup)
-        await page.evaluate(({ cx, cy, cardWidth }) => {
-          const startX = cx + 0.25 * cardWidth;
           for (let i = 1; i <= 5; i++) {
-            const curX = startX + (cx - startX) * (i / 5);
-            window.dispatchEvent(new PointerEvent("pointermove", {
-              pointerId: 1,
-              pointerType: "touch",
-              isPrimary: true,
-              clientX: curX,
-              clientY: cy,
-              bubbles: true,
-              cancelable: true,
-            }));
+            const x = Math.round((cx + dragDist) - dragDist * (i / 5));
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [{ x, y: Math.round(cy) }],
+            });
           }
-          window.dispatchEvent(new PointerEvent("pointerup", {
-            pointerId: 1,
-            pointerType: "touch",
-            isPrimary: true,
-            clientX: cx,
-            clientY: cy,
-            bubbles: true,
-            cancelable: true,
-          }));
-        }, { cx, cy, cardWidth });
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchEnd",
+            touchPoints: [],
+          });
+        } else {
+          // Firefox / Webkit: page.mouse with hasTouch: false
+          await page.mouse.move(cx, cy);
+          await page.mouse.down();
+          await page.mouse.move(cx - dragDist, cy, { steps: 5 });
+
+          await page.waitForFunction(() => document.querySelector("#opt-left")?.classList.contains("on"));
+          assert.ok(
+            await page.evaluate(() => document.querySelector("#opt-left")?.classList.contains("on")),
+            "向左拖动时 #opt-left 应有 on 高亮类",
+          );
+          assert.ok(
+            !(await page.evaluate(() => document.querySelector("#opt-right")?.classList.contains("on"))),
+            "向左拖动时 #opt-right 不应有 on 高亮类",
+          );
+          assert.ok(await optL.isVisible(), "拖动中 #opt-left 保持可见");
+          assert.ok(await optR.isVisible(), "拖动中 #opt-right 保持可见");
+
+          await page.mouse.move(cx + dragDist, cy, { steps: 10 });
+          await page.waitForFunction(() => document.querySelector("#opt-right")?.classList.contains("on"));
+          assert.ok(
+            !(await page.evaluate(() => document.querySelector("#opt-left")?.classList.contains("on"))),
+            "向右拖动时 #opt-left 不应有 on 高亮类",
+          );
+          assert.ok(
+            await page.evaluate(() => document.querySelector("#opt-right")?.classList.contains("on")),
+            "向右拖动时 #opt-right 应有 on 高亮类",
+          );
+          assert.ok(await optL.isVisible(), "拖动中 #opt-left 保持可见");
+          assert.ok(await optR.isVisible(), "拖动中 #opt-right 保持可见");
+
+          await page.mouse.move(cx, cy, { steps: 5 });
+          await page.mouse.up();
+        }
 
         // after release st.current is still T01
         await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 3000 });

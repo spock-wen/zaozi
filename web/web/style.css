@@ -8,6 +8,11 @@
   --down:#E08A74; --up:#8FB8A8;
   --ink:#3b2f20; --muted:#9a93a6;
   --card-h: 468px;
+  /* 10/13 版 7dc14fa 拖卡阈值色，待设计师替换 */
+  --drag-label:#6b5a3e;
+  --drag-label-hot:#7a2f2f;
+  --drag-track:#c9b897;
+  --drag-fill:#7a2f2f;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -78,6 +83,27 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 #card img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
 /* 卡内文字不可选：从卡中心拖会顺手选中「卡头→图片」，选区残留时再拖，chromium 取消拖卡、webkit 卡粘手并误提交「选右」（工程审核 f96632f P1-1） */
 #card{user-select:none;-webkit-user-select:none;}
+.card-drag-hint{
+  position:absolute;left:0;right:0;bottom:24px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  pointer-events:none;z-index:2;
+}
+.card-drag-hint.above-drops,
+.card:has(#card-drops:not([hidden])) .card-drag-hint{
+  bottom:76px;
+}
+.card-drag-label{
+  font-size:18px;font-weight:700;color:var(--drag-label);text-align:center;
+}
+.card-drag-label.hot{
+  color:var(--drag-label-hot);
+}
+.card-drag-bar{
+  width:min(200px,60%);height:6px;background:var(--drag-track);border-radius:3px;overflow:hidden;
+}
+.card-drag-fill{
+  height:100%;background:var(--drag-fill);width:0%;
+}
 .card-drops{
   position:absolute;left:16px;right:16px;bottom:16px;height:56px;border:1px dashed var(--bone-crack);
   border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#7a6a4e;
@@ -100,6 +126,7 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 
 /* 左右选项 */
 .optbtn{
+  position:relative;z-index:10;
   width:192px;min-height:44px;padding:10px 12px;border-radius:10px;background:var(--night-700);
   color:var(--paper-50);font-size:15px;font-weight:700;text-align:center;border:1px solid var(--bone-100);
   transition:transform 160ms ease-out;
@@ -321,7 +348,8 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:12px/1.5 ui-monospace,Menlo,monospace;}
 #dlgbtns{text-align:right;margin-top:8px;}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
-  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;}
+  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;
+  width:max-content;max-width:min(90vw,320px);}
 #toast.on{opacity:1;}
 #rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
 
@@ -360,7 +388,8 @@ body[data-view="desktop"] .card{height:100%;width:auto;aspect-ratio:328/468;}
    任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
 body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}
 body[data-view="desktop"] #wordbox{min-height:0;}
-body[data-view="desktop"] .optbtn{width:192px;flex:0 0 auto;}
+body[data-view="desktop"] #cardcol{flex:0 1 auto;min-width:0;}
+body[data-view="desktop"] .optbtn{width:192px;flex:0 1 auto;min-width:120px;}
 
 /* 手机横屏：提示转竖屏（由 JS 显示 #rotate-hint） */
 body[data-view="mobile"] #drawer-body{max-height:68dvh;}
@@ -450,6 +479,8 @@ body[data-short="B"] #app{padding-bottom:36px;}   /* 底边留白：飘字 / 达
 /* 卡下落字框：矮屏压成一行，别把卡内文挤成两行 */
 body[data-short="A"] .card-drops,
 body[data-short="B"] .card-drops{height:auto;min-height:0;padding:4px 8px;font-size:12px;white-space:nowrap;overflow:hidden;}
+body[data-short="A"] .card.engrave .card-drops,
+body[data-short="B"] .card.engrave .card-drops{white-space:normal;}
 
 /* 桌面矮屏：顶栏行 56→48；四维条（JS 移进顶栏的 #dims-desktop）自适应收窄；
    字匣按设计稿收成居中胶囊（背景不再整行铺满，教学气泡才有空沟不压它）。 */

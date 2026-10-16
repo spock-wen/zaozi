@@ -195,7 +195,13 @@ function artHTML(card) {
 
 // ---------- 交互助手 ----------
 function toast(m) {
-  const t = $("toast"); t.textContent = m; t.classList.add("on");
+  const t = $("toast");
+  const view = document.body.dataset.view;
+  const ol = $("opt-left");
+  t.style.bottom = (view === "mobile" || view === "tablet-portrait") && ol && !ol.hidden
+    ? (innerHeight - ol.getBoundingClientRect().top + 8) + "px"
+    : "";
+  t.textContent = m; t.classList.add("on");
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 1800);
 }
 function deferInteract(el, ms = 350) {         // 防「天亮了」穿透到下一屏的按钮
@@ -379,6 +385,7 @@ function renderCard() {
     if (d) patchHTML(drops, `可落字：<b>${d.char}</b> <span class="chiplink">点字匣里的它</span>`);
     else dropHTML(drops);
   } else { drops.hidden = true; dropHTML(drops); }
+  const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   // 左右选项：各视口在卡/刻阶段均显示（手机与平板竖屏经 CSS 排到卡下方并排）
   const ol = $("opt-left"), or = $("opt-right");
   const showOpts = true;
@@ -868,11 +875,46 @@ function applyTilt() {
   const deg = Math.max(-15, Math.min(15, (ui.dx / r.width) * 15));
   cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg}deg)`;
 }
-function renderDimsOnly() { const d = dimsHTML(); patchHTML($("dims"), d); patchHTML($("dims-desktop"), d); const s = ui.dragged || ui.kbDir ? previewSide() : null; $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
+function renderDragHintOnly() {
+  const el = $("card-drag-hint");
+  if (!el) return;
+  if (!ui.dragging || Math.abs(ui.dx) <= 8 || st.phase !== "card") {
+    el.hidden = true;
+    return;
+  }
+  const c = curCard();
+  if (!c) { el.hidden = true; return; }
+  const opt = ui.dx < 0 ? c.left : c.right;
+  const thr = threshold();
+  const ratio = Math.min(1, Math.abs(ui.dx) / thr);
+  const hot = Math.abs(ui.dx) >= thr;
+  const lbl = $("card-drag-label");
+  if (lbl) {
+    lbl.textContent = opt.label;
+    lbl.classList.toggle("hot", hot);
+  }
+  const fill = $("card-drag-fill");
+  if (fill) {
+    fill.style.width = (ratio * 100) + "%";
+  }
+  const drops = $("card-drops");
+  const dropsVisible = drops && !drops.hidden && drops.offsetHeight > 0;
+  el.classList.toggle("above-drops", dropsVisible);
+  el.hidden = false;
+}
+function renderDimsOnly() {
+  const d = dimsHTML();
+  patchHTML($("dims"), d); patchHTML($("dims-desktop"), d);
+  const s = ui.dragged || ui.kbDir ? previewSide() : null;
+  $("opt-left").classList.toggle("on", s === "left");
+  $("opt-right").classList.toggle("on", s === "right");
+  renderDragHintOnly();
+}
 function onUp() {
   if (!ui.dragging) return;
   clearTimeout(ui.holdT);
   ui.dragging = false; cardEl().classList.remove("dragging");
+  const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   const thr = threshold(), dx = ui.dx;
   const wasHold = ui.hold; ui.hold = false;
   if (Math.abs(dx) >= thr) {
@@ -885,6 +927,7 @@ function onUp() {
   }
 }
 function rebound() {
+  const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   const from = ui.dx;
   if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); return; }
   ui.animating = true; renderShort(); const t0 = performance.now(), dur = 320;
@@ -896,13 +939,27 @@ function rebound() {
   requestAnimationFrame(tick);
 }
 function flyOut(targetX, done) {
-  if (reducedPref()) { cardEl().style.opacity = "0"; setTimeout(() => { cardEl().style.opacity = ""; done(); }, 120); return; }
+  const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
+  if (reducedPref()) {
+    cardEl().style.opacity = "0";
+    setTimeout(() => {
+      cardEl().style.opacity = "";
+      done();
+      whenCardEntryDone().then(() => { ui.animating = false; renderShort(); });
+    }, 120);
+    return;
+  }
   ui.animating = true; renderShort(); const from = ui.dx, t0 = performance.now(), dur = 240, deg = Math.sign(targetX) * 18;
   const tick = (t) => {
     const k = Math.min(1, (t - t0) / dur), e = k * k;
     ui.dx = from + (targetX - from) * e;
     cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg * e}deg)`; cardEl().style.opacity = String(1 - e);
-    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; cardEl().style.transform = ""; cardEl().style.opacity = ""; done(); }
+    if (k < 1) requestAnimationFrame(tick);
+    else {
+      cardEl().style.transform = ""; cardEl().style.opacity = "";
+      done();
+      whenCardEntryDone().then(() => { ui.animating = false; renderShort(); });
+    }
   };
   requestAnimationFrame(tick);
 }
@@ -958,10 +1015,11 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
 function commitSide(dir) {
-  const thr = threshold();
-  if (st.phase !== "card" || ui.animating || ui.dragging) return;
+  if (st.phase !== "card" || ui.animating || ui.dragging || cardEntryBusy()) return;
   ui.animating = true;
-  flyOut((dir === "left" ? -1 : 1) * 620, () => { ui.animating = false; dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action); });
+  flyOut((dir === "left" ? -1 : 1) * 620, () => {
+    dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action);
+  });
 }
 
 // ---------- 事件绑定 ----------
