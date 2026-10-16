@@ -227,4 +227,6 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
   - Permanent screen-reader live region: `#toast-live` (`.sr-only`, role=status, aria-live=polite) carries the toast text and is emptied when the toast hides; `#toast` no longer has aria-live and its visual behaviour is unchanged. e2e toast_live (3 engines × 390×844 / 1280×800, plus a CDP AX-tree check in chromium): fails 6/6 on 9462842.
   - Key hints mention K / 刻 only while the bone chip is shown (engrave phase): #gesture-hint, #keys (N and A tiers) and the B-tier 「?」 popover's K / Enter-刻 rows. The engrave-phase text is unchanged; the new per-phase copy waits for v6.2.x. e2e hints_by_phase (3 engines × 1280×800 / 700 / 600): fails 9/9 on 9462842.
   - toast_coach now covers 390×664 and uses a real touchscreen tap on phones (15 cases). It fails 15/15 on 00f7e5a (before D1) and passes on 9462842: this item only adds test coverage, so there is no code fix to fail against.
+  - short_screen (A/B tier) and short_overlap (D3) now expect the phase-dependent hints (no K outside engrave, 4 popover rows) and re-check the same geometry with the full 6-row engrave set at T03.
+  - Verification: unit 28/28; full 3-engine serial e2e 362/362.
 
