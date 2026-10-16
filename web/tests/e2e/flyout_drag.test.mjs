@@ -362,7 +362,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     t.diagnostic(`T03 落定后：current=${st.cur} phase=${st.phase} 新增动作=${st.n - n0}`);
     assert.equal(st.cur, "T03", "排队的 → 在刻字阶段没有对应行为，教学应停在 T03");
     assert.equal(st.phase, "engrave", "T03 应仍是刻字阶段");
-    assert.equal(st.n - n0, 0, "排队的 → 不应产生任何动作");
+    assert.equal(st.n - n0, 1, "除起飞提交T02外，排队的第3次→在刻字阶段不应产生任何额外动作");
+    assert.deepEqual(await sidesFrom(page, n0), ["right"], "只应有起飞提交 T02 的那一次 right");
     assert.deepEqual(await toastHits(page), [], "按键走 handleKey 的空闲行为，不该弹锁定骨片提示");
     assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
     await ctx.close();
