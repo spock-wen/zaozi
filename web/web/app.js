@@ -379,9 +379,9 @@ function renderCard() {
     if (d) patchHTML(drops, `可落字：<b>${d.char}</b> <span class="chiplink">点字匣里的它</span>`);
     else dropHTML(drops);
   } else { drops.hidden = true; dropHTML(drops); }
-  // 左右选项
+  // 左右选项：各视口在卡/刻阶段均显示（手机与平板竖屏经 CSS 排到卡下方并排）
   const ol = $("opt-left"), or = $("opt-right");
-  const showOpts = document.body.dataset.view === "desktop" || document.body.dataset.view === "tablet-landscape";
+  const showOpts = true;
   ol.hidden = !showOpts; or.hidden = !showOpts;
   if (showOpts) { setText(ol, "← " + c.left.label); setText(or, c.right.label + " →"); }
   const side = previewSide();
