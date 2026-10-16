@@ -262,6 +262,7 @@ function newGame(s) {
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
   ui.pickFocus = null; ui.pickTapped = null; ui.presses.clear(); ui.swallow = [];
   ui.lastDims = null; saveNow(); render();
+  whenCardEntryDone().then(() => setCardSettled(true));
 }
 // ---------- 存档码 ----------
 function openDlg(title, msg, editable) {
@@ -284,7 +285,9 @@ function importCode() {
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
-    ui.lastDims = null; saveNow(); render(); closeDlg();
+    ui.lastDims = null; saveNow(); render();
+    whenCardEntryDone().then(() => setCardSettled(true));
+    closeDlg();
     toast(`导入成功：种子 ${seed}，${actions.length} 步`);
   } catch (e) { openDlg("导入存档码", "这串码走不通：" + e.message, false); }
 }
@@ -390,10 +393,14 @@ function renderCard() {
   const ol = $("opt-left"), or = $("opt-right");
   const showOpts = true;
   ol.hidden = !showOpts; or.hidden = !showOpts;
-  if (showOpts) { setText(ol, "← " + c.left.label); setText(or, c.right.label + " →"); }
+  if (showOpts) {
+    setText(ol, "← " + c.left.label);
+    setText(or, c.right.label + " →");
+    ol.setAttribute("aria-label", "选左：" + c.left.label);
+    or.setAttribute("aria-label", "选右：" + c.right.label);
+  }
   ol.disabled = or.disabled = st.phase !== "card";
-  const side = ui.dragged || ui.kbDir ? previewSide() : null;   // X3 长按看分量不亮选项
-  ol.classList.toggle("on", side === "left"); or.classList.toggle("on", side === "right");
+  paintOpts();
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
   setText($("gesture-hint"), keyboardMode()
     ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
@@ -717,6 +724,19 @@ let cardSettling = false;
 function cardEntryBusy() {
   return ui.animating || cardSettling;
 }
+function inputBusy() {
+  return st.phase !== "card" || ui.animating || ui.dragging || cardEntryBusy();
+}
+function setCardSettled(settled) {
+  const card = $("card");
+  if (settled) {
+    if (card) card.setAttribute("data-ready", "1");
+    document.body.setAttribute("data-card-ready", "1");
+  } else {
+    if (card) card.removeAttribute("data-ready");
+    document.body.removeAttribute("data-card-ready");
+  }
+}
 // 等卡入场动画结束：先等 rAF 阶段，再等 CSS 过渡跑完（Promise.all(finished)），
 // 过渡对象还没建好的一帧用一次 transitionend 兜底。
 function whenCardEntryDone() {
@@ -903,18 +923,31 @@ function renderDragHintOnly() {
   el.classList.toggle("above-drops", dropsVisible);
   el.hidden = false;
 }
+function paintOpts() {
+  const ol = $("opt-left"), or = $("opt-right");
+  if (!ol || !or) return;
+  const thr = threshold();
+  const dragging = ui.dragging && Math.abs(ui.dx) > 8 && st.phase === "card";
+  const pastThr = dragging && Math.abs(ui.dx) >= thr;
+  const side = dragging ? (ui.dx < 0 ? "left" : "right") : (ui.kbDir ? ui.kbDir : null);
+  ol.classList.toggle("on", side === "left");
+  or.classList.toggle("on", side === "right");
+  if (pastThr && side === "left") ol.setAttribute("data-ready", "1");
+  else ol.removeAttribute("data-ready");
+  if (pastThr && side === "right") or.setAttribute("data-ready", "1");
+  else or.removeAttribute("data-ready");
+}
 function renderDimsOnly() {
   const d = dimsHTML();
   patchHTML($("dims"), d); patchHTML($("dims-desktop"), d);
-  const s = ui.dragged || ui.kbDir ? previewSide() : null;
-  $("opt-left").classList.toggle("on", s === "left");
-  $("opt-right").classList.toggle("on", s === "right");
+  paintOpts();
   renderDragHintOnly();
 }
 function onUp() {
   if (!ui.dragging) return;
   clearTimeout(ui.holdT);
   ui.dragging = false; cardEl().classList.remove("dragging");
+  paintOpts();
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   const thr = threshold(), dx = ui.dx;
   const wasHold = ui.hold; ui.hold = false;
@@ -930,18 +963,25 @@ function onUp() {
 function rebound() {
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   const from = ui.dx;
-  if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); return; }
+  if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); setCardSettled(true); return; }
   ui.animating = true; renderShort(); const t0 = performance.now(), dur = 320;
   const tick = (t) => {
     const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
     ui.dx = from * (1 - e); cardEl().style.transform = `translateX(${ui.dx}px)`; renderDimsOnly();
-    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; ui.dx = 0; cardEl().style.transform = ""; render(); }
+    if (k < 1) requestAnimationFrame(tick);
+    else {
+      ui.animating = false; ui.dx = 0; cardEl().style.transform = "";
+      render();
+      setCardSettled(true);
+    }
   };
   requestAnimationFrame(tick);
 }
 function flyOut(targetX, done) {
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   cardSettling = true;
+  setCardSettled(false);
+  paintOpts();
   if (reducedPref()) {
     cardEl().style.opacity = "0";
     cardSettling = true;
@@ -949,6 +989,7 @@ function flyOut(targetX, done) {
       cardEl().style.opacity = "";
       done();
       cardSettling = false;
+      setCardSettled(true);
       renderShort();
     }, 120);
     return;
@@ -967,6 +1008,7 @@ function flyOut(targetX, done) {
       requestAnimationFrame(() => {
         whenCardEntryDone().then(() => {
           cardSettling = false;
+          setCardSettled(true);
           renderShort();
         });
       });
@@ -986,7 +1028,7 @@ addEventListener("pointercancel", onUp);
 
 addEventListener("keydown", (e) => {
   if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }
-  if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; render(); return; }
+  if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; renderMenu(); renderGoalPanel(); render(); return; }
   if (st.phase === "pick") {
     // 键盘光标、金色焦点框和鼠标悬停是同一个状态 ui.pickFocus（P1-2）：
     // 移动光标时同步重绘焦点框和说明卡；Space 选中的就是框里的字。
@@ -1009,6 +1051,7 @@ addEventListener("keydown", (e) => {
     return;
   }
   if (st.phase === "card") {
+    if (inputBusy()) return;
     if (e.code === "Space") { e.preventDefault(); ui.hold = true; render(); return; }
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
@@ -1026,7 +1069,7 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
 function commitSide(dir) {
-  if (st.phase !== "card" || ui.animating || ui.dragging || cardEntryBusy()) return;
+  if (inputBusy()) return;
   ui.animating = true;
   flyOut((dir === "left" ? -1 : 1) * 620, () => {
     dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action);
@@ -1080,7 +1123,13 @@ on($("sidebar-tab"), () => {
 });
 on($("wb-handle"), () => { $("drawer").hidden = false; renderSide(); });
 on($("drawer-mask"), () => { $("drawer").hidden = true; });
-on($("wordbox"), (e) => { const b = e.target.closest("[data-slot]"); if (b && !b.disabled) dispatch({ type: "choose", side: "drop", slot: Number(b.dataset.slot) }); });
+on($("wordbox"), (e) => {
+  const b = e.target.closest("[data-slot]");
+  if (b && !b.disabled) {
+    if (st.phase === "card" && inputBusy()) return;
+    dispatch({ type: "choose", side: "drop", slot: Number(b.dataset.slot) });
+  }
+});
 on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") dispatch({ type: "skip_engrave" }); });
 on($("bonecorner"), () => { if (st.phase === "engrave") { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
 on($("opt-left"), () => commitSide("left"));
@@ -1209,6 +1258,33 @@ window.__zz = {
 if (!DEBUG_GOAL) restore();          // 调试图标（debug_goal）时不读旧存档，保证这一局就是目标被塞进去的局
 computeLayout();
 render();
+whenCardEntryDone().then(() => setCardSettled(true));
 maybeAutoKeyhelp();                  // 矮屏 B：该存档首次进入自动弹一次键位「?」
 loadGlyphs();
-if (BUILD_DIST && "serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+if ("serviceWorker" in navigator) {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) return;
+    if (reloading) return;
+    const key = "zz_sw_reloaded";
+    const last = Number(sessionStorage.getItem(key) || 0);
+    if (Date.now() - last < 5000) return;
+    sessionStorage.setItem(key, String(Date.now()));
+    reloading = true;
+    const tryReload = () => {
+      if (ui.dragging || ui.animating || cardEntryBusy()) {
+        whenCardEntryDone().then(() => {
+          if (ui.dragging) { setTimeout(tryReload, 100); return; }
+          saveNow();
+          location.reload();
+        });
+      } else {
+        saveNow();
+        location.reload();
+      }
+    };
+    tryReload();
+  });
+  if (BUILD_DIST) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
