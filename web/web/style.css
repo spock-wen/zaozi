@@ -111,8 +111,29 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 
 /* 教学气泡 */
 #coachcol{display:none;}
-body[data-view="mobile"] #stage,body[data-view="tablet-portrait"] #stage{flex-direction:column;gap:8px;}
-body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;width:100%;max-width:480px;align-self:center;}
+/* 移动端与平板竖屏：卡片居中，左右选项置于卡片正下方并排（各占半宽、间距 8px）；教学气泡位于选项下方 */
+body[data-view="mobile"] #stage,
+body[data-view="tablet-portrait"] #stage{
+  display:grid;
+  grid-template-areas:
+    "card card"
+    "l r"
+    "coach coach";
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  column-gap:8px;row-gap:8px;
+  align-content:center;justify-items:center;
+  width:min(calc(100% - 32px),480px);
+  align-self:center;padding:0;
+}
+body[data-view="mobile"] #cardcol,body[data-view="tablet-portrait"] #cardcol{grid-area:card;width:100%;gap:6px;}
+body[data-view="mobile"] #cardwrap,body[data-view="tablet-portrait"] #cardwrap{width:min(100%,calc((100dvh - 368px) * 328 / 468));margin:0 auto;}
+body[data-view="mobile"] .optbtn,body[data-view="tablet-portrait"] .optbtn{
+  width:100%;height:100%;min-height:44px;padding:6px 8px;font-size:13px;line-height:1.25;
+  display:flex;align-items:center;justify-content:center;
+}
+body[data-view="mobile"] #opt-left,body[data-view="tablet-portrait"] #opt-left{grid-area:l;}
+body[data-view="mobile"] #opt-right,body[data-view="tablet-portrait"] #opt-right{grid-area:r;}
+body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;}
 body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-width:none;}
 #coach{
   max-width:320px;background:var(--paper-100);color:var(--ink);border-radius:12px;padding:10px 12px;
@@ -299,7 +320,6 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
 
 /* ---------- 平板竖屏（600–1023 竖） ---------- */
-body[data-view="tablet-portrait"] #cardwrap{width:min(calc(100vw - 64px),480px);}
 
 /* ---------- 平板横屏（600–1023 横） ---------- */
 body[data-view="tablet-landscape"] #sidebar{display:block;}
