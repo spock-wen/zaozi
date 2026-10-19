@@ -984,7 +984,6 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
 function commitSide(dir) {
-  const thr = threshold();
   flyOut((dir === "left" ? -1 : 1) * 620, () => dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action));
 }
 
