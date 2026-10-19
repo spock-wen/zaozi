@@ -1,4 +1,4 @@
-// e2e：清队后触屏在飞出中点卡片排队与锁定提示回归（P9-1）。
+// e2e：清队后触屏在飞出中点卡片排队与锁定提示回归（P9-1）及飞出中途重置运动态覆盖（M1/M2）。
 // 复现与规格：
 //   1) T01 left, T02 left → T03。
 //   2) 触点卡片中心下方 30px 触发拦截提示。
@@ -8,8 +8,12 @@
 // 断言：
 //   - 点卡后 queued ≥ 1。
 //   - 刻字卡 T03 落定后，拦截提示「先点卡角骨片刻下这件事」在独立落定时间 ≥ +245ms 后显形。
-// 对照：
+// 对照与飞出中途覆盖：
 //   - [guard] 清队前队列为空。
+//   - M1 "飞出中途重新开局"：触点 #opt-left 起飞，~50ms 内真实触点打开 ☰ 并点「重新开局」
+//     （断言重置发生瞬间 __zz.animating 仍为 true）；落定后断言 __zz.animating 为 false、
+//     #card transform/opacity 为空、卡片中心在屏幕内；下一次起飞中触点卡片正常入队 (queued ≥ 1) 且 action log 无多余记录。
+//   - M2 "飞出中途导入存档"：触点 #opt-left 起飞，~50ms 内真实触点打开 ☰ →「导入存档码」→「导入」按钮，规格同 M1。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
@@ -215,6 +219,151 @@ async function runScenario(engine, variant) {
   await ctx.close();
 }
 
+async function runMidFlyoutReset(engine, mode) {
+  const ctx = await browsers[engine].newContext({
+    viewport: VP_TOUCH,
+    hasTouch: true,
+    isMobile: engine !== "firefox",
+    deviceScaleFactor: 3,
+  });
+  const page = await ctx.newPage();
+  const errs = [];
+  collectErrors(page, errs);
+
+  const clk = async (x, y) => { await page.touchscreen.tap(x, y); };
+  const ctr = (s) => page.evaluate((sel) => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  }, s);
+  const still = async () => {
+    await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
+    await page.waitForTimeout(400);
+  };
+
+  await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+  await page.waitForFunction(() => !!window.__zz);
+  await page.waitForTimeout(500);
+  await still();
+
+  const code = await page.evaluate(() => __zz.code());
+  const menuBtnPos = await ctr("#menubtn");
+
+  let newBtnPos = null;
+  let importBtnPos = null;
+  let applyBtnPos = null;
+
+  if (mode === "重新开局") {
+    await clk(menuBtnPos[0], menuBtnPos[1]);
+    await page.waitForTimeout(50);
+    newBtnPos = await ctr("#menu-pop [data-menu=new]");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+  } else {
+    await clk(menuBtnPos[0], menuBtnPos[1]);
+    await page.waitForTimeout(50);
+    importBtnPos = await ctr("#menu-pop [data-menu=import]");
+    await clk(importBtnPos[0], importBtnPos[1]);
+    await page.waitForTimeout(50);
+    applyBtnPos = await ctr("#dlgapply");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+  }
+
+  // 挂载飞出起飞与重置时机监听，验证重置落在飞出进行中 (__zz.animating 仍为 true)
+  await page.evaluate(({ mode, code }) => {
+    if (mode === "导入") {
+      document.getElementById("dlgtext").value = code;
+    }
+    window.__midReset = null;
+    document.getElementById("opt-left").addEventListener("click", () => {
+      window.__flyStartT = performance.now();
+    }, true);
+    const targetSel = mode === "重新开局" ? "[data-menu=new]" : "#dlgapply";
+    document.addEventListener("click", (e) => {
+      if (e.target.closest?.(targetSel)) {
+        window.__midReset = {
+          t: performance.now(),
+          animating: window.__zz.animating,
+          dx: window.__zz.dx,
+        };
+      }
+    }, true);
+  }, { mode, code });
+
+  // 真实输入：触点 #opt-left 起飞，在飞出中途 (~50-80ms 内) 触发菜单重置
+  const optLeftPos = await ctr("#opt-left");
+  await clk(optLeftPos[0], optLeftPos[1]);
+  await page.waitForTimeout(50);
+
+  if (mode === "重新开局") {
+    await clk(menuBtnPos[0], menuBtnPos[1]);
+    await clk(newBtnPos[0], newBtnPos[1]);
+  } else {
+    await clk(menuBtnPos[0], menuBtnPos[1]);
+    await clk(importBtnPos[0], importBtnPos[1]);
+    await clk(applyBtnPos[0], applyBtnPos[1]);
+  }
+
+  await page.waitForTimeout(100);
+  const mid = await page.evaluate(() => {
+    if (!window.__midReset) return null;
+    return {
+      ...window.__midReset,
+      dt: window.__midReset.t - (window.__flyStartT || window.__midReset.t),
+    };
+  });
+
+  assert.ok(mid != null, `${mode}: 真实输入必须命中重置按钮并触发事件`);
+  assert.equal(mid.animating, true, `${mode}: 重置发生瞬间 __zz.animating 必须仍为 true (dt=${mid.dt.toFixed(1)}ms)`);
+  assert.ok(mid.dt < 240, `${mode}: 重置必须在飞出进行中完成 (<240ms)，实为 ${mid.dt.toFixed(1)}ms`);
+
+  // 等待新局 T01 完全落定
+  await still();
+
+  // 断言：落定后 __zz.animating false, #card transform "" and opacity "", card centre on-screen
+  const cardSettle = await page.evaluate(() => {
+    const c = document.getElementById("card");
+    const r = c.getBoundingClientRect();
+    return {
+      animating: window.__zz.animating,
+      transform: c.style.transform,
+      opacity: c.style.opacity,
+      cx: r.left + r.width / 2,
+      cy: r.top + r.height / 2,
+    };
+  });
+
+  assert.equal(cardSettle.animating, false, `${mode}: 落定后 __zz.animating 必须为 false`);
+  assert.equal(cardSettle.transform, "", `${mode}: 落定后 #card transform 必须重置为空字符串，实为 "${cardSettle.transform}"`);
+  assert.equal(cardSettle.opacity, "", `${mode}: 落定后 #card opacity 必须重置为空字符串，实为 "${cardSettle.opacity}"`);
+  assert.ok(cardSettle.cx > 100 && cardSettle.cx < 275, `${mode}: 卡片中心应在屏幕正中 (100..275)，实为 ${cardSettle.cx}`);
+  assert.ok(cardSettle.cy > 100 && cardSettle.cy < 500, `${mode}: 卡片中心纵坐标应在屏幕内，实为 ${cardSettle.cy}`);
+
+  // 断言：在下一次飞出中触点卡片正常入队 (queued >= 1)，且行动日志保持一致 (无多余 action)
+  const actionsBefore = await page.evaluate(() => window.__zz.actions.length);
+  const L_next = await ctr("#opt-left");
+  await clk(L_next[0], L_next[1]);
+  await page.waitForTimeout(50);
+  const C_next = await ctr("#card");
+  await clk(C_next[0], C_next[1]);
+
+  const qAfter = await page.evaluate(() => window.__zz.queued);
+  assert.ok(qAfter >= 1, `${mode}: 下一次飞出中触点卡片应正常入队 (queued >= 1)，实为 ${qAfter}`);
+
+  await still();
+  const actionsAfter = await page.evaluate(() => window.__zz.actions.length);
+  assert.equal(
+    actionsAfter,
+    actionsBefore + 1,
+    `${mode}: 行动日志应保持一致 (仅增加 1 次选项提交，入队触点不应产生多余 action)，之前 ${actionsBefore}，现在 ${actionsAfter}`
+  );
+
+  assert.deepEqual(errs, [], "页面不应有未捕获报错：" + errs.join(" | "));
+  await ctx.close();
+}
+
 for (const [engine] of Object.entries(ENGINES)) {
   test(`${engine} 375 touch: 清队(重新开局)后飞出中触点卡片正常入队且T03停稳250ms后出拦截提示`, async () => {
     await runScenario(engine, "重新开局");
@@ -226,5 +375,13 @@ for (const [engine] of Object.entries(ENGINES)) {
 
   test(`${engine} 375 touch: [guard] 空队列清队对照组飞出中触点卡片正常入队`, async () => {
     await runScenario(engine, "guard");
+  });
+
+  test(`${engine} 375 touch: M1 飞出中途重新开局重置卡片运动态且新局触点正常入队`, async () => {
+    await runMidFlyoutReset(engine, "重新开局");
+  });
+
+  test(`${engine} 375 touch: M2 飞出中途导入存档重置卡片运动态且新局触点正常入队`, async () => {
+    await runMidFlyoutReset(engine, "导入");
   });
 }
