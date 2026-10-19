@@ -6,7 +6,7 @@
 //       导致当前卡提前切换，而 240ms 飞出回调到达时又对下一张卡执行 left 提交，产生 actions=[drop0, left]。
 //
 // 期望行为（本分支 fix/web-flyout-keys 队列模型）：
-// - F1a：飞出期间快按 3 次方向键，每项必须入队，等下一张卡落定并经历 ≥250ms 最短停留（window.__zz.settledAt）
+// - F1a：飞出期间快按 3 次方向键，每项必须入队，等下一张卡落定并经历 ≥250ms 最短停留（独立 rAF 记录器 window.__settles）
 //        后再依序重放；单帧内绝对不得发生多次提交；总提交数严格符合队列模型（第一张提交，第二张预览+提交，第三张预览，共2次提交）。
 // - F1b：长按方向键时，Playwright 触发的 auto-repeat（repeat:true）事件一律被过滤不入队，
 //        第一张卡提交后，后续按住仅作为下一张卡的预览，不产生额外提交，单帧无多重提交。
@@ -93,7 +93,6 @@ async function startRecorder(page) {
     if (window.__raf) cancelAnimationFrame(window.__raf);
     window.__frames = [];
     window.__commits = [];
-    window.__settleEvents = [];
     window.__keyEvents = [];
     window.__settles = {};
 
@@ -108,14 +107,12 @@ async function startRecorder(page) {
 
     let prevN = window.__zz.actions.length;
     let prevCur = window.__zz.st.current;
-    let prevSettledAt = 0;
 
     const loop = () => {
       const z = window.__zz;
       const card = document.getElementById("card");
       const n = z ? z.actions.length : 0;
       const cur = z?.st?.current;
-      const settledAt = z?.settledAt ?? 0;
       const t = performance.now();
       const delta = n - prevN;
 
@@ -137,7 +134,6 @@ async function startRecorder(page) {
           n,
           cur,
           prevCur,
-          settledAt,
           cardKeyBefore: prevCur + "|" + prevN,
           acts: z.actions.slice(prevN).map((a) =>
             a.side === "drop" ? `drop${a.slot}` : (a.side || a.type)
@@ -145,12 +141,7 @@ async function startRecorder(page) {
         });
       }
 
-      if (settledAt !== prevSettledAt && settledAt > 0) {
-        window.__settleEvents.push({ t, settledAt, cur });
-        prevSettledAt = settledAt;
-      }
-
-      window.__frames.push({ t, n, delta, cur, settledAt });
+      window.__frames.push({ t, n, delta, cur });
       prevN = n;
       prevCur = cur;
       window.__raf = requestAnimationFrame(loop);
@@ -172,7 +163,6 @@ async function stopRecorder(page, startN) {
       maxDelta,
       frames: window.__frames,
       commits: window.__commits,
-      settleEvents: window.__settleEvents,
       settles: window.__settles,
       keyEvents: window.__keyEvents,
       actions: z ? z.actions.slice(n0).map((a) =>
