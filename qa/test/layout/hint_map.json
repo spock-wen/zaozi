@@ -1,0 +1,123 @@
+{
+ "_说明": "提示关键词 → 所指元素。kind=pointer：提示出现时 targets 任一须可见（尺寸>0、display/visibility/opacity、在视口内、不被祖先 overflow 裁、elementFromPoint 中心+四角不被遮挡）；keyboard：只指键位，无界面元素；info：人工核过、不指向界面元素的标签/叙述。新增含指向词的文案必须在这里登记，否则运行时与静态扫描都报「未映射」。match 为 JS/Python 通用正则，按顺序取第一条命中。",
+ "static_scope": {
+  "files": [
+   "app.js",
+   "index.html",
+   "data/tutorial.json",
+   "data/goals.json"
+  ],
+  "exclude_where_regex": "^_|\\.note$|_selection|_not_implemented"
+ },
+ "entries": [
+  {
+   "id": "目标与造法说明",
+   "match": "用骨片刻下一件事|^达成|落一个字$|别的造法",
+   "kind": "info",
+   "targets": [],
+   "source": "data/goals.json pool[].text/banner（目标描述，不是操作指引）；data/tutorial.json first_winter.tell_after_first_carve（造法说明）"
+  },
+  {
+   "id": "骨片-刻",
+   "match": "卡角.{0,2}骨片|点骨片|骨片刻|卡上点骨片",
+   "kind": "pointer",
+   "targets": [
+    "#bonecorner"
+   ],
+   "source": "data/tutorial.json steps[2].coach/coach_desktop/lock_hint；app.js:846 onDown 兜底 toast；app.js:701 键位浮层"
+  },
+  {
+   "id": "字匣-落字",
+   "match": "字匣里的|点它，落在卡上|落在卡上",
+   "kind": "pointer",
+   "targets": [
+    "#wordbox .slot.ok",
+    "#wordbox .slot"
+   ],
+   "source": "data/tutorial.json steps[3]；app.js:379 卡内落字框"
+  },
+  {
+   "id": "拖卡",
+   "match": "拖卡|拖过一小段|想好再松手|松手",
+   "kind": "pointer",
+   "targets": [
+    "#card"
+   ],
+   "source": "tutorial steps[0]/[4]；app.js:392 #gesture-hint"
+  },
+  {
+   "id": "按住卡",
+   "match": "按住卡|长按看分量|看这一下会动哪几项|按住看分量",
+   "kind": "pointer",
+   "targets": [
+    "#card"
+   ],
+   "source": "tutorial steps[1]；app.js:392/700"
+  },
+  {
+   "id": "冬夜-事签",
+   "match": "点一张事签|先点一张事签",
+   "kind": "pointer",
+   "targets": [
+    "#winter .tally"
+   ],
+   "source": "app.js:506/542"
+  },
+  {
+   "id": "冬夜-亮点",
+   "match": "依次点三个亮点",
+   "kind": "pointer",
+   "targets": [
+    "#xcv"
+   ],
+   "source": "app.js:517/546"
+  },
+  {
+   "id": "挑字-候选",
+   "match": "点一个字看它能做什么|再点一次带上|^点字，或用",
+   "kind": "pointer",
+   "targets": [
+    "#pick .cand"
+   ],
+   "source": "app.js:597/598"
+  },
+  {
+   "id": "存档-复制导入",
+   "match": "点复制|点导入",
+   "kind": "pointer",
+   "targets": [
+    "#dlgcopy",
+    "#dlgapply"
+   ],
+   "source": "app.js:272/985"
+  },
+  {
+   "id": "键位行",
+   "match": "←/→|← →|←→|按 ←|Space|按 K|K 刻字|Enter|Backspace",
+   "kind": "keyboard",
+   "targets": [],
+   "source": "app.js #gesture-hint 键鼠文案 / #keys / 键位浮层"
+  },
+  {
+   "id": "资源-骨片数",
+   "match": "^空?骨片( \\d+)?$|^空骨片 \\d+$|字录 / 骨片 / 日志",
+   "kind": "info",
+   "targets": [],
+   "source": "index.html:20 #bones-chip；app.js:475/481 侧栏/抽屉标题（计数标签，不是操作提示）"
+  },
+  {
+   "id": "叙述-结果",
+   "match": "骨片裂|^刻成「|^刻$|^刻字$|^落字$|· 已落|已落$|^刻（Enter）$|^出发挑字|挑三个字带上路|用骨片刻下一件事|落一个字|^达成",
+   "kind": "info",
+   "targets": [],
+   "source": "app.js:549 结果 toast；index.html:37 骨片按钮自身文字；app.js:466/594/699/702；data/tutorial.json elder.body；data/goals.json 目标文案"
+  },
+  {
+   "id": "叙述-迹与结算",
+   "match": "^卡上出现一道迹|^粮 \\d+ · 信",
+   "kind": "info",
+   "targets": [],
+   "source": "app.js:375 卡内迹文（叙述，后跟「先不刻」按钮本身）；app.js:679 结局页四维/骨片数"
+  }
+ ]
+}
