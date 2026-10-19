@@ -255,6 +255,7 @@ function resetCardMotion() {
   ui.dx = 0;
   ui.animating = false;
   ui.dragging = false; ui.dragged = false; ui.hold = false;
+  ui.kbDir = null; ui.preview = false;
   clearTimeout(ui.holdT); ui.holdT = 0;
   const c = $("card");
   if (c) {
@@ -263,6 +264,9 @@ function resetCardMotion() {
     c.style.transform = "";
     c.style.opacity = "";
   }
+  const ol = $("opt-left"), or = $("opt-right");
+  if (ol) ol.classList.remove("on");
+  if (or) or.classList.remove("on");
   capturedPointers.clear();
 }
 function restore() {
@@ -275,6 +279,7 @@ function restore() {
     hideToast();
     seed = d.seed; actions = d.actions.slice();
     toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
+    render();
     return true;
   } catch (e) {
     try {                                  // 先备份再删（B5）
