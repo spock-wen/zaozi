@@ -79,12 +79,28 @@ for (const engine of Object.keys(ENGINES)) {
 
         assert.notEqual(g.keysDisplay, "none", "A 档应显示键位行");
         assert.equal(Math.round(g.keys.h), 28, "A 档键位行应为一行 28");
-        assert.equal(g.keysText, "←→选 · 1–3 落字 · 按住 Space 看分量", "A 档键位行文案（无骨片不显 K 刻字）");
+        assert.equal(g.keysText, "←→选 1–3落字 Space分量", "A 档键位行文案");
         assert.ok(g.keys.bottom <= g.vh + 1, "键位行应在视口内");
         assert.ok(!intersect(g.card, g.wb) && !intersect(g.wb, g.keys) && !intersect(g.card, g.keys), "卡/字匣/键位行互不交叠");
 
         assert.equal(g.hintDisplay, "none", "矮屏不显旧手势行（设计稿卡下只有卡→字匣→键位）");
         assert.ok(g.scroll <= 1, `矮屏不应滚动，溢出 ${g.scroll}`);
+
+        // 刻字阶段（T03）：键位行追加「K刻」，几何依然满足一行 28、在屏内、卡/字匣/键位互不交叠
+        await commit(page, "left");   // T01 → T02
+        await commit(page, "right");  // T02 → T03
+        const gEngrave = await box(page);
+        assert.notEqual(gEngrave.keysDisplay, "none", "刻字阶段 A 档应显示键位行");
+        assert.equal(Math.round(gEngrave.keys.h), 28, "刻字阶段 A 档键位行应为一行 28");
+        assert.equal(gEngrave.keysText, "←→选 1–3落字 Space分量 K刻", "刻字阶段 A 档键位行文案");
+        assert.ok(gEngrave.keys.bottom <= gEngrave.vh + 1, "刻字阶段键位行应在视口内");
+        assert.ok(
+          !intersect(gEngrave.card, gEngrave.wb) &&
+          !intersect(gEngrave.wb, gEngrave.keys) &&
+          !intersect(gEngrave.card, gEngrave.keys),
+          "刻字阶段卡/字匣/键位行互不交叠",
+        );
+        assert.ok(gEngrave.scroll <= 1, `刻字阶段矮屏不应滚动，溢出 ${gEngrave.scroll}`);
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {
@@ -127,7 +143,7 @@ for (const engine of Object.keys(ENGINES)) {
         const pb = await pop.boundingBox();
         assert.ok(pb.y >= 0 && pb.y + pb.height <= g.vh + 1, "键位浮层应在视口内");
         const rows = await pop.locator(".kh-row").count();
-        assert.ok(rows >= 4, `浮层应列出全部键位，实际 ${rows} 行`);
+        assert.equal(rows, 4, `普通阶段浮层应列出 4 条键位，实际 ${rows} 行`);
 
         // 同一存档再进入不再自动弹（只弹一次）
         await page.reload({ waitUntil: "load" });
@@ -139,6 +155,22 @@ for (const engine of Object.keys(ENGINES)) {
         assert.ok(await pop.isVisible(), "点「?」应打开键位浮层");
         await page.mouse.click(10, g.vh / 2);
         assert.ok(!(await pop.isVisible()), "点浮层外应收起");
+
+        // 刻字阶段（T03）：展示全部 6 条键位，几何依然满足浮层在视口内、卡与字匣不交叠、不滚动
+        await commit(page, "left");   // T01 → T02
+        await commit(page, "right");  // T02 → T03
+        if (await pop.isHidden()) {
+          await btn.click();
+        }
+        await pop.waitFor({ state: "visible" });
+        const pbEngrave = await pop.boundingBox();
+        assert.ok(pbEngrave.y >= 0 && pbEngrave.y + pbEngrave.height <= g.vh + 1, "刻字阶段键位浮层应在视口内");
+        const rowsEngrave = await pop.locator(".kh-row").count();
+        assert.equal(rowsEngrave, 6, `刻字阶段浮层应列出全部 6 条键位，实际 ${rowsEngrave} 行`);
+        const gEngrave = await box(page);
+        assert.ok(!intersect(gEngrave.card, gEngrave.wb), "刻字阶段卡与字匣不交叠");
+        assert.equal(gEngrave.keysDisplay, "none", "B 档刻字阶段不显示键位行");
+        assert.ok(gEngrave.scroll <= 1, `刻字阶段矮屏不应滚动，溢出 ${gEngrave.scroll}`);
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {

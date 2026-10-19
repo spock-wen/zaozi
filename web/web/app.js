@@ -17,6 +17,7 @@ const DIMS = RULES.dims.keys, DIMNAME = RULES.dims.names, SEASON = RULES.year.se
 const METHOD = Object.fromEntries(Object.entries(RULES.winter_night.methods).map(([k, v]) => [k, v.name]));
 const POSNAME = { top: "上", middle: "中", bottom: "下" };
 const DRAG_RATIO = INPUT.card.drag.commit_threshold_ratio;   // 0.35
+const DWELL_MS = 250;   // 排队输入生效前，目标卡「落定并绘制」后还要多留的最短停留（round 5 A）
 const SIDEBAR_KEY = "zaozi.sidebar.open";
 const MUTE_KEY = "zaozi.mute";
 const MOTION_KEY = "zaozi.motion";
@@ -37,7 +38,9 @@ let lastHover = { x: NaN, y: NaN };   // 上一次鼠标位置：区分「真的
 let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
-  preview: false, kbDir: null, animating: false, floats: {},
+  preview: false, kbDir: null, animating: false, floats: {}, keyQueue: [], drainArmed: false,
+  settleKey: null, settledAt: 0, dwellT: 0, commitNotBefore: 0, heldCommitT: 0,   // round 5：最短停留 / 提交不早于
+  resumeHeldCommit: null, epoch: 0,
   winter: freshWinter(),
   goalShown: 0, bannerQueue: [], bannerOn: false,
   panelOpen: false, menuOpen: false, elderShown: false,
@@ -182,7 +185,7 @@ function loadGlyphs() {
   }).catch((e) => toast("字形包没加载上：" + e.message));
 }
 const glyphURL = (ch) => GLYPH[CHARS[ch]?.glyph_id] || "";
-const gimg = (ch) => (glyphURL(ch) ? `<img src="${glyphURL(ch)}" alt="${ch}" loading="lazy">` : `<span>${ch}</span>`);
+const gimg = (ch) => (glyphURL(ch) ? `<img src="${glyphURL(ch)}" alt="${ch}" loading="lazy" draggable="false">` : `<span>${ch}</span>`);
 function artHTML(card) {
   const art = CARD_ART.cards[card.id]; if (!art) return "";
   const b = CARD_ART.base;
@@ -220,22 +223,27 @@ function toast(m) {
   t.style.bottom = "auto";
   t.textContent = m;
   t.classList.add("on");
+  const tl = $("toast-live"); if (tl) tl.textContent = m;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => {
     t.classList.remove("on");
     t.style.top = "";
     t.style.bottom = "";
+    if (tl) tl.textContent = "";
   }, 1800);
 }
-function clearToast() {
-  const t = $("toast");
+function hideToast() {                          // D1：切卡/换阶段时立刻收起，别让 toast 盖住下一张卡的 #coach
+  const t = $("toast"); clearTimeout(toast._t);
   if (t) {
     t.classList.remove("on");
-    t.textContent = "";
+    t.style.transition = "none"; void t.offsetWidth; t.style.transition = "";  // 跳过 .3s 淡出，立即变透明
     t.style.top = "";
     t.style.bottom = "";
   }
-  clearTimeout(toast._t);
+  const tl = $("toast-live"); if (tl) tl.textContent = "";
+}
+function clearToast() {
+  hideToast();
 }
 // N1（R05，PM U1 裁定 + P1）的状态（判定函数 n1RepeatTap 在 bindOpt 上方）。
 // n1Ref 只记「用户直接点选项按钮、当下启动的那次飞卡」的那一下落点；它挂着（这次飞卡还没结束）
@@ -246,7 +254,7 @@ let n1Ref = null;                // { side, x, y } | null：当前这次飞卡�
 let n1Swallowed = 0;             // 被 N1 吞掉的点按数（调试计数，window.__zz.n1Swallowed）
 let n1Reason = null;             // 最后一次吞掉的原因（window.__zz.n1Reason），供用例区分「N1 吞的」与「inputBusy 挡的」
 function resetInputState() {
-  clearToast();
+  hideToast();
   clearTimeout(ui.holdT);
   n1Swallowed = 0; n1Reason = null;
   n1Ref = null;
@@ -270,10 +278,12 @@ function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closes
 // ---------- 派发 / 存档 ----------
 function dispatch(a) {
   try {
+    const prevCurrent = st.current, prevPhase = st.phase;   // D1
     st = step(st, a);
     actions.push(a);
     afterAction(a);
     saveNow();
+    if (st.current !== prevCurrent || st.phase !== prevPhase) hideToast();  // D1：换卡/换阶段即收起 toast
   } catch (e) { toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();
@@ -295,15 +305,39 @@ function saveNow() {
   ui.lastDims = { ...st.dims };
   try { saveToStorage(localStorage, seed, actions); } catch { /* 隐私模式 */ }
 }
+const capturedPointers = new Set();
+// 重置卡片运动与拖拽残留态（仅用于 newGame / importCode / restore 三个重置入口）：
+// 换局/导入时若正逢飞出或拖拽，epoch++ 会使动画/提交中止，此处将位移归零、动画态与实拖标志清空、
+// 取消长按定时器、释放卡片捕获的指针，并重置卡片 DOM 的 transform/opacity 与 .dragging 类。
+function resetCardMotion() {
+  ui.dx = 0;
+  ui.animating = false;
+  ui.dragging = false; ui.dragged = false; ui.hold = false;
+  ui.kbDir = null; ui.preview = false;
+  clearTimeout(ui.holdT); ui.holdT = 0;
+  const c = $("card");
+  if (c) {
+    for (const id of capturedPointers) { try { c.releasePointerCapture?.(id); } catch {} }
+    c.classList.remove("dragging");
+    c.style.transform = "";
+    c.style.opacity = "";
+  }
+  const ol = $("opt-left"), or = $("opt-right");
+  if (ol) ol.classList.remove("on");
+  if (or) or.classList.remove("on");
+  capturedPointers.clear();
+}
 function restore() {
+  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
   resetInputState();
   let d = null;
   try { d = loadFromStorage(localStorage); } catch { d = null; }
   if (!d) return false;
   try {
     st = run({ seed: d.seed }, d.actions);
+    hideToast();
     seed = d.seed; actions = d.actions.slice();
-    return true;
+    toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
   } catch (e) {
     try {                                  // 先备份再删（B5）
       const raw = localStorage.getItem(SAVE_KEY);
@@ -313,9 +347,18 @@ function restore() {
     toast("存档读不出来，已备份后重开");
     return false;
   }
+  try {
+    render();
+  } catch (e) {
+    console.error("render failed on restore", e);
+    toast("渲染出错：" + e.message);
+  }
+  return true;
 }
 function newGame(s) {
+  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
   resetInputState();
+  hideToast();   // 先清队列（含挂起的重放/提交、epoch++），再收 toast：之后不会再有排队项把提示弹回来
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
   ui.pickFocus = null; ui.pickTapped = null; ui.presses.clear(); ui.swallow = [];
@@ -343,6 +386,9 @@ function importCode() {
   try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
+    clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
+    hideToast();   // 顺序同 newGame/restore：先清队列，再收 toast
+    toast(`导入成功：种子 ${seed}，${actions.length} 步`);
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
     ui.lastDims = null; saveNow(); render();
     whenCardEntryDone().then(() => setCardSettled(true));
@@ -473,9 +519,12 @@ function renderCard() {
   ol.disabled = or.disabled = st.phase !== "card";
   paintOpts();
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
+  // R18 (L15)：电脑端按键提示只出现一处，由底部 #keys 承载，卡下 #gesture-hint 置空隐藏。
   const deskKeys = document.body.dataset.view === "desktop" && keyboardMode();
   setText($("gesture-hint"), deskKeys ? "" : (keyboardMode()
-    ? ("←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量" + (boneAvailable() ? " · K 刻字" : ""))
+    ? (st.phase === "engrave"
+        ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
+        : "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量")
     : "左右拖卡做选择 · 长按看分量"));
 }
 function boneAvailable() { return st.phase === "engrave"; }
@@ -680,7 +729,8 @@ function renderPick() {
   if (el.dataset.pickBuilt !== "1") { buildPickSkeleton(el); el.dataset.pickBuilt = "1"; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
-  setText(el.querySelector("h2"), `出发挑字 · 第 ${st.generation ?? 2} 代`);
+  // 挑字页标题显示即将开始的代：此刻 st.generation 还是刚结束的那一代（begin_generation 之后才 +1），与交棒按钮（n+1）保持一致。
+  setText(el.querySelector("h2"), `出发挑字 · 第 ${(st.generation ?? 1) + 1} 代`);
   // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
   setText(el.querySelector(".season-note"), document.body.dataset.view === "desktop"
     ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
@@ -777,13 +827,11 @@ function renderKeys() {
   const tier = document.body.dataset.short || "";
   const el = $("keys");
   if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
-  const bone = boneAvailable();
+  const engrave = st.phase === "engrave";
   if (tier === "A") {
-    setText(el, bone
-      ? "←→选 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
-      : "←→选 · 1–3 落字 · 按住 Space 看分量");
+    setText(el, engrave ? "←→选 1–3落字 Space分量 K刻" : "←→选 1–3落字 Space分量");
   } else {
-    setText(el, bone
+    setText(el, engrave
       ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
       : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · Esc 关浮层");
   }
@@ -794,12 +842,12 @@ function keyhelpHTML() {
     ["← →", "选字；再按同向或 Enter 提交"],
     ["1–3", "落字"],
     ["Space", "按住看分量"],
+    ...(st.phase === "engrave" ? [
+      ["K", "刻字（或点卡角骨片）"],
+      ["S", "先不刻"],
+    ] : []),
+    ["Esc", "关浮层"],
   ];
-  if (boneAvailable()) {
-    rows.push(["K", "刻字（或点卡角骨片）"]);
-    rows.push(["Enter", "刻"]);
-  }
-  rows.push(["Esc", "关浮层"]);
   return rows.map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
 }
 // 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
@@ -815,9 +863,6 @@ function cardEntryBusy() {
   if (!$("card").getAnimations().some((a) => a.playState === "running")) cardSettling = false;
   return cardSettling;
 }
-function inputBusy() {
-  return st.phase !== "card" || ui.animating || ui.dragging || cardEntryBusy();
-}
 function setCardSettled(settled) {
   const card = $("card");
   if (settled) {
@@ -827,6 +872,15 @@ function setCardSettled(settled) {
     if (card) card.removeAttribute("data-ready");
     document.body.removeAttribute("data-card-ready");
   }
+}
+// 「输入忙」：出卡阶段里卡还在飞出/入场，或还有排队项/挂起的重放——此时离散输入一律先入队。
+function inputBusy() {
+  return st.phase === "card" && (cardEntryBusy() || ui.keyQueue.length > 0 || ui.drainArmed);
+}
+// 刻字阶段的同一条规则：卡还在入场、或队列里还有没重放的项/挂起的重放时，K/S（骨片/先不刻同路）
+// 也先入队，等刻字卡落定并经历最短停留后再生效（M22：与出卡阶段的 inputBusy 一致，别抢在上一张卡的队列前头）。
+function carveBusy() {
+  return st.phase === "engrave" && (cardEntryBusy() || ui.keyQueue.length > 0 || ui.drainArmed);
 }
 // 等卡入场动画结束：先等 rAF 阶段，再等 CSS 过渡跑完（Promise.all(finished)），
 // 过渡对象还没建好的一帧用一次 transitionend 兜底。
@@ -965,21 +1019,38 @@ function render() {
 
 // ---------- 拖卡 / 键盘 ----------
 const cardEl = () => $("card");
-function threshold() { return DRAG_RATIO * cardEl().getBoundingClientRect().width; }
+function threshold() { return DRAG_RATIO * (cardEl().offsetWidth || cardEl().getBoundingClientRect().width); }
 
-function onDown(e) {
-  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
-  if (st.phase !== "card" || ui.animating) return;
-  // 真正起拖时才清掉页面上已有的文字选区（鼠标）：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
-  // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
-  if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
-  ui.dragging = true; ui.dragged = false; ui.startX = e.clientX;
+// 试着在 #card 上捕获指针：真实指针成功，合成指针（e2e 触屏 PointerEvent）会抛，吞掉即可。
+const captureCard = (id) => {
+  try {
+    cardEl().setPointerCapture?.(id);
+    capturedPointers.add(id);
+  } catch { /* 合成指针会抛 */ }
+};
+// 起拖：onDown 与「排队 press 的重放」共用同一段（round 4 A5）。置拖拽态、加 .dragging、挂长按计时。
+function beginDrag(x, pointerId) {
+  ui.dragging = true; ui.dragged = false; ui.startX = x;
   cardEl().classList.add("dragging");
-  cardEl().setPointerCapture?.(e.pointerId);
+  captureCard(pointerId);
   ui.holdT = setTimeout(() => { if (ui.dragging && Math.abs(ui.dx) < 8) { ui.hold = true; render(); } }, 300);
 }
+const queuedPress = (id) => ui.keyQueue.find((it) => it.kind === "press" && it.id === id);
+function onDown(e) {
+  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
+  if (st.phase !== "card" || inputBusy()) return;
+  // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
+  // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
+  if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
+  beginDrag(e.clientX, e.pointerId);
+  ui.commitNotBefore = 0;                                 // 现场起拖：松手即可提交，不受最短停留约束
+}
 function onMove(e) {
-  if (!ui.dragging) return;
+  if (!ui.dragging) {
+    const p = queuedPress(e.pointerId);        // 排队中的 press：先把位置记上，重放起拖时用它当起点
+    if (p && p.down) p.x = e.clientX;
+    return;
+  }
   ui.dx = e.clientX - ui.startX;
   if (Math.abs(ui.dx) > 8) { ui.dragged = true; clearTimeout(ui.holdT); ui.hold = false; }
   if (Math.abs(ui.dx) >= threshold() && !ui._thr) { ui._thr = true; sfx.threshold(); }
@@ -988,8 +1059,8 @@ function onMove(e) {
   renderDimsOnly();
 }
 function applyTilt() {
-  const r = cardEl().getBoundingClientRect();
-  const deg = Math.max(-15, Math.min(15, (ui.dx / r.width) * 15));
+  const w = cardEl().offsetWidth || cardEl().getBoundingClientRect().width;
+  const deg = Math.max(-15, Math.min(15, (ui.dx / w) * 15));
   cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg}deg)`;
 }
 function renderDragHintOnly() {
@@ -1039,8 +1110,18 @@ function renderDimsOnly() {
   paintOpts();
   renderDragHintOnly();
 }
-function onUp() {
-  if (!ui.dragging) return;
+function onUp(e) {
+  if (e?.pointerId != null) capturedPointers.delete(e.pointerId);
+  if (!ui.dragging) {
+    // 排队中的 press 松手：按抬起时的位移决定「在队列原位变成一次 side 提交」还是整项丢弃。
+    const it = e?.pointerId != null ? queuedPress(e.pointerId) : null;
+    if (!it) return;
+    it.x = e.clientX; it.down = false;
+    const i = ui.keyQueue.indexOf(it), dx = it.x - it.startX;
+    if (e.type === "pointerup" && Math.abs(dx) >= threshold()) ui.keyQueue[i] = { kind: "side", dir: dx < 0 ? "left" : "right" };
+    else it.down = false;
+    return;
+  }
   clearTimeout(ui.holdT);
   ui.dragging = false; cardEl().classList.remove("dragging");
   paintOpts();
@@ -1048,8 +1129,35 @@ function onUp() {
   const thr = threshold(), dx = ui.dx;
   const wasHold = ui.hold; ui.hold = false;
   if (Math.abs(dx) >= thr) {
-    sfx.commit();
-    flyOut(Math.sign(dx) * 620, () => dispatch(dx < 0 ? INPUT.card.drag.left_action : INPUT.card.drag.right_action));
+    const target = Math.sign(dx) * 620, act = dx < 0 ? INPUT.card.drag.left_action : INPUT.card.drag.right_action;
+    const ep = ui.epoch;
+    if (performance.now() < ui.commitNotBefore) {
+      // 还在最短停留窗口内：卡停在松手处不动，等窗口结束再飞出提交（round 5 A）；期间 animating 让后续输入继续排队。
+      ui.animating = true;
+      const fire = () => {
+        ui.heldCommitT = 0;
+        ui.resumeHeldCommit = null;
+        if (document.hidden || ui.epoch !== ep || modalOpen() || st.phase !== "card") {
+          ui.animating = false;
+          rebound();
+          return;
+        }
+        ui.animating = false;
+        sfx.commit();
+        flyOut(target, () => {
+          if (ui.epoch !== ep) return;
+          dispatch(act);
+        });
+      };
+      ui.resumeHeldCommit = fire;
+      ui.heldCommitT = setTimeout(fire, ui.commitNotBefore - performance.now());
+    } else {
+      sfx.commit();
+      flyOut(target, () => {
+        if (ui.epoch !== ep) return;
+        dispatch(act);
+      });
+    }
   } else {
     if (wasHold) sfx.rebound();
     else if (ui.dragged) sfx.rebound();
@@ -1058,10 +1166,11 @@ function onUp() {
 }
 function rebound() {
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
-  const from = ui.dx;
+  const ep = ui.epoch, from = ui.dx;
   if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); setCardSettled(true); return; }
   ui.animating = true; renderShort(); const t0 = performance.now(), dur = 320;
   const tick = (t) => {
+    if (ui.epoch !== ep) { ui.animating = false; return; }
     const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
     ui.dx = from * (1 - e); cardEl().style.transform = `translateX(${ui.dx}px)`; renderDimsOnly();
     if (k < 1) requestAnimationFrame(tick);
@@ -1079,12 +1188,15 @@ function flyOut(targetX, done) {
   cardSettling = true;
   setCardSettled(false);
   paintOpts();
+  const ep = ui.epoch;
   if (reducedPref()) {
+    ui.animating = true;
     cardEl().style.opacity = "0";
     cardSettling = true;
     setTimeout(() => {
       cardEl().style.opacity = "";
-      done();
+      ui.animating = false;
+      if (ui.epoch === ep) done();
       cardSettling = false;
       n1Ref = null;               // 这次飞卡结束：N1 不再管随后的点按
       setCardSettled(true);
@@ -1094,15 +1206,17 @@ function flyOut(targetX, done) {
   }
   ui.animating = true; renderShort(); const from = ui.dx, t0 = performance.now(), dur = 240, deg = Math.sign(targetX) * 18;
   const tick = (t) => {
+    if (ui.epoch !== ep) { ui.animating = false; return; }
     const k = Math.min(1, (t - t0) / dur), e = k * k;
     ui.dx = from + (targetX - from) * e;
     cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg * e}deg)`; cardEl().style.opacity = String(1 - e);
     if (k < 1) requestAnimationFrame(tick);
     else {
       ui.animating = false;
+      ui.dx = 0;
       cardEl().style.transform = ""; cardEl().style.opacity = "";
       cardSettling = true;
-      done();
+      if (ui.epoch === ep) done();
       requestAnimationFrame(() => {
         whenCardEntryDone().then(() => {
           cardSettling = false;
@@ -1115,19 +1229,75 @@ function flyOut(targetX, done) {
   };
   requestAnimationFrame(tick);
 }
-// 只在按下点真的落在 #card 内才起拖：按坐标判定会在「浮层盖住卡」时（#drawer-mask / #savedlg /
-// 菜单 / 目标面板…）也在卡上方起拖，onDown 的 setPointerCapture 把随后的 click 重定向到 #card，
-// 浮层自身的关闭点击就永远不触发（Firefox 390 触屏 6/6）。改用命中目标判定。
-addEventListener("pointerdown", (e) => { if (e.target.closest("#card") && !e.target.closest("button")) onDown(e); });
+// 按下目标统一判定 #cardwrap：卡片区内（含卡边距但非按钮）无论空闲现场起拖或忙时排队按下均一致接受，
+// 避免命中边缘在空闲与飞出重放时表现不一致。
+addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button")) return;
+  const isPrimary = e.isPrimary || !e.isTrusted;
+  if (inputBusy()) {
+    if (isPrimary && e.target.closest("#cardwrap")) {
+      captureCard(e.pointerId);
+      enqueueInput({ kind: "press", id: e.pointerId, pointerType: e.pointerType, startX: e.clientX, x: e.clientX, down: true });
+    }
+  } else if (isPrimary && e.target.closest("#cardwrap")) onDown(e);
+});
 // 卡上不许原生拖拽（图片 / 选中内容）：dragstart 一律拦掉，否则 webkit 丢 pointerup 粘卡、其他引擎 pointercancel。
 cardEl().addEventListener("dragstart", (e) => e.preventDefault());
 addEventListener("pointermove", onMove);
 addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);
 
+// 模态浮层：存档框 / ☰ 菜单 / 目标面板 / 移动抽屉（键位浮层不是模态）。
+function modalOpen() { return !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden; }
+// 关掉「最上面」的浮层：存档框最后开、最先关；否则关菜单/目标面板/抽屉。只关浮层，不动输入队列。
+function closeOverlay() {
+  if (!$("savedlg").hidden) { closeDlg(); return; }
+  ui.menuOpen = false; ui.panelOpen = false; $("drawer").hidden = true;
+  renderMenu(); render();                              // render() 内含 renderGoalPanel()，目标面板随之收起
+}
 addEventListener("keydown", (e) => {
-  if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }
-  if (e.key === "Escape") { ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; renderMenu(); renderGoalPanel(); render(); return; }
+  // 浮层打开时键盘属于它：Esc 只关浮层；出卡阶段其它键（方向/落字/Enter…）既不排队也不处理，
+  // 也不拦默认（存档框里打字、菜单按钮上的 Enter 等原生行为照旧）。其它阶段落入下方原有逻辑。
+  if (modalOpen()) { if (e.key === "Escape") { closeOverlay(); return; } if (st.phase === "card") return; }
+  if (e.key === "Escape" && (ui.keyhelpOpen || !$("keyhelp-pop").hidden)) { ui.keyhelpOpen = false; renderShort(); return; }
+  // 出卡阶段焦点在牌桌外的按钮/输入控件上（如 ☰）时，Enter 归该控件：不拦默认、不入队、不处理游戏。
+  // 牌桌内的卡、字匣格、左右选项不算：点过它们焦点会留在上面，Enter 仍是「提交预览」。
+  if (e.key === "Enter" && st.phase === "card" && e.target?.closest?.("button, a[href], input, textarea, select")
+      && !e.target.closest("#card, #wordbox, .optbtn")) return;
+  if (inputBusy()) {
+    if (e.key === "Escape" || e.code === "Space") { handleKey(e); return; }   // Esc/Space 保持原有即时行为
+    // K/S pressed during a fly-out are not card keys and are not queued (unchanged)
+    const cardKey = e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter" || !!INPUT.card.keys[e.code];
+    if (!cardKey || e.ctrlKey || e.metaKey || e.altKey) return;               // 其它键不排队、不拦、不处理
+    e.preventDefault();
+    if (!e.repeat) enqueueInput({ kind: "key", key: e.key, code: e.code });  // 自动重复只拦默认，不入队
+    return;
+  }
+  if (carveBusy()) {
+    if (e.key === "Escape") { handleKey(e); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === INPUT.engrave.key) {
+      e.preventDefault();
+      if (!e.repeat) enqueueInput({ kind: "carve" });
+      return;
+    }
+    if (e.code === "KeyS") {
+      e.preventDefault();
+      if (!e.repeat) enqueueInput({ kind: "skip" });
+      return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
+      e.preventDefault();
+      if (!e.repeat) enqueueInput({ kind: "key", key: e.key, code: e.code });
+      return;
+    }
+    return;
+  }
+  handleKey(e);
+});
+function handleKey(e) {
+  if (!$("savedlg").hidden && e.key === "Escape") { closeDlg(); return; }   // 关存档框不清队列（keydown 的 modalOpen 分支已先接管）
+  if (e.key === "Escape") { clearQueue(); ui.panelOpen = false; ui.menuOpen = false; ui.keyhelpOpen = false; renderMenu(); renderGoalPanel(); render(); return; }
   if (st.phase === "pick") {
     // 键盘光标、金色焦点框和鼠标悬停是同一个状态 ui.pickFocus（P1-2）：
     // 移动光标时同步重绘焦点框和说明卡；Space 选中的就是框里的字。
@@ -1150,7 +1320,7 @@ addEventListener("keydown", (e) => {
     return;
   }
   if (st.phase === "card") {
-    if (inputBusy()) return;
+    if (e.repeat && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter")) { e.preventDefault(); return; }  // 自动重复只预览一次
     if (e.code === "Space") { e.preventDefault(); ui.hold = true; render(); return; }
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
@@ -1162,19 +1332,136 @@ addEventListener("keydown", (e) => {
     if (e.key === "Enter" && ui.kbDir) { e.preventDefault(); commitSide(ui.kbDir); return; }
     const a = INPUT.card.keys[e.code]; if (a && !e.repeat) { e.preventDefault(); dispatch(a); }
   } else if (st.phase === "engrave") {
-    if (e.code === INPUT.engrave.key) { clearToast(); ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
-    else if (e.code === "KeyS") { clearToast(); dispatch(INPUT.engrave.skip); }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
+      toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+    } else if (e.code === INPUT.engrave.key) {
+      clearToast();
+      ui.engraved = true;
+      dispatch({ type: "engrave", trace: st.pendingTrace.target });
+    } else if (e.code === "KeyS") {
+      clearToast();
+      dispatch(INPUT.engrave.skip);
+    }
   } else if (st.phase === "winter" && e.key === "Enter") { e.preventDefault(); winterCarve(); }
-});
+}
+// 离散输入的排队与重放：唯一入队口 enqueueInput、唯一启动口 armDrain，逐项重放一次只放一个。
+// 每项都要等当前卡落定（whenCardEntryDone）后再过两帧 rAF，保证卡先画出来、输入才生效；
+// 换阶段或弹出存档框/菜单时整队作废（那是玩家还没看到的界面，不替他按）。
+function enqueueInput(item) {
+  ui.keyQueue.push(item);
+  armDrain();
+}
+const drainStep = () => {
+  // 触屏窗口（round 4 A4）：等飞出结束；若队列头是一次仍按住的 press，就把卡的入场过渡直接结束，
+  // 让卡立刻落定——「拖不动」的窗口只剩飞出 + 两帧，否则还要再等 ~400ms 的入场过渡。
+  const settle = new Promise((resolve) => {
+    const step = () => {
+      if (ui.animating) { requestAnimationFrame(step); return; }
+      const head = ui.keyQueue[0];
+      if (head && head.kind === "press" && head.down) cardEl().getAnimations().forEach((a) => a.finish());
+      resolve();
+    };
+    step();
+  });
+  settle.then(() => whenCardEntryDone()).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (modalOpen()) { clearQueue(); ui.drainArmed = false; return; }
+    if (st.phase !== "card" && st.phase !== "engrave") { clearQueue(); ui.drainArmed = false; return; }
+    if (document.hidden) { ui.drainArmed = false; return; }
+    if (ui.dragging) { ui.drainArmed = false; armDrain(); return; }   // 拖拽中：本帧不重放，下一帧再试
+    const key = st.current + "|" + actions.length;                     // 这张卡「落定并绘制」的时刻（第 5 轮）：同卡保留，
+    if (ui.settleKey !== key) { ui.settleKey = key; ui.settledAt = performance.now(); }   // 预览、提交共用同一个时间戳。
+    const head = ui.keyQueue[0];
+    if (head && !(head.kind === "press" && head.down) && performance.now() < ui.settledAt + DWELL_MS) {
+      ui.drainArmed = false;                                           // 除了仍按住的 press（起拖不等停留），其它都要多留 DWELL_MS
+      clearTimeout(ui.dwellT); ui.dwellT = setTimeout(armDrain, ui.settledAt + DWELL_MS - performance.now());
+      return;
+    }
+    if (st.phase === "engrave") {
+      const idx = ui.keyQueue.findIndex((it) => it.kind === "carve" || it.kind === "skip");
+      if (idx >= 0) {
+        const item = ui.keyQueue[idx];
+        ui.keyQueue.splice(0, idx + 1);
+        ui.drainArmed = false;
+        if (item.kind === "carve") { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
+        else dispatch(INPUT.engrave.skip);
+        if (ui.keyQueue.length) armDrain();
+        return;
+      }
+      const hint = ui.keyQueue.some((it) => it.kind === "press" || it.kind === "side" || it.kind === "key");
+      clearQueue();
+      ui.drainArmed = false;
+      if (hint) toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+      return;
+    }
+    const item = ui.keyQueue.shift();
+    if (!item) { ui.drainArmed = false; return; }
+    if (item.kind === "press") {                                      // 排队的按下：仍按住就起成实拖（round 4 A3）
+      ui.drainArmed = false;
+      if (item.down) {
+        beginDrag(item.startX, item.id);
+        ui.dx = item.x - item.startX;
+        if (Math.abs(ui.dx) > 8) { ui.dragged = true; clearTimeout(ui.holdT); ui.hold = false; }
+        if (Math.abs(ui.dx) >= threshold() && !ui._thr) { ui._thr = true; sfx.threshold(); }
+        if (Math.abs(ui.dx) < threshold()) ui._thr = false;
+        applyTilt();
+        renderDimsOnly();
+        ui.commitNotBefore = ui.settledAt + DWELL_MS;
+      }
+      if (ui.keyQueue.length) armDrain();
+      return;
+    }
+    applyQueued(item);
+    if (ui.keyQueue.length) { ui.drainArmed = false; armDrain(); }
+    else ui.drainArmed = false;
+  })));
+};
+function armDrain() {
+  if (ui.drainArmed) return;
+  ui.drainArmed = true;
+  drainStep();
+}
+// 整队作废（Esc / 换阶段 / 弹层打开）：清空队列、取消停留计时；若正挂在「等最短停留后再提交」的实拖上，取消它并弹回原位。
+function clearQueue() {
+  ui.keyQueue.length = 0;
+  clearTimeout(ui.dwellT); ui.dwellT = 0;
+  if (ui.heldCommitT || ui.resumeHeldCommit) {
+    clearTimeout(ui.heldCommitT); ui.heldCommitT = 0;
+    ui.resumeHeldCommit = null;
+    ui.animating = false;
+    rebound();
+  }
+}
+function applyQueued(item) {
+  if (item.kind === "key") handleKey({ key: item.key, code: item.code, repeat: false, preventDefault() {} });
+  else if (item.kind === "drop") dropSlot(item.slot);
+  else if (item.kind === "side") commitSide(item.dir);
+}
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
-// 返回是否真的起了飞卡（inputBusy 时不起飞，返回 false）——选项点按要靠它决定是否给 N1 设参照点。
+// 后台标签页（P2-3）：document.hidden 期间停止 dwell / heldCommit 计时并禁止排队执行；恢复可见两帧后重新等满 DWELL_MS。
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    clearTimeout(ui.dwellT); ui.dwellT = 0;
+    if (ui.heldCommitT) { clearTimeout(ui.heldCommitT); ui.heldCommitT = 0; }
+  } else {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (document.hidden) return;
+      const now = performance.now();
+      ui.settledAt = now;
+      if (ui.resumeHeldCommit) {
+        ui.commitNotBefore = now + DWELL_MS;
+        ui.animating = true;
+        ui.heldCommitT = setTimeout(ui.resumeHeldCommit, DWELL_MS);
+      }
+      if (ui.keyQueue.length) armDrain();
+    }));
+  }
+});
 function commitSide(dir) {
-  if (inputBusy()) return false;
-  ui.animating = true;
+  const ep = ui.epoch;
   flyOut((dir === "left" ? -1 : 1) * 620, () => {
+    if (ui.epoch !== ep) return;
     dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action);
   });
-  return true;
 }
 
 // ---------- 事件绑定 ----------
@@ -1225,15 +1512,31 @@ on($("sidebar-tab"), () => {
 });
 on($("wb-handle"), () => { $("drawer").hidden = false; renderSide(); });
 on($("drawer-mask"), () => { $("drawer").hidden = true; });
+// 落字：点字匣格子与重放排队项共用这一条路（重放时按当前卡重新取格子，沿用 disabled 判定）。
+function dropSlot(slot) {
+  const b = document.querySelector(`#wordbox [data-slot="${slot}"]`);
+  if (b && !b.disabled) dispatch({ type: "choose", side: "drop", slot });
+}
 on($("wordbox"), (e) => {
-  const b = e.target.closest("[data-slot]");
-  if (b && !b.disabled) {
-    if (st.phase === "card" && inputBusy()) return;
-    dispatch({ type: "choose", side: "drop", slot: Number(b.dataset.slot) });
+  const b = e.target.closest("[data-slot]"); if (!b || b.disabled) return;
+  if (inputBusy()) enqueueInput({ kind: "drop", slot: Number(b.dataset.slot) });
+  else dropSlot(Number(b.dataset.slot));
+});
+on($("card"), (e) => {
+  const b = e.target.closest("[data-do]"); if (!b) return;
+  if (b.dataset.do === "skip") {
+    clearToast();
+    if (carveBusy()) enqueueInput({ kind: "skip" });
+    else dispatch({ type: "skip_engrave" });
   }
 });
-on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") { clearToast(); dispatch({ type: "skip_engrave" }); } });
-on($("bonecorner"), () => { if (st.phase === "engrave") { clearToast(); ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
+on($("bonecorner"), () => {
+  if (st.phase === "engrave") {
+    clearToast();
+    if (carveBusy()) enqueueInput({ kind: "carve" });
+    else { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
+  }
+});
 // 左右选项：支持 pointerup 提交并与 click 去重（S-1）。
 // WebKit 在切卡/重绘（setText 换 text 节点）跨越按下与抬起时，不会为按钮合成 click。
 // 在 pointerup 上若未起拖且仍在按钮内，即提交；随后的 click 借时间窗口去重，确保仅触发一次。
@@ -1244,8 +1547,7 @@ let optPress = null;
 // 同选项 ≤10px 的每一下都吞。参照点 n1Ref 只由「用户直接点选项按钮、当下起飞」的那一下设置
 // （见 bindOpt 里的 n1Arm）：键盘（←/→/Enter/1–3）、拖拽松手、点字格、队列项启动的飞卡
 // 没有参照点，途中点选项一律按 R06 走（PM P1、P1 补）。
-// 本分支没有输入队列（PR9 才有，R20）：N1 只是一道**纯过滤器**，没有任何丢弃/入队逻辑，
-// 放在 hit / inputBusy() 之前；合并后队列拿到的就是 N1 没吞掉的每一次点按。
+// N1 是一道纯过滤器，放在 hit / inputBusy() 之前；队列拿到的就是 N1 没吞掉的每一次点按。
 const N1_MAX_DIST = 10;
 function n1Arm(side, x, y) { n1Ref = { side, x, y }; }      // 只有「直接点选项且真的起飞」才调
 function n1RepeatTap(side, x, y) {
@@ -1274,15 +1576,19 @@ function bindOpt(id, side) {
     // 不依赖抬起时卡片是否已经飞出移位（选项按钮不在 #card 里，不随飞出位移）。
     if (n1RepeatTap(side, press.x, press.y)) {
       // 这次点按没有提交，但它后面照样会合成一个 click：借 S-1 那条既有的 700ms 去重把它挡掉，
-      // 否则这条 click 会绕过 N1 走到 commitSide（本分支被 inputBusy 挡下，将来看起来就是白入队一次）。
+      // 否则这条 click 会绕过 N1 走到 commitSide（白入队一次）。
       lastOptPointerCommit = { side, at: performance.now() };
       return;
     }
     const hit = el.contains(e.target) || document.elementFromPoint(e.clientX, e.clientY)?.closest("#" + id);
     if (!hit) return;
-    if (inputBusy()) return;
     lastOptPointerCommit = { side, at: performance.now() };
-    if (commitSide(side)) n1Arm(side, press.x, press.y);   // 这一下真的起了飞卡：N1 从这一刻盯同选项 ≤10px
+    if (inputBusy()) {
+      enqueueInput({ kind: "side", dir: side });
+    } else {
+      commitSide(side);
+      n1Arm(side, press.x, press.y);   // 这一下真的起了飞卡：N1 从这一刻盯同选项 ≤10px
+    }
   });
   el.addEventListener("pointercancel", (e) => {
     if (optPress && optPress.id === e.pointerId) optPress = null;
@@ -1295,7 +1601,13 @@ function bindOpt(id, side) {
     }
     // pointerup 没赶上（S-1：WebKit 跨重绘不合成 click 的同类反例）时，click 自己提交；
     // 它也是一次「直接点选项」，照设参照点（没有坐标的合成 click 传 0,0，量不出距离就不会误吞）。
-    if (commitSide(side)) n1Arm(side, e.clientX || 0, e.clientY || 0);
+    if (n1RepeatTap(side, e.clientX || 0, e.clientY || 0)) return;
+    if (inputBusy()) {
+      enqueueInput({ kind: "side", dir: side });
+    } else {
+      commitSide(side);
+      n1Arm(side, e.clientX || 0, e.clientY || 0);
+    }
   });
 }
 bindOpt("opt-left", "left");
@@ -1368,7 +1680,7 @@ addEventListener("pointerup", (e) => {
   ui.swallow.push({ token: press.token, at: performance.now() });
   pickAction(press.do, press.char);                        // 用按下时记下的字/动作，不用抬起时的节点内容
 });
-addEventListener("pointercancel", (e) => { ui.presses.delete(e.pointerId); });
+addEventListener("pointercancel", (e) => { ui.presses.delete(e.pointerId); capturedPointers.delete(e.pointerId); });
 on($("pick"), (e) => {
   const c = e.target.closest(PICK_HIT); if (!c) return;
   if (consumePickSwallow()) return;                        // 这次 click 由 pointerup 已处理的同一次按下合成
@@ -1416,10 +1728,12 @@ window.__zz = {
   get short() { return document.body.dataset.short || ""; },
   get animating() { return ui.animating; },
   get busy() { return inputBusy(); },          // 当前是否处在飞卡/入场闭锁中（供用例判断「还在飞出途中」）
+  get queued() { return ui.keyQueue.length + (ui.drainArmed ? 1 : 0); },
   get n1Swallowed() { return n1Swallowed; },   // N1 重复点按过滤器吞掉的次数（见 n1RepeatTap）
   get n1Reason() { return n1Reason; },         // 最后一次被 N1 吞掉的原因，供用例区分 N1 与 inputBusy
   get n1Ref() { return n1Ref ? { ...n1Ref } : null; },   // 当前这次飞卡的 N1 参照点（null = N1 不生效）
   get debugGoal() { return DEBUG_GOAL; },
+  get settledAt() { return ui.settledAt; },
   dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
   setMuted(v) { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); renderMenu(); },
@@ -1446,9 +1760,11 @@ if ("serviceWorker" in navigator) {
     sessionStorage.setItem(key, String(Date.now()));
     reloading = true;
     const tryReload = () => {
-      if (ui.dragging || ui.animating || cardEntryBusy()) {
+      const busy = ui.dragging || ui.animating || cardEntryBusy() || (ui.keyQueue && ui.keyQueue.length > 0) || ui.drainArmed;
+      if (busy) {
         whenCardEntryDone().then(() => {
-          if (ui.dragging) { setTimeout(tryReload, 100); return; }
+          const stillBusy = ui.dragging || ui.animating || cardEntryBusy() || (ui.keyQueue && ui.keyQueue.length > 0) || ui.drainArmed;
+          if (stillBusy) { setTimeout(tryReload, 100); return; }
           saveNow();
           location.reload();
         });

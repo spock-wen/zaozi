@@ -64,7 +64,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 /* ---------- 卡区 ---------- */
 #stage{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px;min-height:0;position:relative;}
 #cardcol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:0;}
-#cardwrap{width:min(100%,480px);perspective:1200px;}
+#cardwrap{width:min(100%,480px);perspective:1200px;touch-action:none;}
 .card{
   position:relative;width:100%;aspect-ratio:328/468;background:var(--paper-50);color:var(--ink);
   border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:16px;overflow:hidden;
@@ -205,6 +205,8 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
 }
 .slot img{width:24px;height:24px;background:var(--paper-100);border-radius:4px;flex-shrink:0;}
 .slot span{font-size:13px;line-height:18px;white-space:nowrap;text-align:center;}
+/* 工程审核 P2-12：字匣字形小图不许原生拖拽 */
+#wordbox img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;}
 .slot.ok{border-color:var(--gold-400);box-shadow:0 0 0 2px rgba(216,180,106,.5);animation:breathe 1200ms ease-in-out 2;}
 .slot.used{border-color:var(--bone-crack);color:var(--paper-200);text-decoration:line-through;}
 .slot.used span{font-size:13px;line-height:18px;white-space:nowrap;}
@@ -370,10 +372,11 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #dlgbox{background:var(--night-700);border:1px solid var(--night-line);border-radius:12px;padding:16px;width:min(560px,100%);max-height:92dvh;overflow:auto;}
 #dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:13px/1.5 ui-monospace,Menlo,monospace;}
 #dlgbtns{text-align:right;margin-top:8px;}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
-  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;
+  background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s;pointer-events:none;
   width:max-content;max-width:min(90vw,320px);}
-#toast.on{opacity:1;}
+#toast.on{opacity:1;visibility:visible;transition:opacity .3s,visibility 0s;}  /* D1：收起后连命中/绘制一起退出，不在 #coach 上留透明盒 */
 #rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
 
 /* ---------- 平板竖屏（600–1023 竖） ---------- */

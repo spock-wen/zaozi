@@ -98,6 +98,7 @@ const readState = (page) => page.evaluate(() => ({
   n1: window.__zz.n1Swallowed,
   reason: window.__zz.n1Reason,
   ref: window.__zz.n1Ref,
+  queued: window.__zz.queued,
 }));
 
 // 「N1 吞了第 2 下」：计数器、原因、只交一张，三件套一起验。
@@ -289,8 +290,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (c) 飞卡途中点另一个选项 → N1 不管（R06）；本分支由 inputBusy 挡下，只交一张
-  test(`${engine} 390x844 touch: (c) tap the OTHER option during the fly-out → n1Swallowed unchanged, 1 action`, async () => {
+  // (c) 飞卡途中点另一个选项 → N1 不管（R06）；排队并在落定后作用到下一张（T02 → T03，2 actions）
+  test(`${engine} 390x844 touch: (c) tap the OTHER option during the fly-out → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -310,10 +311,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.equal(ds[1].sel, "#opt-right", `第 2 下应落在右选项上，实际 ${ds[1].sel}`);
       assertInsideFlyout(ds[1], "(c)");
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（第 2 下入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(c)");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -321,8 +322,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (d) 飞卡途中同选项但偏 14px（>10px）→ N1 不管（R06）
-  test(`${engine} 390x844 touch: (d) 2nd tap same option 14px away during the fly-out → n1Swallowed unchanged, 1 action`, async () => {
+  // (d) 飞卡途中同选项但偏 14px（>10px）→ N1 不管（R06）；排队作用到下一张（T02 → T03，2 actions）
+  test(`${engine} 390x844 touch: (d) 2nd tap same option 14px away during the fly-out → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -341,10 +342,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.ok(d > 10, `两次点按的真实间距应 >10px（跳出 N1 窗口），实际 ${d.toFixed(1)}px`);
       assertInsideFlyout(ds[1], "(d)", { anim: true });
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（第 2 下入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(d)");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -352,8 +353,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (e) 键盘（ArrowLeft ×2：预览 → 提交）起飞的飞卡 → N1 没有参照点，途中点选项不吞（P1）
-  test(`${engine} 390x844 touch: (e) keyboard-started fly-out (ArrowLeft x2) then tap the option → n1Swallowed unchanged, 1 action`, async () => {
+  // (e) 键盘（ArrowLeft ×2：预览 → 提交）起飞的飞卡 → N1 没有参照点，途中点选项不吞（P1）；排队作用到下一张
+  test(`${engine} 390x844 touch: (e) keyboard-started fly-out (ArrowLeft x2) then tap the option → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -376,10 +377,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       const ds = await downs(page);
       assertInsideFlyout(ds[0], "(e)");
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（途中点选项入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(e)");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -387,8 +388,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (f) 拖拽松手起飞的飞卡 → N1 没有参照点，途中点选项不吞（P1）
-  test(`${engine} 390x844 touch: (f) drag-release-started fly-out then tap the option → n1Swallowed unchanged, 1 action`, async () => {
+  // (f) 拖拽松手起飞的飞卡 → N1 没有参照点，途中点选项不吞（P1）；排队作用到下一张
+  test(`${engine} 390x844 touch: (f) drag-release-started fly-out then tap the option → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -415,10 +416,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       const ds = await downs(page);
       assertInsideFlyout(ds[0], "(f)");
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（途中点选项入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(f)");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -429,10 +430,9 @@ for (const [engine] of Object.entries(ENGINES)) {
   // (g) RULES L444 四档（`/workspace/zaozi-formal/v6_hint_audit/RULES_fix2_v2.md` L447/L444 §10.4）：
   //     A 左→途中右→途中左 30px = LRL｜C 同一选项 30px = LL｜D 左→途中右→Esc = L｜
   //     E 键盘 →→ 途中 ← Enter = RL。全部作为「一次点选项启动的飞卡途中」的点按来跑，
-  //     断言 N1 吞了哪些（只有同选项 ≤10px 才吞）和本分支实际上交了几张。
-  //     注意：合并 PR9 后这些第二、第三下会排队作用到下一张（R06），本分支只能验「没被 N1 吞」。
+  //     断言 N1 吞了哪些（只有同选项 ≤10px 才吞）和排队在下一张的表现。
   for (const [key, name] of [["A", "LRL"], ["C", "LL"], ["D", "L"], ["E", "RL"]]) {
-    test(`${engine} 390x844 touch: (g) RULES L444 ${key} (${name}) taps inside one option-started fly-out → n1Swallowed 0, 1 action on this branch`, async () => {
+    test(`${engine} 390x844 touch: (g) RULES L444 ${key} (${name}) taps inside one option-started fly-out → n1Swallowed 0, queue drains`, async () => {
       const ctx = await browsers[engine].newContext(VP);
       const page = await ctx.newPage();
       const errs = [];
@@ -443,7 +443,6 @@ for (const [engine] of Object.entries(ENGINES)) {
         const R = await box(page, "#opt-right");
         const [lx, ly] = ctr(L);
         const [rx, ry] = ctr(R);
-        // 「正在飞卡途中」：本分支 busy（rAF + 落定回位）；base 上只有 animating（没有入场闭锁）
         const inside = () => page.waitForFunction(
           () => window.__zz.busy === true || window.__zz.animating === true, null, { timeout: 8000 },
         );
@@ -461,7 +460,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           await inside();
           if (key === "D") {
             await tap(page, rx, ry, true);               // 第 2 下：另一个选项
-            await page.keyboard.press("Escape");         // Esc：本分支没有队列可清
+            await page.keyboard.press("Escape");         // Esc：清空队列
           } else if (key === "A") {
             await tap(page, rx, ry, true);               // 第 2 下：另一个选项
             await inside();
@@ -471,17 +470,119 @@ for (const [engine] of Object.entries(ENGINES)) {
           }
         }
 
-        await settle(page, "T02");
-        const s = await readState(page);
-        assert.equal(s.actions, 1, `${key}(${name})：本分支应只提交 1 次动作，实际为 ${s.actions}`);
-        assert.equal(s.cur, "T02", `${key}(${name})：卡面应推进到 T02，实际为 ${s.cur}`);
-        assertNotSwallowed(s, `(g)${key}`);
+        if (key === "D") {
+          await settle(page, "T02");
+          const s = await readState(page);
+          assert.equal(s.actions, 1, `${key}(${name})：Esc 应清空队列，只提交 1 次动作，实际为 ${s.actions}`);
+          assert.equal(s.cur, "T02", `${key}(${name})：卡面应停在 T02，实际为 ${s.cur}`);
+          assertNotSwallowed(s, `(g)${key}`);
+        } else {
+          await settle(page, "T03");
+          const s = await readState(page);
+          assert.equal(s.actions, 2, `${key}(${name})：排队动作应在下一张执行，提交 2 次动作，实际为 ${s.actions}`);
+          assert.equal(s.cur, "T03", `${key}(${name})：卡面应推进到 T03，实际为 ${s.cur}`);
+          assertNotSwallowed(s, `(g)${key}`);
+        }
         assert.deepEqual(errs, [], "页面不应有未捕获异常");
       } finally {
         await ctx.close();
       }
     });
   }
+
+  // (i) 排队起飞的飞卡不设 N1 参照点：排队执行起飞途中，同一选项 +4px 仍入队，不被 N1 吞
+  test(`${engine} 390x844 touch: (i) fly-out started by queued option item does not arm N1 → same-option +4px tap is QUEUED, not swallowed`, async () => {
+    const ctx = await browsers[engine].newContext(VP);
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+    try {
+      await fresh(page);
+      const L = await box(page, "#opt-left");
+      const R = await box(page, "#opt-right");
+      const [lx, ly] = ctr(L);
+      const [rx, ry] = ctr(R);
+
+      // T01：点左选项起飞
+      await tap(page, lx, ly, true);
+      await page.waitForFunction(() => window.__zz.animating === true, null, { timeout: 8000 });
+
+      // 飞卡途中点右选项：右选项入队
+      await tap(page, rx, ry, true);
+      assert.ok((await page.evaluate(() => window.__zz.queued)) >= 1, "右选项应已入队");
+
+      // 等 T01 飞完、排队的右选项在 T02 触发起飞（当前卡推进到 T02 且正在飞出动画中）
+      await page.waitForFunction(
+        () => window.__zz.st.current === "T02" && window.__zz.animating === true,
+        null, { timeout: 8000 },
+      );
+
+      // 排队起飞的飞卡不应设 N1 参照点（P1 / R06）
+      assert.equal(await page.evaluate(() => window.__zz.n1Ref ?? null), null,
+        "排队项执行起飞不应设 N1 参照点");
+
+      // 在 T02 飞卡途中，再次点击右选项 +4px（同选项且 ≤10px）
+      await tap(page, rx + 4, ry, true);
+
+      // 因为没有 N1 参照点，不应被吞，应该入队
+      const sMid = await readState(page);
+      assert.equal(sMid.n1, 0, "N1 不应吞掉此点按（n1Swallowed 仍为 0）");
+      assert.ok(sMid.queued >= 1, `该点按应入队（queued >= 1），实得 ${sMid.queued}`);
+
+      // 等全部落定到 T03
+      await settle(page, "T03");
+      const sEnd = await readState(page);
+      assert.equal(sEnd.actions, 2, `T01与T02各提交1次，共2次，实际为 ${sEnd.actions}`);
+      assert.equal(sEnd.cur, "T03", `卡面应推进到 T03，实际为 ${sEnd.cur}`);
+      assert.equal(sEnd.n1, 0, "N1 计数应保持为 0");
+      assert.deepEqual(errs, [], "页面不应有未捕获异常");
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  // (j) N1 选择性验证：直接点选项起飞后，同选项 ≤10px 不入队（被吞），另一选项正常入队
+  test(`${engine} 390x844 touch: (j) same-option <=10px tap during option-started fly-out is NOT enqueued while other-option tap IS enqueued`, async () => {
+    const ctx = await browsers[engine].newContext(VP);
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+    try {
+      await fresh(page);
+      const L = await box(page, "#opt-left");
+      const R = await box(page, "#opt-right");
+      const [lx, ly] = ctr(L);
+      const [rx, ry] = ctr(R);
+
+      // T01：直接点左选项起飞
+      await tap(page, lx, ly, true);
+      await page.waitForFunction(() => window.__zz.animating === true, null, { timeout: 8000 });
+      assert.ok(await page.evaluate(() => window.__zz.n1Ref !== null), "直接点选项起飞应武装 N1");
+      assert.equal(await page.evaluate(() => window.__zz.queued), 0, "起飞初队列应为空");
+
+      // 1. 同选项 +4px：应被 N1 吞掉，不得入队
+      await tap(page, lx + 4, ly, true);
+      const s1 = await readState(page);
+      assert.equal(s1.n1, 1, "同选项 ≤10px 应被 N1 吞掉（n1Swallowed=1）");
+      assert.equal(s1.queued, 0, "被 N1 吞掉的点按不得入队（queued 仍为 0）");
+
+      // 2. 另一选项（右选项）：不被 N1 吞掉，应正常入队
+      await tap(page, rx, ry, true);
+      const s2 = await readState(page);
+      assert.equal(s2.n1, 1, "另一选项不应被 N1 吞掉（n1Swallowed 保持为 1）");
+      assert.ok(s2.queued >= 1, `另一选项点按应正常入队（queued >= 1），实得 ${s2.queued}`);
+
+      // 等落定推进到 T03
+      await settle(page, "T03");
+      const s3 = await readState(page);
+      assert.equal(s3.actions, 2, `应提交 2 次动作（T01左 + T02右），实际为 ${s3.actions}`);
+      assert.equal(s3.cur, "T03", `卡面应推进到 T03，实际为 ${s3.cur}`);
+      assert.equal(s3.n1, 1, "N1 吞点计数应保持为 1");
+      assert.deepEqual(errs, [], "页面不应有未捕获异常");
+    } finally {
+      await ctx.close();
+    }
+  });
 
   // (h) PM P1 补：点**字格**（字匣格子）不启动 N1。本分支里点字格是 dispatch(choose drop)，
   //     走 render() 换卡、根本不走 flyOut——所以没有任何「字格启动的飞卡」，N1 参照点也不会被设上。
@@ -608,8 +709,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (c) 鼠标：飞卡途中点另一个选项 → 不吞
-  test(`${engine} 1280x800 mouse: (c) click the OTHER option during the fly-out → n1Swallowed unchanged, 1 action`, async () => {
+  // (c) 鼠标：飞卡途中点另一个选项 → 不吞；排队作用到下一张（T02 → T03，2 actions）
+  test(`${engine} 1280x800 mouse: (c) click the OTHER option during the fly-out → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -626,10 +727,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.equal(ds[1].sel, "#opt-right", `第 2 下应落在右选项上，实际 ${ds[1].sel}`);
       assertInsideFlyout(ds[1], "(c)mouse");
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（第 2 下入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(c)mouse");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -637,8 +738,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (d) 鼠标：飞卡途中同选项偏 14px → 不吞
-  test(`${engine} 1280x800 mouse: (d) 2nd click same option 14px away during the fly-out → n1Swallowed unchanged, 1 action`, async () => {
+  // (d) 鼠标：飞卡途中同选项偏 14px → 不吞；排队作用到下一张（T02 → T03，2 actions）
+  test(`${engine} 1280x800 mouse: (d) 2nd click same option 14px away during the fly-out → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -656,10 +757,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       assert.ok(d > 10, `两次点按的真实间距应 >10px（跳出 N1 窗口），实际 ${d.toFixed(1)}px`);
       assertInsideFlyout(ds[1], "(d)mouse", { anim: true });
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（第 2 下入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(d)mouse");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -667,8 +768,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (e) 鼠标：键盘起飞的飞卡 → 不吞
-  test(`${engine} 1280x800 mouse: (e) keyboard-started fly-out (ArrowLeft x2) then click the option → n1Swallowed unchanged, 1 action`, async () => {
+  // (e) 鼠标：键盘起飞的飞卡 → 不吞；排队作用到下一张
+  test(`${engine} 1280x800 mouse: (e) keyboard-started fly-out (ArrowLeft x2) then click the option → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -689,10 +790,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       const ds = await downs(page);
       assertInsideFlyout(ds[0], "(e)mouse");
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（途中点选项入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(e)mouse");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {
@@ -700,8 +801,8 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  // (f) 鼠标：拖拽松手起飞的飞卡 → 不吞
-  test(`${engine} 1280x800 mouse: (f) drag-release-started fly-out then click the option → n1Swallowed unchanged, 1 action`, async () => {
+  // (f) 鼠标：拖拽松手起飞的飞卡 → 不吞；排队作用到下一张
+  test(`${engine} 1280x800 mouse: (f) drag-release-started fly-out then click the option → n1Swallowed unchanged, 2 actions queued`, async () => {
     const ctx = await browsers[engine].newContext(VP);
     const page = await ctx.newPage();
     const errs = [];
@@ -726,10 +827,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       const ds = await downs(page);
       assertInsideFlyout(ds[0], "(f)mouse");
 
-      await settle(page, "T02");
+      await settle(page, "T03");
       const s = await readState(page);
-      assert.equal(s.actions, 1, `应只提交 1 次动作，实际为 ${s.actions}`);
-      assert.equal(s.cur, "T02", `卡面应推进到 T02，实际为 ${s.cur}`);
+      assert.equal(s.actions, 2, `应提交 2 次动作（途中点选项入队后作用到下一张），实际为 ${s.actions}`);
+      assert.equal(s.cur, "T03", `卡面应推进到 T03，实际为 ${s.cur}`);
       assertNotSwallowed(s, "(f)mouse");
       assert.deepEqual(errs, [], "页面不应有未捕获异常");
     } finally {

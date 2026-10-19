@@ -122,9 +122,9 @@ for (const [engine] of Object.entries(ENGINES)) {
             const gest = document.querySelector("#gesture-hint");
             const kt = keys ? keys.innerText : "";
             const gt = gest ? gest.innerText : "";
-            return kt.includes("K 刻字") || gt.includes("K 刻字");
+            return kt.includes("K 刻字") || kt.includes("K刻") || gt.includes("K 刻字");
           });
-          assert.ok(kHintOk, "On desktop/keyboard, 'K 刻字' hint must be visible");
+          assert.ok(kHintOk, "On desktop/keyboard, 'K 刻字' / 'K刻' hint must be visible");
         }
 
         // Real click on 先不刻 skips -> advances to next state

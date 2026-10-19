@@ -93,7 +93,7 @@ for (const [engine] of Object.entries(ENGINES)) {
             return { found: false, msg: "keys hidden" };
           }
           const text = (keys.innerText || "").replace(/\s+/g, " ").trim();
-          const hasK = text.includes("K 刻字");
+          const hasK = text.includes("K 刻字") || text.includes("K刻");
           const r = keys.getBoundingClientRect();
           const inView = r.top >= 0 && r.bottom <= window.innerHeight + 1 && r.left >= 0 && r.right <= window.innerWidth + 1;
 
@@ -106,7 +106,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           return { found: hasK, text, inView, hitKeys, r };
         });
 
-        assert.ok(kCheck.found, `Bone chip available on T03: #keys must contain 'K 刻字', got: '${kCheck.text}'`);
+        assert.ok(kCheck.found, `Bone chip available on T03: #keys must contain 'K 刻字' or 'K刻', got: '${kCheck.text}'`);
         assert.ok(kCheck.inView, `#keys must be inside viewport`);
         assert.ok(kCheck.hitKeys, `#keys centre must be hit via elementFromPoint`);
         assert.deepEqual(errs, []);
@@ -437,7 +437,9 @@ for (const [engine] of Object.entries(ENGINES)) {
         };
 
         // 1. T01 with coach
-        const segsT01 = ["1–3 落字", "按住 Space 看分量", "左右拖卡做选择"];
+        const segsT01 = vp.h <= 760
+          ? ["1–3落字", "Space分量", "左右拖卡做选择"]
+          : ["1–3 落字", "按住 Space 看分量", "左右拖卡做选择"];
         const resT01 = await checkHintUniqueness("T01", segsT01);
         for (const seg of segsT01) {
           const list = resT01[seg];
@@ -448,15 +450,18 @@ for (const [engine] of Object.entries(ENGINES)) {
           );
           assert.ok(list[0].notCovered, `On T01, element containing '${seg}' must not be covered per elementFromPoint`);
         }
-        // K 刻字 must be in 0 visible elements on T01
-        const resK_T01 = await checkHintUniqueness("T01", ["K 刻字"]);
-        assert.equal(resK_T01["K 刻字"].length, 0, `On T01, 'K 刻字' must appear in 0 visible elements`);
+        // K 刻字 / K刻 must be in 0 visible elements on T01
+        const kSegT01 = vp.h <= 760 ? "K刻" : "K 刻字";
+        const resK_T01 = await checkHintUniqueness("T01", [kSegT01]);
+        assert.equal(resK_T01[kSegT01].length, 0, `On T01, '${kSegT01}' must appear in 0 visible elements`);
 
         // Advance to T02 (normal card, coach hidden)
         await commitCard(page, "left");
         assert.equal(await page.evaluate(() => window.__zz.st?.current), "T02");
 
-        const segsT02 = ["1–3 落字", "按住 Space 看分量"];
+        const segsT02 = vp.h <= 760
+          ? ["1–3落字", "Space分量"]
+          : ["1–3 落字", "按住 Space 看分量"];
         const resT02 = await checkHintUniqueness("T02", segsT02);
         for (const seg of segsT02) {
           const list = resT02[seg];
@@ -472,7 +477,9 @@ for (const [engine] of Object.entries(ENGINES)) {
         await commitCard(page, "right");
         assert.equal(await page.evaluate(() => window.__zz.st?.phase), "engrave");
 
-        const segsT03 = ["1–3 落字", "按住 Space 看分量", "K 刻字"];
+        const segsT03 = vp.h <= 760
+          ? ["1–3落字", "Space分量", "K刻"]
+          : ["1–3 落字", "按住 Space 看分量", "K 刻字"];
         const resT03 = await checkHintUniqueness("T03", segsT03);
         for (const seg of segsT03) {
           const list = resT03[seg];
