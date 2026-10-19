@@ -255,15 +255,14 @@ for (const [engine] of Object.entries(ENGINES)) {
   }
 
   // ==========================================
-  // ABCSE residual: #topbar must not overflow vertically while the animated
-  // float delta (span.float.up/down) is live inside the merged dims bar.
-  // webkit 1280x720 T03-after-engrave reported scrollHeight 58 vs clientHeight 48.
+  // ABCSE residual: #topbar must not overflow vertically or horizontally,
+  // all elements must stay inside its box, no item overlap, font >= 14px desktop.
   // ==========================================
   for (const vp of [
     { name: "1280x720", w: 1280, h: 720 },
     { name: "1280x800", w: 1280, h: 800 },
   ]) {
-    test(`${engine} ${vp.name}: #topbar scrollHeight<=clientHeight+1 during float delta after engraving`, { timeout: 60000 }, async () => {
+    test(`${engine} ${vp.name}: #topbar real geometry, containment, non-overlap, font >=14 during float delta`, { timeout: 60000 }, async () => {
       const ctx = await browsers[engine].newContext({ viewport: { width: vp.w, height: vp.h } });
       const page = await ctx.newPage();
       const errs = [];
@@ -288,39 +287,151 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#bonecorner").click();
         await page.waitForFunction(() => window.__zz.st.log.some((l) => l.startsWith("刻事签")), null, { timeout: 10000 });
 
-        // Sample the whole float lifetime (650ms) — the overflow only exists mid-animation.
+        // Sample the whole float lifetime (650ms) measuring real geometry throughout animation.
         const samples = await page.evaluate(async () => {
           const tb = document.querySelector("#topbar");
           const out = [];
+          const isShort = !!document.body.dataset.short;
+          const TOL = 1.0;
+
           for (let i = 0; i < 45; i++) {
             await new Promise((r) => setTimeout(r, 20));
+            const tbRect = tb.getBoundingClientRect();
             const floats = Array.from(document.querySelectorAll("#topbar .float")).filter((f) => getComputedStyle(f).opacity !== "0");
+
+            // Elements that belong inside #topbar
+            const tbChildren = Array.from(tb.querySelectorAll("*")).filter((el) => {
+              if (!isShort && (el.id === "goals-slip" || el.closest("#goals-slip"))) return false;
+              if (el.hidden || getComputedStyle(el).display === "none") return false;
+              const r = el.getBoundingClientRect();
+              return r.width > 0 && r.height > 0 && getComputedStyle(el).opacity !== "0";
+            });
+
+            const outside = [];
+            for (const el of tbChildren) {
+              const r = el.getBoundingClientRect();
+              if (r.top < tbRect.top - TOL || r.bottom > tbRect.bottom + TOL ||
+                  r.left < tbRect.left - TOL || r.right > tbRect.right + TOL) {
+                outside.push({
+                  id: el.id || el.className || el.tagName,
+                  rect: [r.left, r.top, r.right, r.bottom],
+                  tbRect: [tbRect.left, tbRect.top, tbRect.right, tbRect.bottom],
+                });
+              }
+            }
+
+            // Topbar item overlap check
+            const overlaps = [];
+            const topItems = isShort
+              ? ["#gen-line", "#goals-slip", "#dims-desktop", "#topright"]
+              : ["#gen-line", "#topright"];
+            const itemBoxes = topItems.map((sel) => {
+              const el = document.querySelector(sel);
+              return { sel, r: el ? el.getBoundingClientRect() : null };
+            }).filter((x) => x.r && x.r.width > 0 && x.r.height > 0);
+
+            for (let j = 0; j < itemBoxes.length; j++) {
+              for (let k = j + 1; k < itemBoxes.length; k++) {
+                const a = itemBoxes[j], b = itemBoxes[k];
+                if (a.r.left < b.r.right - TOL && b.r.left < a.r.right - TOL &&
+                    a.r.top < b.r.bottom - TOL && b.r.top < a.r.bottom - TOL) {
+                  overlaps.push(`${a.sel} overlaps ${b.sel}`);
+                }
+              }
+            }
+
+            // Topright items overlap check
+            const trItems = Array.from(document.querySelectorAll("#topright > *")).map((el) => ({
+              id: el.id || el.tagName,
+              r: el.getBoundingClientRect(),
+            })).filter((x) => x.r.width > 0 && x.r.height > 0);
+            for (let j = 0; j < trItems.length; j++) {
+              for (let k = j + 1; k < trItems.length; k++) {
+                const a = trItems[j], b = trItems[k];
+                if (a.r.left < b.r.right - TOL && b.r.left < a.r.right - TOL &&
+                    a.r.top < b.r.bottom - TOL && b.r.top < a.r.bottom - TOL) {
+                  overlaps.push(`#topright ${a.id} overlaps ${b.id}`);
+                }
+              }
+            }
+
+            // Dims items overlap check if in topbar
+            if (isShort) {
+              const dimItems = Array.from(document.querySelectorAll("#dims-desktop .dim")).map((el, idx) => ({
+                idx,
+                r: el.getBoundingClientRect(),
+              })).filter((x) => x.r.width > 0 && x.r.height > 0);
+              for (let j = 0; j < dimItems.length; j++) {
+                for (let k = j + 1; k < dimItems.length; k++) {
+                  const a = dimItems[j], b = dimItems[k];
+                  if (a.r.left < b.r.right - TOL && b.r.left < a.r.right - TOL &&
+                      a.r.top < b.r.bottom - TOL && b.r.top < a.r.bottom - TOL) {
+                    overlaps.push(`.dim[${a.idx}] overlaps .dim[${b.idx}]`);
+                  }
+                }
+              }
+            }
+
             out.push({
               over: tb.scrollHeight - tb.clientHeight,
               scrollH: tb.scrollHeight,
               clientH: tb.clientHeight,
-              short: document.body.dataset.short || "",
+              scrollW: tb.scrollWidth,
+              clientW: tb.clientWidth,
+              short: isShort,
               floatBox: floats.length ? floats[0].getBoundingClientRect().toJSON() : null,
+              outside,
+              overlaps,
             });
           }
-          return out;
+
+          // Font size check on desktop topbar elements (>= 14px)
+          const badFonts = [];
+          const textEls = Array.from(tb.querySelectorAll("*")).filter((el) => {
+            if (!isShort && (el.id === "goals-slip" || el.closest("#goals-slip"))) return false;
+            return Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim());
+          });
+          for (const el of textEls) {
+            const fs = parseFloat(getComputedStyle(el).fontSize);
+            if (fs < 13.9) {
+              badFonts.push(`${el.tagName}#${el.id}.${el.className}「${el.textContent.trim()}」fs=${fs}`);
+            }
+          }
+
+          return { samples: out, badFonts };
         });
 
-        assert.ok(samples.length > 0, "no samples taken");
-        for (const s of samples) {
+        assert.ok(samples.samples.length > 0, "no samples taken");
+
+        for (const s of samples.samples) {
           assert.ok(
             s.over <= 1,
-            `#topbar overflows vertically during float delta: scrollHeight ${s.scrollH} > clientHeight ${s.clientH} (short=${s.short || "none"})`
+            `#topbar overflows vertically during float delta: scrollHeight ${s.scrollH} > clientHeight ${s.clientH} (short=${s.short})`
+          );
+          assert.ok(
+            s.scrollW <= s.clientW + 1,
+            `#topbar overflows horizontally: scrollWidth ${s.scrollW} > clientWidth ${s.clientW}`
+          );
+          assert.deepEqual(
+            s.outside,
+            [],
+            `Elements inside #topbar escaped topbar bounding box: ${JSON.stringify(s.outside)}`
+          );
+          assert.deepEqual(
+            s.overlaps,
+            [],
+            `Items inside #topbar overlap: ${s.overlaps.join("; ")}`
           );
         }
-        // The float delta must really render inside the topbar (short tiers merge the
-        // dims bar into it) and stay on-screen — the fix must not just hide it.
-        const shortActive = samples.some((s) => s.short);
-        const sawFloat = samples.some((s) => s.floatBox);
+
+        assert.deepEqual(samples.badFonts, [], `Desktop topbar font size < 14px: ${samples.badFonts.join("; ")}`);
+
+        const shortActive = samples.samples.some((s) => s.short);
+        const sawFloat = samples.samples.some((s) => s.floatBox);
         if (shortActive) {
           assert.ok(sawFloat, "float delta span should render inside #topbar while animating");
         }
-        for (const s of samples) {
+        for (const s of samples.samples) {
           if (!s.floatBox) continue;
           assert.ok(s.floatBox.top >= -0.5 && s.floatBox.bottom <= vp.h + 0.5,
             `float delta leaves the viewport: ${JSON.stringify(s.floatBox)} vs ${vp.w}x${vp.h}`);

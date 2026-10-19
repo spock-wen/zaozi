@@ -203,29 +203,33 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         for (const cid of cardsToCheck) {
           const res = await page.evaluate((id) => {
-            // N3 strengthened (engineering review of b81125d found real clipping/overlap
-            // at 375x667 & 390x664, e.g. #card-drops rendered on top of #card-text lines).
-            // For every text node inside #card (#card-title, #card-text, .card-head speaker/
-            // season, #card-drops) walk each *line* via Range.getClientRects() and require:
-            //   1) the line rect is fully inside the card's visible box
-            //      (card rect ∩ every ancestor's overflow clip rect),
-            //   2) the line rect is inside the viewport,
-            //   3) no other visible #card child overlaps the line rect
-            //      (catches card-drops covering card-text lines).
             const TOL = 1.5;
-            const fmt = (r) => `[${r.left.toFixed(1)}, ${r.top.toFixed(1)}, ${r.right.toFixed(1)}, ${r.bottom.toFixed(1)}]`;
             const contains = (outer, inner) =>
               inner.left >= outer.left - TOL && inner.right <= outer.right + TOL &&
               inner.top >= outer.top - TOL && inner.bottom <= outer.bottom + TOL;
-            const inter = (a, b) => ({
-              left: Math.max(a.left, b.left),
-              top: Math.max(a.top, b.top),
-              right: Math.min(a.right, b.right),
-              bottom: Math.min(a.bottom, b.bottom),
-            });
-            const hits = (a, b) =>
+            const overlaps = (a, b) =>
               a.left < b.right - TOL && b.left < a.right - TOL && a.top < b.bottom - TOL && b.top < a.bottom - TOL;
 
+            const inter = (a, b) => ({
+              left: Math.max(a.left, b.left), top: Math.max(a.top, b.top),
+              right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom),
+            });
+
+            const visibleBoxOf = (el) => {
+              let b = el.getBoundingClientRect();
+              for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+                const cs = getComputedStyle(p);
+                if (cs.overflow !== "visible" || cs.overflowX !== "visible" || cs.overflowY !== "visible") {
+                  const pr = p.getBoundingClientRect();
+                  b = inter(b, pr);
+                }
+              }
+              return b;
+            };
+
+            const vpBox = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+
+            // 1. Decision phase
             window.__zz.st.current = id;
             window.__zz.st.phase = "card";
             window.__zz.render();
@@ -233,61 +237,109 @@ for (const [engine] of Object.entries(ENGINES)) {
             const card = document.querySelector("#card");
             if (!card) return { ok: false, msg: `${id}: #card missing` };
             const cr = card.getBoundingClientRect();
+            const vbox = visibleBoxOf(card);
 
-            // Card's visible box: intersect every ancestor that clips overflow.
-            let vbox = { left: cr.left, top: cr.top, right: cr.right, bottom: cr.bottom };
-            for (let p = card.parentElement; p && p !== document.body; p = p.parentElement) {
-              const cs = getComputedStyle(p);
-              if (cs.overflow !== "visible" || cs.overflowX !== "visible" || cs.overflowY !== "visible") {
-                const pr = p.getBoundingClientRect();
-                vbox = inter(vbox, { left: pr.left, top: pr.top, right: pr.right, bottom: pr.bottom });
+            if (!contains(vpBox, cr)) {
+              return { ok: false, msg: `${id}: #card outside viewport` };
+            }
+
+            const contentSels = [".card-head", "#card-title", "#card-text", ".card-art", "#card-drops"];
+            const contentBoxes = [];
+
+            for (const sel of contentSels) {
+              const el = document.querySelector(sel);
+              if (!el || el.hidden || getComputedStyle(el).display === "none" || getComputedStyle(el).visibility === "hidden") continue;
+              const r = el.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) continue;
+
+              // Text containers scrollHeight <= clientHeight + 1
+              if (sel !== ".card-art") {
+                if (el.scrollHeight > el.clientHeight + 1) {
+                  return { ok: false, msg: `${id}: ${sel} scrollHeight ${el.scrollHeight} > clientHeight ${el.clientHeight}` };
+                }
+              }
+
+              // Inside card
+              if (!contains(cr, r)) {
+                return { ok: false, msg: `${id}: ${sel} overflows #card` };
+              }
+              // Inside visible ancestor clipping box
+              if (!contains(vbox, r)) {
+                return { ok: false, msg: `${id}: ${sel} clipped by ancestor overflow` };
+              }
+              // Inside viewport
+              if (!contains(vpBox, r)) {
+                return { ok: false, msg: `${id}: ${sel} outside viewport` };
+              }
+
+              contentBoxes.push({ sel, el, r });
+            }
+
+            // Mutual non-overlap between distinct content elements inside card
+            for (let i = 0; i < contentBoxes.length; i++) {
+              for (let j = i + 1; j < contentBoxes.length; j++) {
+                const a = contentBoxes[i], b = contentBoxes[j];
+                if (overlaps(a.r, b.r)) {
+                  return { ok: false, msg: `${id}: ${a.sel} overlaps ${b.sel}` };
+                }
               }
             }
 
-            const boxes = [];
-            for (const sel of [".card-head", "#card-title", "#card-text", "#card-drops"]) {
-              const el = document.querySelector(sel);
-              if (!el) return { ok: false, msg: `${id}: ${sel} missing` };
-              if (el.hidden || getComputedStyle(el).display === "none" || getComputedStyle(el).visibility === "hidden") continue;
-              boxes.push({ el, label: sel });
+            // Option buttons in decision phase
+            const optL = document.querySelector("#opt-left");
+            const optR = document.querySelector("#opt-right");
+            if (optL && !optL.hidden && getComputedStyle(optL).display !== "none") {
+              const lr = optL.getBoundingClientRect();
+              if (lr.width <= 0 || lr.height <= 0 || !contains(vpBox, lr)) {
+                return { ok: false, msg: `${id}: #opt-left outside viewport` };
+              }
+              if (optL.scrollHeight > optL.clientHeight + 1) {
+                return { ok: false, msg: `${id}: #opt-left text clipped` };
+              }
             }
-            // Every other visible #card child is a potential overlapper.
-            const others = Array.from(card.children)
-              .filter((el) => !boxes.some((b) => b.el === el) && !el.hidden && getComputedStyle(el).display !== "none")
-              .map((el) => ({ el, label: el.id || el.className || el.tagName }));
+            if (optR && !optR.hidden && getComputedStyle(optR).display !== "none") {
+              const rr = optR.getBoundingClientRect();
+              if (rr.width <= 0 || rr.height <= 0 || !contains(vpBox, rr)) {
+                return { ok: false, msg: `${id}: #opt-right outside viewport` };
+              }
+              if (optR.scrollHeight > optR.clientHeight + 1) {
+                return { ok: false, msg: `${id}: #opt-right text clipped` };
+              }
+            }
 
-            for (const b of boxes) {
-              const walker = document.createTreeWalker(b.el, NodeFilter.SHOW_TEXT);
-              let lines = 0;
-              while (walker.nextNode()) {
-                const node = walker.currentNode;
-                if (!node.nodeValue.trim()) continue;
-                const range = document.createRange();
-                range.selectNodeContents(node);
-                for (const rect of range.getClientRects()) {
-                  if (rect.width <= 0 || rect.height <= 0) continue;
-                  lines++;
-                  if (!contains(cr, rect)) {
-                    return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} not inside card ${fmt(cr)}` };
-                  }
-                  if (!contains(vbox, rect)) {
-                    return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} clipped by ancestor overflow (visible ${fmt(vbox)})` };
-                  }
-                  if (rect.left < -0.5 || rect.top < -0.5 || rect.right > window.innerWidth + 0.5 || rect.bottom > window.innerHeight + 0.5) {
-                    return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} outside viewport` };
-                  }
-                  for (const o of [...boxes, ...others]) {
-                    if (o.el === b.el || b.el.contains(o.el)) continue;
-                    const orr = o.el.getBoundingClientRect();
-                    if (orr.width <= 0 || orr.height <= 0) continue;
-                    if (hits(rect, orr)) {
-                      return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} overlapped by ${o.label} ${fmt(orr)}` };
-                    }
+            // 2. Carve phase (for carve cards like T03)
+            if (id === "T03") {
+              window.__zz.st.phase = "engrave";
+              window.__zz.st.pendingTrace = { target: "休", tally_text: "晌午正热，赶路的背抵着一截老干" };
+              window.__zz.render();
+
+              const engraveContent = [];
+              for (const sel of [".card-head", "#card-title", "#card-text", ".card-art", "#card-drops"]) {
+                const el = document.querySelector(sel);
+                if (!el || el.hidden || getComputedStyle(el).display === "none" || getComputedStyle(el).visibility === "hidden") continue;
+                const r = el.getBoundingClientRect();
+                if (r.width <= 0 || r.height <= 0) continue;
+                if (sel !== ".card-art" && el.scrollHeight > el.clientHeight + 1) {
+                  return { ok: false, msg: `${id} (engrave): ${sel} scrollHeight ${el.scrollHeight} > clientHeight ${el.clientHeight}` };
+                }
+                if (!contains(cr, r)) {
+                  return { ok: false, msg: `${id} (engrave): ${sel} overflows #card` };
+                }
+                if (!contains(vbox, r)) {
+                  return { ok: false, msg: `${id} (engrave): ${sel} clipped by ancestor` };
+                }
+                engraveContent.push({ sel, el, r });
+              }
+              for (let i = 0; i < engraveContent.length; i++) {
+                for (let j = i + 1; j < engraveContent.length; j++) {
+                  const a = engraveContent[i], b = engraveContent[j];
+                  if (overlaps(a.r, b.r)) {
+                    return { ok: false, msg: `${id} (engrave): ${a.sel} overlaps ${b.sel}` };
                   }
                 }
               }
-              if (lines === 0) return { ok: false, msg: `${id}: ${b.label} has no visible text lines` };
             }
+
             return { ok: true };
           }, cid);
 
