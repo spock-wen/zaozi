@@ -335,9 +335,7 @@ function restore() {
   if (!d) return false;
   try {
     st = run({ seed: d.seed }, d.actions);
-    hideToast();
     seed = d.seed; actions = d.actions.slice();
-    toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
   } catch (e) {
     try {                                  // 先备份再删（B5）
       const raw = localStorage.getItem(SAVE_KEY);
@@ -348,10 +346,17 @@ function restore() {
     return false;
   }
   try {
+    hideToast();
+    toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
     render();
   } catch (e) {
     console.error("render failed on restore", e);
-    toast("渲染出错：" + e.message);
+    try {
+      toast("渲染出错：" + e.message);
+    } catch {
+      const t = $("toast");
+      if (t) { t.textContent = "渲染出错：" + e.message; t.classList.add("on"); }
+    }
   }
   return true;
 }
