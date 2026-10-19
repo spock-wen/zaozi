@@ -253,4 +253,83 @@ for (const [engine] of Object.entries(ENGINES)) {
       await ctx.close();
     });
   }
+
+  // ==========================================
+  // ABCSE residual: #topbar must not overflow vertically while the animated
+  // float delta (span.float.up/down) is live inside the merged dims bar.
+  // webkit 1280x720 T03-after-engrave reported scrollHeight 58 vs clientHeight 48.
+  // ==========================================
+  for (const vp of [
+    { name: "1280x720", w: 1280, h: 720 },
+    { name: "1280x800", w: 1280, h: 800 },
+  ]) {
+    test(`${engine} ${vp.name}: #topbar scrollHeight<=clientHeight+1 during float delta after engraving`, { timeout: 60000 }, async () => {
+      const ctx = await browsers[engine].newContext({ viewport: { width: vp.w, height: vp.h } });
+      const page = await ctx.newPage();
+      const errs = [];
+      collectErrors(page, errs);
+
+      try {
+        await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+        await page.waitForFunction(() => !!window.__zz && window.__zz.st?.current === "T01", null, { timeout: 10000 });
+
+        await page.evaluate(() => {
+          window.__zz.dispatch({ type: "choose", side: "left" });
+          window.__zz.dispatch({ type: "choose", side: "right" });
+        });
+        await page.waitForFunction(() => window.__zz.st?.phase === "engrave", null, { timeout: 10000 });
+
+        // Hint toast left over, exactly like the reported T03-after-engraving state.
+        await page.evaluate(() => {
+          window.__zz.st.pendingTrace = { target: "休", tally_text: "晌午正热，赶路的背抵着一截老干，头顶叶子筛下的光斑落了一身。" };
+          window.__zz.render();
+          if (typeof window.__zz.toast === "function") window.__zz.toast("先点卡角骨片刻下这件事");
+        });
+        await page.locator("#bonecorner").click();
+        await page.waitForFunction(() => window.__zz.st.log.some((l) => l.startsWith("刻事签")), null, { timeout: 10000 });
+
+        // Sample the whole float lifetime (650ms) — the overflow only exists mid-animation.
+        const samples = await page.evaluate(async () => {
+          const tb = document.querySelector("#topbar");
+          const out = [];
+          for (let i = 0; i < 45; i++) {
+            await new Promise((r) => setTimeout(r, 20));
+            const floats = Array.from(document.querySelectorAll("#topbar .float")).filter((f) => getComputedStyle(f).opacity !== "0");
+            out.push({
+              over: tb.scrollHeight - tb.clientHeight,
+              scrollH: tb.scrollHeight,
+              clientH: tb.clientHeight,
+              short: document.body.dataset.short || "",
+              floatBox: floats.length ? floats[0].getBoundingClientRect().toJSON() : null,
+            });
+          }
+          return out;
+        });
+
+        assert.ok(samples.length > 0, "no samples taken");
+        for (const s of samples) {
+          assert.ok(
+            s.over <= 1,
+            `#topbar overflows vertically during float delta: scrollHeight ${s.scrollH} > clientHeight ${s.clientH} (short=${s.short || "none"})`
+          );
+        }
+        // The float delta must really render inside the topbar (short tiers merge the
+        // dims bar into it) and stay on-screen — the fix must not just hide it.
+        const shortActive = samples.some((s) => s.short);
+        const sawFloat = samples.some((s) => s.floatBox);
+        if (shortActive) {
+          assert.ok(sawFloat, "float delta span should render inside #topbar while animating");
+        }
+        for (const s of samples) {
+          if (!s.floatBox) continue;
+          assert.ok(s.floatBox.top >= -0.5 && s.floatBox.bottom <= vp.h + 0.5,
+            `float delta leaves the viewport: ${JSON.stringify(s.floatBox)} vs ${vp.w}x${vp.h}`);
+        }
+
+        assert.deepEqual(errs, []);
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
 }

@@ -484,11 +484,14 @@ body[data-short="A"] #topbar .dim,
 body[data-short="B"] #topbar .dim{font-size:13px;}
 body[data-short="A"] #topbar .dim .bar,
 body[data-short="B"] #topbar .dim .bar{height:4px;margin-top:1px;}
-/* 飘字/预览圆点原本画在资源条上方，顶栏里改成画在下方，避免出屏 */
+/* 预览圆点画在资源条下方（顶上出屏） */
 body[data-short="A"] #topbar .dim .dots,
 body[data-short="B"] #topbar .dim .dots{top:auto;bottom:-9px;height:8px;}
+/* 飘字从四维条中点升起 16px 停在条上方：原 top:calc(100% + 2px) 会让飘字盒伸出
+   顶栏下沿（顶栏 48px，飘字起点 38.5px + 19px 高 → scrollHeight 58 > clientHeight 48，
+   webkit 1280x720 复现）；起点收到条中点后全程不出顶栏、不出屏。 */
 body[data-short="A"] #topbar .float,
-body[data-short="B"] #topbar .float{top:calc(100% + 2px);}
+body[data-short="B"] #topbar .float{top:50%;}
 
 /* 卡高（宽由 aspect-ratio 得）；#stage 内边距与左右选项宽度按档收窄 */
 body[data-short="A"] #cardwrap{height:clamp(380px,calc(100dvh - 188px),468px);}
