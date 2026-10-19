@@ -164,7 +164,7 @@ for (const engine of Object.keys(ENGINES)) {
         };
       });
       assert.equal(s.hidden, false, "视口高 <600 应显示「窗口太小」提示");
-      assert.ok(s.text.includes("窗口太小"), `提示文案应为「窗口太小…」，实际：${s.text}`);
+      assert.equal(s.text, "窗口太小，放大窗口更好玩", `提示文案应精确为「窗口太小，放大窗口更好玩」，实际：${s.text}`);
       assert.ok(s.y >= 0 && s.bottom <= s.vh + 1, "提示应在视口内");
       assert.equal(Math.round(s.cardH), 427, "视口高 599 卡高 clamp(320, 599-172, 428) 为 427");
       assert.equal(s.sideCollapsed, true, "视口高 599 侧栏强制收起");
@@ -176,6 +176,34 @@ for (const engine of Object.keys(ENGINES)) {
     const just = await open(engine, { width: 1024, height: 600 });
     try {
       assert.equal(await just.page.locator("#too-short").isHidden(), true, "视口高 600 不应出提示（<600 才出）");
+      assert.deepEqual(just.errs, [], "页面不应有报错：" + just.errs.join(" | "));
+    } finally {
+      await just.ctx.close();
+    }
+  });
+
+  test(`${engine} 视口宽 359: 出「窗口太小」提示（360 不出）`, async () => {
+    const narrow = await open(engine, { width: 359, height: 700 });
+    try {
+      const s = await narrow.page.evaluate(() => {
+        const el = document.querySelector("#too-short");
+        const r = el.getBoundingClientRect();
+        return {
+          hidden: el.hidden, text: el.textContent.trim(),
+          y: r.y, bottom: r.bottom, vh: innerHeight,
+        };
+      });
+      assert.equal(s.hidden, false, "视口宽 <360 应显示「窗口太小」提示");
+      assert.equal(s.text, "窗口太小，放大窗口更好玩", `提示文案应精确为「窗口太小，放大窗口更好玩」，实际：${s.text}`);
+      assert.ok(s.y >= 0 && s.bottom <= s.vh + 1, "提示应在视口内");
+      assert.deepEqual(narrow.errs, [], "页面不应有报错：" + narrow.errs.join(" | "));
+    } finally {
+      await narrow.ctx.close();
+    }
+
+    const just = await open(engine, { width: 360, height: 700 });
+    try {
+      assert.equal(await just.page.locator("#too-short").isHidden(), true, "视口宽 360 不应出提示（<360 才出）");
       assert.deepEqual(just.errs, [], "页面不应有报错：" + just.errs.join(" | "));
     } finally {
       await just.ctx.close();

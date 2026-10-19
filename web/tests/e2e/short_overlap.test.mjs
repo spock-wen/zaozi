@@ -37,7 +37,7 @@ const snap = (page) =>
       const cs = getComputedStyle(e);
       const r = e.getBoundingClientRect();
       const hidden = e.hidden || cs.display === "none" || cs.visibility === "hidden";
-      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, hidden };
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, hidden, text: e.textContent.trim() };
     };
     const R = (s) => {
       const e = document.querySelector(s);
@@ -87,6 +87,7 @@ for (const engine of Object.keys(ENGINES)) {
         const g = await snap(page);
         assert.equal(g.short, "B", "491 应落 B 档");
         assert.equal(g.tooShort.hidden, false, "视口高 <600 应显示「窗口太小」提示");
+        assert.equal(g.tooShort.text, "窗口太小，放大窗口更好玩", `提示文案应精确为「窗口太小，放大窗口更好玩」，实际：${g.tooShort.text}`);
         assert.ok(inViewport(g.tooShort, g.vw, g.vh), `提示应在视口内：${box(g.tooShort)}`);
         assert.ok(
           !intersects(g.tooShort, g.cardHead),

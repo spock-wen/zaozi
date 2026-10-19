@@ -33,6 +33,21 @@ const PHONES = [
   { name: "390x664", w: 390, h: 664 },
 ];
 
+const BANNER_VIEWPORTS = [
+  // 7 phones
+  { name: "375x667", w: 375, h: 667, isTouch: true },
+  { name: "360x800", w: 360, h: 800, isTouch: true },
+  { name: "390x844", w: 390, h: 844, isTouch: true },
+  { name: "393x852", w: 393, h: 852, isTouch: true },
+  { name: "412x915", w: 412, h: 915, isTouch: true },
+  { name: "430x932", w: 430, h: 932, isTouch: true },
+  { name: "390x664", w: 390, h: 664, isTouch: true },
+  // 3 tablets
+  { name: "768x1024", w: 768, h: 1024, isTouch: true },
+  { name: "820x1180", w: 820, h: 1180, isTouch: true },
+  { name: "1024x768", w: 1024, h: 768, isTouch: false },
+];
+
 for (const [engine] of Object.entries(ENGINES)) {
   // ==========================================
   // a. N1: Double tap/click within 70ms -> exactly 1 commit
@@ -519,4 +534,106 @@ for (const [engine] of Object.entries(ENGINES)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  // ==========================================
+  // i. Milestone banner does not cover topbar, dims, menubtn, coach, options on T04 drop
+  // ==========================================
+  for (const vp of BANNER_VIEWPORTS) {
+    test(`${engine} ${vp.name}: milestone banner on T04 drop does not intersect topbar, dims, menubtn, coach, options`, async () => {
+      const ctx = await browsers[engine].newContext({
+        viewport: { width: vp.w, height: vp.h },
+        hasTouch: vp.isTouch,
+      });
+      const page = await ctx.newPage();
+      const errs = [];
+      collectErrors(page, errs);
+
+      try {
+        await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+        await page.waitForFunction(() => document.body.dataset.cardReady === "1");
+
+        // Real input: T01 -> T02
+        if (vp.isTouch) {
+          await page.locator("#opt-left").tap();
+        } else {
+          await page.locator("#opt-left").click();
+        }
+        await page.waitForFunction(() => window.__zz.st?.current === "T02" && document.body.dataset.cardReady === "1", null, { timeout: 5000 });
+
+        // T02 -> T03
+        if (vp.isTouch) {
+          await page.locator("#opt-right").tap();
+        } else {
+          await page.locator("#opt-right").click();
+        }
+        await page.waitForFunction(() => window.__zz.st?.current === "T03" && document.body.dataset.cardReady === "1", null, { timeout: 5000 });
+
+        // T03 -> T04 (刻)
+        if (vp.isTouch) {
+          await page.locator("#bonecorner").tap();
+        } else {
+          await page.locator("#bonecorner").click();
+        }
+        await page.waitForFunction(() => window.__zz.st?.current === "T04" && document.body.dataset.cardReady === "1", null, { timeout: 5000 });
+
+        // T04 drop 水 via wordbox tap
+        const slot = page.locator("#wordbox .slot.ok").first();
+        if (vp.isTouch) {
+          await slot.tap();
+        } else {
+          await slot.click();
+        }
+
+        // Wait for milestone banner 「达成 落一个字」
+        const banner = page.locator("#banner");
+        await banner.waitFor({ state: "visible", timeout: 5000 });
+        const bannerText = (await banner.textContent()).trim();
+        assert.ok(bannerText.includes("达成"), `Banner text should contain 「达成」, got: ${bannerText}`);
+
+        const data = await page.evaluate(() => {
+          const rect = (s) => {
+            const el = document.querySelector(s);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            const hidden = el.hidden || cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0";
+            return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom, hidden };
+          };
+          return {
+            banner: rect("#banner"),
+            topbar: rect("#topbar"),
+            dims: rect("#dims"),
+            dimsDesktop: rect("#dims-desktop"),
+            menubtn: rect("#menubtn"),
+            coach: rect("#coach"),
+            optL: rect("#opt-left"),
+            optR: rect("#opt-right"),
+          };
+        });
+
+        assert.ok(data.banner && !data.banner.hidden, "Banner must be visible");
+
+        const intersects = (a, b) => {
+          if (!a || !b || a.hidden || b.hidden) return false;
+          const ix = Math.min(a.r, b.r) - Math.max(a.x, b.x);
+          const iy = Math.min(a.b, b.b) - Math.max(a.y, b.y);
+          return ix > 0 && iy > 0;
+        };
+
+        const boxStr = (o) => (o && !o.hidden ? `x${Math.round(o.x)}..${Math.round(o.r)} y${Math.round(o.y)}..${Math.round(o.b)}` : "(hidden)");
+
+        assert.ok(!intersects(data.banner, data.topbar), `Banner must not intersect #topbar: banner=${boxStr(data.banner)} topbar=${boxStr(data.topbar)}`);
+        assert.ok(!intersects(data.banner, data.dims), `Banner must not intersect #dims: banner=${boxStr(data.banner)} dims=${boxStr(data.dims)}`);
+        assert.ok(!intersects(data.banner, data.dimsDesktop), `Banner must not intersect #dims-desktop: banner=${boxStr(data.banner)} dimsDesktop=${boxStr(data.dimsDesktop)}`);
+        assert.ok(!intersects(data.banner, data.menubtn), `Banner must not intersect #menubtn: banner=${boxStr(data.banner)} menubtn=${boxStr(data.menubtn)}`);
+        assert.ok(!intersects(data.banner, data.coach), `Banner must not intersect #coach: banner=${boxStr(data.banner)} coach=${boxStr(data.coach)}`);
+        assert.ok(!intersects(data.banner, data.optL), `Banner must not intersect #opt-left: banner=${boxStr(data.banner)} optL=${boxStr(data.optL)}`);
+        assert.ok(!intersects(data.banner, data.optR), `Banner must not intersect #opt-right: banner=${boxStr(data.banner)} optR=${boxStr(data.optR)}`);
+
+        assert.deepEqual(errs, [], "No console/page errors");
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
 }

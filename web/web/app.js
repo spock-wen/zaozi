@@ -391,13 +391,26 @@ function syncGoalEvents() {
   ui.goalShown = ev.length;
   pumpBanner();                                        // 达成横幅先出，等它放完再进结局（A9/A12）
 }
+function placeBanner() {
+  const b = $("banner");
+  if (!b || b.hidden) return;
+  const view = document.body.dataset.view;
+  const dims = (view === "desktop" ? $("dims-desktop") : null) || $("dims");
+  const tb = $("topbar");
+  let baseBottom = tb ? tb.getBoundingClientRect().bottom : 0;
+  if (dims && dims.getBoundingClientRect().height > 0) {
+    baseBottom = Math.max(baseBottom, dims.getBoundingClientRect().bottom);
+  }
+  b.style.top = (baseBottom + 8) + "px";
+}
 function pumpBanner() {
   if (ui.bannerOn || ui.bannerQueue.length === 0) return;
   if (Object.keys(ui.floats).length) return;          // 等飘字结束再出（A12）
   const ev = ui.bannerQueue.shift();
   ui.bannerOn = true; sfx.goal();
   const b = $("banner"); b.textContent = ev.banner ?? ev.text; b.hidden = false;
-  setTimeout(() => { b.hidden = true; ui.bannerOn = false; pumpBanner(); render(); }, 1800);
+  placeBanner();
+  setTimeout(() => { b.hidden = true; b.style.top = ""; ui.bannerOn = false; pumpBanner(); render(); }, 1800);
 }
 function renderSprout() { /* 开春展开：每代第一张卡显示三件事，随后收起 */ }
 
@@ -924,6 +937,7 @@ function render() {
   renderGoalSlip(); renderGoalPanel();
   renderWinter(); renderPick(); renderElder(); renderEnded();
   renderKeys(); renderShort();
+  if (ui.bannerOn) placeBanner();
   if (st.phase !== "ended" && st.phase !== "pick" && st.phase !== "winter") $("endseq").hidden = true;
 }
 
