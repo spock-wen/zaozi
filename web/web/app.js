@@ -726,6 +726,11 @@ function cardEntryBusy() {
 function inputBusy() {
   return st.phase === "card" && (cardEntryBusy() || ui.keyQueue.length > 0 || ui.drainArmed);
 }
+// 刻字阶段的同一条规则：卡还在入场、或队列里还有没重放的项/挂起的重放时，K/S（骨片/先不刻同路）
+// 也先入队，等刻字卡落定并经历最短停留后再生效（M22：与出卡阶段的 inputBusy 一致，别抢在上一张卡的队列前头）。
+function carveBusy() {
+  return st.phase === "engrave" && (cardEntryBusy() || ui.keyQueue.length > 0 || ui.drainArmed);
+}
 // 等卡入场动画结束：先等 rAF 阶段，再等 CSS 过渡跑完（Promise.all(finished)），
 // 过渡对象还没建好的一帧用一次 transitionend 兜底。
 function whenCardEntryDone() {
@@ -1015,7 +1020,7 @@ addEventListener("keydown", (e) => {
     if (!e.repeat) enqueueInput({ kind: "key", key: e.key, code: e.code });  // 自动重复只拦默认，不入队
     return;
   }
-  if (st.phase === "engrave" && cardEntryBusy()) {
+  if (carveBusy()) {
     if (e.key === "Escape") { handleKey(e); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === INPUT.engrave.key) {
@@ -1117,25 +1122,16 @@ const drainStep = () => {
       return;
     }
     if (st.phase === "engrave") {
+      // 刻字阶段只认 K/S（骨片/先不刻同路）：队列里有 carve/skip 就执行第一个；排队攒下的
+      // ←/→/Enter/拖拽到这里只弹一次锁定提示。上一张卡飞出窗口里按的 K/S 不是出卡键、也不入队，
+      // 等这张刻字卡落定后直接生效；这之后再来的一律由 carveBusy 挡回队尾。
+      const item = ui.keyQueue.find((it) => it.kind === "carve" || it.kind === "skip") || null;
+      const hint = !item && ui.keyQueue.some((it) => it.kind === "press" || it.kind === "side" || it.kind === "key");
+      clearQueue();
       ui.drainArmed = false;
-      const item = ui.keyQueue.shift();
-      if (!item) return;
-      if (item.kind === "carve") {
-        ui.engraved = true;
-        dispatch({ type: "engrave", trace: st.pendingTrace.target });
-        clearQueue();
-      } else if (item.kind === "skip") {
-        dispatch(INPUT.engrave.skip);
-        clearQueue();
-      } else if (item.kind === "press" || item.kind === "side") {
-        toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
-        clearQueue();
-      } else if (item.kind === "key") {
-        applyQueued(item);
-        clearQueue();
-      } else {
-        clearQueue();
-      }
+      if (item && item.kind === "carve") { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
+      else if (item) dispatch(INPUT.engrave.skip);
+      else if (hint) toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
       return;
     }
     const item = ui.keyQueue.shift();
@@ -1269,13 +1265,13 @@ on($("wordbox"), (e) => {
 on($("card"), (e) => {
   const b = e.target.closest("[data-do]"); if (!b) return;
   if (b.dataset.do === "skip") {
-    if (st.phase === "engrave" && cardEntryBusy()) enqueueInput({ kind: "skip" });
+    if (carveBusy()) enqueueInput({ kind: "skip" });
     else dispatch({ type: "skip_engrave" });
   }
 });
 on($("bonecorner"), () => {
   if (st.phase === "engrave") {
-    if (cardEntryBusy()) enqueueInput({ kind: "carve" });
+    if (carveBusy()) enqueueInput({ kind: "carve" });
     else { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
   }
 });
