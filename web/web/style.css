@@ -36,7 +36,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 }
 #gen-line{font-size:13px;color:var(--paper-200);white-space:nowrap;}
 #topright{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;}
-#season-chip,#bones-chip{color:var(--gold-400);white-space:nowrap;}
+#season-chip,#bones-chip{color:var(--gold-400);white-space:nowrap;font-size:13px;}
+#bonesnum,#gennum{font-size:13px;}
 #menubtn{
   width:44px;height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;
   font-size:24px;line-height:1;border-radius:8px;margin-right:-4px;/* 距右 4 */
@@ -46,7 +47,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 /* 四维条：手机/平板单独一行（资源条下）；桌面在卡上方 */
 #dimrow{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:14px 16px 4px;}
 .dims{display:flex;gap:10px;align-items:flex-end;flex:1 1 auto;min-width:0;justify-content:space-between;}
-.dim{position:relative;flex:1 1 0;min-width:0;font-size:12px;}
+.dim{position:relative;flex:1 1 0;min-width:0;font-size:13px;}
 .dim .lbl{display:flex;justify-content:space-between;color:var(--paper-200);}
 .dim .bar{height:8px;border-radius:4px;background:var(--night-line);overflow:hidden;margin-top:2px;}
 .dim .fill{height:100%;width:100%;background:var(--gold-400);transform-origin:left center;transform:scaleX(.5);transition:transform 400ms cubic-bezier(.2,.8,.2,1);}
@@ -105,23 +106,23 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
   height:100%;background:var(--drag-fill);width:0%;
 }
 .card-drops{
-  position:absolute;left:16px;right:16px;bottom:16px;height:56px;border:1px dashed var(--bone-crack);
-  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#7a6a4e;
+  position:absolute;left:16px;right:16px;bottom:16px;height:56px;border:1px dashed var(--night-line);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ink);
 }
-.card-drops .chiplink{color:var(--zhu-600);font-weight:700;margin-left:6px;}
+.card-drops .chiplink{color:var(--zhu-600);font-weight:700;margin-left:6px;font-size:13px;}
 
 /* 卡角骨片四态。z-index 让它恒在卡内正文（含 .card-head）之上，命中测试优先。 */
 .bonecorner{
   position:absolute;top:8px;right:8px;width:44px;height:44px;min-width:44px;min-height:44px;box-sizing:border-box;border-radius:10px;z-index:1;
   display:none;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--ink);
-  background:linear-gradient(var(--bone-100),var(--bone-200));border:1px solid var(--bone-crack);
+  background:linear-gradient(var(--bone-100),var(--bone-200));border:1.5px solid var(--zhu-600);
   transition:transform 120ms ease-out,box-shadow 120ms ease-out;
 }
 .card.engrave .bonecorner{display:flex;}
 .bonecorner:active{transform:scale(.92);box-shadow:0 0 0 3px rgba(181,67,46,.45);}
 .bonecorner.done{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);pointer-events:none;}
 .card.engrave .bonecorner:not(.done):hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.3);border-color:var(--zhu-600);}
-.bone-hint{position:absolute;top:14px;right:58px;font-size:12px;color:var(--zhu-600);background:var(--paper-100);padding:2px 6px;border-radius:6px;display:none;}
+.bone-hint{position:absolute;top:14px;right:58px;font-size:13px;color:var(--zhu-600);background:var(--paper-100);padding:2px 6px;border-radius:6px;display:none;}
 .card.engrave .bone-hint{display:block;}
 
 /* 左右选项 */
@@ -135,7 +136,7 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 .optbtn[data-ready]{background:var(--zhu-600);color:var(--paper-50);box-shadow:0 0 0 2px var(--paper-50);}
 .optbtn:disabled{background:transparent;color:var(--paper-200);border:1px dashed var(--bone-crack);cursor:not-allowed;visibility:hidden;}
 
-#gesture-hint{font-size:12px;color:var(--muted);text-align:center;min-height:16px;}
+#gesture-hint{font-size:13px;color:var(--paper-200);text-align:center;min-height:16px;}
 
 /* 教学气泡 */
 #coachcol{display:none;}
@@ -168,8 +169,8 @@ body[data-view="mobile"] .card.engrave .card-drops{white-space:normal;overflow-w
 body[data-view="mobile"] .card-drops .act[data-do="skip"],
 body[data-view="tablet-portrait"] .card-drops .act[data-do="skip"]{flex-shrink:0;min-height:44px;min-width:44px;box-sizing:border-box;padding:0 12px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;}
 body[data-view="mobile"] .slot img{width:24px;height:24px;}
-body[data-view="mobile"] .slot span{font-size:10px;line-height:1.1;text-align:center;}
-body[data-view="mobile"] .slot.used span{font-size:9px;line-height:10px;max-width:100%;overflow-wrap:anywhere;}
+body[data-view="mobile"] .slot span{font-size:13px;line-height:15px;text-align:center;}
+body[data-view="mobile"] .slot.used span{font-size:13px;line-height:15px;white-space:nowrap;}
 body[data-view="mobile"] .optbtn,body[data-view="tablet-portrait"] .optbtn{
   width:100%;height:54px;min-height:54px;padding:0 8px;
   font-size:15px;line-height:20px;
@@ -179,13 +180,13 @@ body[data-view="mobile"] .optbtn,body[data-view="tablet-portrait"] .optbtn{
 body[data-view="mobile"] .optbtn:disabled,body[data-view="tablet-portrait"] .optbtn:disabled{visibility:hidden;}
 body[data-view="mobile"] #opt-left,body[data-view="tablet-portrait"] #opt-left{grid-area:l;}
 body[data-view="mobile"] #opt-right,body[data-view="tablet-portrait"] #opt-right{grid-area:r;}
-body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;}
+body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;min-height:60px;}
 body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-width:none;}
 #coach{
   max-width:320px;background:var(--paper-100);color:var(--ink);border-radius:12px;padding:10px 12px;
   font-size:14px;line-height:20px;box-shadow:0 4px 12px rgba(0,0,0,.3);pointer-events:none;
 }
-#coach .coach-keys{display:block;margin-top:4px;font-size:12px;color:#7a6a4e;}
+#coach .coach-keys{display:block;margin-top:4px;font-size:13px;color:var(--ink);}
 
 /* ---------- 字匣 ---------- */
 #wordbox-bar{
@@ -193,19 +194,22 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
   border-radius:16px 16px 0 0;margin:0 8px;padding:6px 8px calc(10px + env(safe-area-inset-bottom));
   min-height:110px;
 }
-.wb-handle{width:36px;height:4px;border-radius:2px;background:var(--night-line);margin:2px auto 8px;}
+.wb-handle{position:relative;width:36px;height:4px;border-radius:2px;background:var(--bone-crack);margin:2px auto 8px;box-sizing:border-box;}
+.wb-handle::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:48px;height:44px;}
 #wordbox{display:flex;gap:8px;justify-content:center;align-items:center;min-height:52px;}
 .slot{
-  width:52px;height:52px;border-radius:10px;border:1px solid var(--night-line);background:var(--night-700);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--paper-200);
+  width:auto;min-width:52px;height:52px;border-radius:10px;border:1px solid var(--bone-crack);background:var(--night-700);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 8px;font-size:13px;color:var(--paper-200);box-sizing:border-box;
 }
-.slot img{width:30px;height:30px;background:var(--paper-100);border-radius:4px;}
+.slot img{width:24px;height:24px;background:var(--paper-100);border-radius:4px;flex-shrink:0;}
+.slot span{font-size:13px;line-height:15px;white-space:nowrap;text-align:center;}
 .slot.ok{border-color:var(--gold-400);box-shadow:0 0 0 2px rgba(216,180,106,.5);animation:breathe 1200ms ease-in-out 2;}
-.slot.used{opacity:.35;text-decoration:line-through;}
+.slot.used{border-color:var(--bone-crack);color:var(--paper-200);text-decoration:line-through;}
+.slot.used span{font-size:13px;line-height:15px;white-space:nowrap;}
 @keyframes breathe{0%,100%{box-shadow:0 0 0 2px rgba(216,180,106,.25)}50%{box-shadow:0 0 0 3px rgba(216,180,106,.8)}}
 
 /* ---------- 底部键位行（桌面；平板接了键鼠也显） ---------- */
-#keys{display:none;flex:0 0 auto;padding:6px 16px;font-size:12px;color:var(--muted);text-align:center;}
+#keys{display:none;flex:0 0 auto;padding:6px 16px;font-size:13px;color:var(--paper-200);text-align:center;}
 /* BREAKPOINTS：平板竖屏「接了键盘（pointer:fine）才显键位行」、平板横屏「有键盘显键位」。
    手机档（<600）设计上一律「不显键位」；触控设备（非 pointer:fine）也不显——两者都保持原样。 */
 @media (hover:hover) and (pointer:fine){

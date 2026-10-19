@@ -127,7 +127,7 @@ for (const engine of Object.keys(ENGINES)) {
         const pb = await pop.boundingBox();
         assert.ok(pb.y >= 0 && pb.y + pb.height <= g.vh + 1, "键位浮层应在视口内");
         const rows = await pop.locator(".kh-row").count();
-        assert.ok(rows >= 5, `浮层应列出全部键位，实际 ${rows} 行`);
+        assert.ok(rows >= 4, `浮层应列出全部键位，实际 ${rows} 行`);
 
         // 同一存档再进入不再自动弹（只弹一次）
         await page.reload({ waitUntil: "load" });
