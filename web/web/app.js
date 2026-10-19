@@ -402,10 +402,12 @@ function renderCard() {
   ol.disabled = or.disabled = st.phase !== "card";
   paintOpts();
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
-  setText($("gesture-hint"), keyboardMode()
-    ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
-    : "左右拖卡做选择 · 长按看分量");
+  const deskKeys = document.body.dataset.view === "desktop" && keyboardMode();
+  setText($("gesture-hint"), deskKeys ? "" : (keyboardMode()
+    ? ("←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量" + (boneAvailable() ? " · K 刻字" : ""))
+    : "左右拖卡做选择 · 长按看分量"));
 }
+function boneAvailable() { return st.phase === "engrave"; }
 function hasFinePointer() { return matchMedia("(hover:hover) and (pointer:fine)").matches; }
 // 键鼠文案与键位行：接了键鼠（pointer:fine）才用（BREAKPOINTS 平板竖/横「有键盘显键位」）；
 // 手机档（<600）设计上一律「不显键位」，保持触控文案。
@@ -703,20 +705,31 @@ function renderKeys() {
   const tier = document.body.dataset.short || "";
   const el = $("keys");
   if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
-  setText(el, tier === "A"
-    ? "←→选 1–3落字 Space分量 K/Enter刻"
-    : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层");
+  const bone = boneAvailable();
+  if (tier === "A") {
+    setText(el, bone
+      ? "←→选 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
+      : "←→选 · 1–3 落字 · 按住 Space 看分量");
+  } else {
+    setText(el, bone
+      ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
+      : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · Esc 关浮层");
+  }
 }
 // 矮屏 B 顶栏「?」浮层：列出全部键位。首次进入某存档自动弹一次（3 秒后收起）。
 function keyhelpHTML() {
-  return [
+  const rows = [
     ["← →", "选字；再按同向或 Enter 提交"],
+    ["Enter", "确认选择"],
     ["1–3", "落字"],
     ["Space", "按住看分量"],
-    ["K", "刻字（或点卡角骨片）"],
-    ["Enter", "刻"],
-    ["Esc", "关浮层"],
-  ].map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
+  ];
+  if (boneAvailable()) {
+    rows.push(["K", "刻字（或点卡角骨片）"]);
+    rows.push(["Enter", "刻"]);
+  }
+  rows.push(["Esc", "关浮层"]);
+  return rows.map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
 }
 // 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
 // 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。

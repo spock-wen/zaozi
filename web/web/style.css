@@ -389,10 +389,33 @@ body[data-view="desktop"] #sidebar.collapsed,body[data-view="tablet-landscape"] 
 body[data-view="desktop"] #dims-desktop{display:flex;width:480px;max-width:100%;justify-content:space-between;margin-bottom:4px;}
 body[data-view="desktop"] #dims-desktop .dim{flex:0 0 auto;width:110px;}
 body[data-view="desktop"] #gesture-hint{color:var(--night-line);}
+body[data-view="desktop"] #gesture-hint:empty{display:none;}
 /* 卡槽宽 = 卡高 × 328/468（同 tablet-landscape 注释）：让 #cardwrap 盒 = 卡盒，
    卡在槽内居中、字匣（居中在网格列）正好在卡下，矮屏 A/B 也沿用此比例。 */
-body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;aspect-ratio:328/468;}
-body[data-view="desktop"] .card{height:100%;width:auto;aspect-ratio:328/468;}
+body[data-view="desktop"] #cardwrap{height:468px;width:auto;aspect-ratio:328/468;max-width:480px;}
+body[data-view="desktop"] .card{
+  height:100%;width:auto;aspect-ratio:328/468;
+  display:flex;flex-direction:column;
+}
+body[data-view="desktop"] .card > *{flex:0 0 auto;}
+body[data-view="desktop"] .card-art{flex:0 1 auto;min-height:0;display:flex;justify-content:center;}
+body[data-view="desktop"] .card-art picture{height:100%;display:flex;justify-content:center;}
+body[data-view="desktop"] .card-art img{height:100%;max-height:100%;width:auto;max-width:100%;object-fit:contain;}
+body[data-view="desktop"] .card-drops{
+  position:static;margin-top:auto;flex:0 0 auto;height:auto;min-height:44px;
+}
+body[data-view="desktop"] .card.engrave .card-drops{
+  white-space:normal;overflow-wrap:anywhere;padding:6px 10px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+body[data-view="desktop"] .card-drops .act[data-do="skip"]{
+  flex-shrink:0;min-height:36px;padding:0 10px;font-size:12px;
+}
+body[data-view="desktop"] .slot img{width:24px;height:24px;}
+body[data-view="desktop"] .slot span{font-size:10px;line-height:1.1;text-align:center;}
+body[data-view="desktop"] .slot.used span{font-size:9px;line-height:10px;max-width:100%;overflow-wrap:anywhere;}
+body[data-view="desktop"] #log{font-size:14px;line-height:1.5;}
+body[data-view="desktop"] #log li{overflow-wrap:anywhere;}
 /* 桌面教学气泡沉到卡区底部右下：卡角「刻」在卡的右上，气泡在底部就不可能在
    任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
 body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}

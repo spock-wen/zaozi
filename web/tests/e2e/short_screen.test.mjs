@@ -79,7 +79,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         assert.notEqual(g.keysDisplay, "none", "A 档应显示键位行");
         assert.equal(Math.round(g.keys.h), 28, "A 档键位行应为一行 28");
-        assert.equal(g.keysText, "←→选 1–3落字 Space分量 K/Enter刻", "A 档键位行文案");
+        assert.equal(g.keysText, "←→选 · 1–3 落字 · 按住 Space 看分量", "A 档键位行文案（无骨片不显 K 刻字）");
         assert.ok(g.keys.bottom <= g.vh + 1, "键位行应在视口内");
         assert.ok(!intersect(g.card, g.wb) && !intersect(g.wb, g.keys) && !intersect(g.card, g.keys), "卡/字匣/键位行互不交叠");
 
