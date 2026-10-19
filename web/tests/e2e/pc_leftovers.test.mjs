@@ -30,12 +30,19 @@ const DESKTOP_SIZES = [
 async function waitSettled(page, condition) {
   if (condition) await page.waitForFunction(condition, null, { timeout: 10000 });
   else await page.waitForFunction(() => !!window.__zz && (window.__zz.st?.phase === "card" || window.__zz.st?.phase === "engrave"), null, { timeout: 10000 });
-  const hasMarker = await page.evaluate(() => "cardReady" in document.body.dataset);
-  if (hasMarker) {
-    await page.waitForFunction(() => document.body.dataset.cardReady === "1", null, { timeout: 5000 });
-  } else {
-    await page.waitForFunction(() => !window.__zz?.animating, null, { timeout: 5000 });
-  }
+  await page.waitForFunction(() => !window.__zz?.animating, null, { timeout: 5000 });
+  await page.waitForTimeout(300);
+}
+
+async function commitCard(page, dir) {
+  await page.waitForFunction(() => !window.__zz?.animating, null, { timeout: 5000 });
+  await page.waitForTimeout(200);
+  const k = dir === "left" ? "ArrowLeft" : "ArrowRight";
+  await page.keyboard.press(k);
+  await page.waitForTimeout(60);
+  await page.keyboard.press(k);
+  await page.waitForFunction(() => !window.__zz?.animating, null, { timeout: 5000 });
+  await page.waitForTimeout(400);
 }
 
 for (const [engine] of Object.entries(ENGINES)) {
@@ -71,13 +78,11 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.equal(carriersNoBone.length, 0, `No bone chip on T01: must not mention K 刻字/骨片, found in: ${carriersNoBone.join(", ")}`);
 
         // Real input to advance T01 -> T02 -> T03 (engrave phase)
-        await page.keyboard.press("ArrowLeft");
-        await page.keyboard.press("Enter");
-        await waitSettled(page, () => window.__zz.st?.current === "T02");
+        await commitCard(page, "left");
+        assert.equal(await page.evaluate(() => window.__zz.st?.current), "T02");
 
-        await page.keyboard.press("ArrowRight");
-        await page.keyboard.press("Enter");
-        await waitSettled(page, () => window.__zz.st?.phase === "engrave");
+        await commitCard(page, "right");
+        assert.equal(await page.evaluate(() => window.__zz.st?.phase), "engrave");
 
         // On T03: Bone chip is available (#bonecorner shown) -> K hint MUST be present and visible
         const kCheck = await page.evaluate(() => {
@@ -404,9 +409,8 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.equal(resK_T01["K 刻字"].length, 0, `On T01, 'K 刻字' must appear in 0 visible elements`);
 
         // Advance to T02 (normal card, coach hidden)
-        await page.keyboard.press("ArrowLeft");
-        await page.keyboard.press("Enter");
-        await waitSettled(page, () => window.__zz.st?.current === "T02");
+        await commitCard(page, "left");
+        assert.equal(await page.evaluate(() => window.__zz.st?.current), "T02");
 
         const segsT02 = ["1–3 落字", "按住 Space 看分量"];
         const resT02 = await checkHintUniqueness("T02", segsT02);
@@ -421,9 +425,8 @@ for (const [engine] of Object.entries(ENGINES)) {
         }
 
         // Advance to T03 (engrave state, bone chip available)
-        await page.keyboard.press("ArrowRight");
-        await page.keyboard.press("Enter");
-        await waitSettled(page, () => window.__zz.st?.phase === "engrave");
+        await commitCard(page, "right");
+        assert.equal(await page.evaluate(() => window.__zz.st?.phase), "engrave");
 
         const segsT03 = ["1–3 落字", "按住 Space 看分量", "K 刻字"];
         const resT03 = await checkHintUniqueness("T03", segsT03);
