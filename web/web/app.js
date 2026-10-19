@@ -237,17 +237,19 @@ function clearToast() {
   }
   clearTimeout(toast._t);
 }
-// N1 重复点按过滤器的状态（判定函数 n1RepeatTap 在 bindOpt 上方）。
-// lastOptTap 记「上一次真的点在某个选项上的点按」——不管它后来是被提交、被 inputBusy 挡下，
-// 还是被 N1 自己吞掉，都刷新，这样连点的第二、第三下都归它管。
-let lastOptTap = { side: null, x: 0, y: 0, t: 0 };
+// N1（R05，PM U1 裁定 + P1）的状态（判定函数 n1RepeatTap 在 bindOpt 上方）。
+// n1Ref 只记「用户直接点选项按钮、当下启动的那次飞卡」的那一下落点；它挂着（这次飞卡还没结束）
+// 时，同一选项上落点 ≤10px 的点按整次吞掉——不提交、不入队。**没有时间窗**（70ms 已删）。
+// 键盘（←/→/Enter/1–3）、拖拽松手、点字格、队列项启动的飞卡都不设参照点（P1、P1 补），
+// 途中点选项一律按 R06 走。
+let n1Ref = null;                // { side, x, y } | null：当前这次飞卡的 N1 参照点
 let n1Swallowed = 0;             // 被 N1 吞掉的点按数（调试计数，window.__zz.n1Swallowed）
 let n1Reason = null;             // 最后一次吞掉的原因（window.__zz.n1Reason），供用例区分「N1 吞的」与「inputBusy 挡的」
 function resetInputState() {
   clearToast();
   clearTimeout(ui.holdT);
   n1Swallowed = 0; n1Reason = null;
-  lastOptTap = { side: null, x: 0, y: 0, t: 0 };
+  n1Ref = null;
   ui.dragging = false; ui.dragged = false; ui.hold = false; ui.kbDir = null; ui.animating = false; ui.dx = 0;
   const c = cardEl();
   if (c) {
@@ -1077,6 +1079,7 @@ function rebound() {
 }
 function flyOut(targetX, done) {
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
+  n1Ref = null;                   // 新一次飞出：上一次飞卡的 N1 参照点作废（键盘/拖拽启动的也没有参照点）
   cardSettling = true;
   setCardSettled(false);
   paintOpts();
@@ -1087,6 +1090,7 @@ function flyOut(targetX, done) {
       cardEl().style.opacity = "";
       done();
       cardSettling = false;
+      n1Ref = null;               // 这次飞卡结束：N1 不再管随后的点按
       setCardSettled(true);
       renderShort();
     }, 120);
@@ -1106,6 +1110,7 @@ function flyOut(targetX, done) {
       requestAnimationFrame(() => {
         whenCardEntryDone().then(() => {
           cardSettling = false;
+          n1Ref = null;           // 这次飞卡（含落定回位）结束：N1 不再管随后的点按
           setCardSettled(true);
           renderShort();
         });
@@ -1166,12 +1171,14 @@ addEventListener("keydown", (e) => {
   } else if (st.phase === "winter" && e.key === "Enter") { e.preventDefault(); winterCarve(); }
 });
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
+// 返回是否真的起了飞卡（inputBusy 时不起飞，返回 false）——选项点按要靠它决定是否给 N1 设参照点。
 function commitSide(dir) {
-  if (inputBusy()) return;
+  if (inputBusy()) return false;
   ui.animating = true;
   flyOut((dir === "left" ? -1 : 1) * 620, () => {
     dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action);
   });
+  return true;
 }
 
 // ---------- 事件绑定 ----------
@@ -1235,23 +1242,21 @@ on($("bonecorner"), () => { if (st.phase === "engrave") { clearToast(); ui.engra
 // 在 pointerup 上若未起拖且仍在按钮内，即提交；随后的 click 借时间窗口去重，确保仅触发一次。
 let lastOptPointerCommit = { side: null, at: 0 };
 let optPress = null;
-// N1 (Q5=B): same option ≤10px ≤70ms → swallow.
-// 卡飞出过程中的「同一个选项按钮上、离上一次点按 ≤10px 且间隔 ≤70ms」的第二次点按是重复点击
-// （手指双击/回弹），整次吞掉：不提交、也不入队。故意做得很窄——点在另一个选项上、
-// 同选项但偏离 >10px、或间隔 >70ms，都不归它管，照原路走（本分支上仍由 inputBusy() 的
-// 飞出闭锁挡下；inputBusy 与 S-1 的 pointerup+700ms 去重语义都不动）。
-// 兼容方向（designer §10，稍后落地，不是现在）：飞出过程中的输入将改为「按下即入队」，
-// 进刻字阶段再按 K/S 跑队列、箭头只显示一次闭锁提示，队列不丢弃。所以这里刻意只做一道
-// 纯过滤器——只看「这一按是不是重复」，没有任何丢弃/入队逻辑；将来队列拿到的就是 N1 没吞掉的每一次点按。
-const N1_MAX_DIST = 10, N1_MAX_MS = 70;
+// N1（R05 / Q5=B，PM U1 裁定）：**飞卡途中**，同一个选项上、落点离「启动这次飞卡的那一下」
+// ≤10px 的点按整次吞掉——不提交、不入队。**没有时间窗**（70ms 已删）：只要这次飞卡还没结束，
+// 同选项 ≤10px 的每一下都吞。参照点 n1Ref 只由「用户直接点选项按钮、当下起飞」的那一下设置
+// （见 bindOpt 里的 n1Arm）：键盘（←/→/Enter/1–3）、拖拽松手、点字格、队列项启动的飞卡
+// 没有参照点，途中点选项一律按 R06 走（PM P1、P1 补）。
+// 本分支没有输入队列（PR9 才有，R20）：N1 只是一道**纯过滤器**，没有任何丢弃/入队逻辑，
+// 放在 hit / inputBusy() 之前；合并后队列拿到的就是 N1 没吞掉的每一次点按。
+const N1_MAX_DIST = 10;
+function n1Arm(side, x, y) { n1Ref = { side, x, y }; }      // 只有「直接点选项且真的起飞」才调
 function n1RepeatTap(side, x, y) {
-  const now = performance.now();
-  const dt = now - lastOptTap.t, d = Math.hypot(x - lastOptTap.x, y - lastOptTap.y);
-  const repeat = lastOptTap.side === side && dt <= N1_MAX_MS && d <= N1_MAX_DIST;
-  lastOptTap = { side, x, y, t: now };
-  if (!repeat) return false;
+  if (!n1Ref || n1Ref.side !== side) return false;          // 没有参照点（不是点选项起的飞卡）→ 不吞
+  const d = Math.hypot(x - n1Ref.x, y - n1Ref.y);
+  if (d > N1_MAX_DIST) return false;                        // 另一处落点 → 不吞
   n1Swallowed++;
-  n1Reason = `n1:same-option d=${d.toFixed(1)}px dt=${Math.round(dt)}ms`;
+  n1Reason = `n1:same-option d=${d.toFixed(1)}px`;
   return true;
 }
 function bindOpt(id, side) {
@@ -1280,18 +1285,20 @@ function bindOpt(id, side) {
     if (!hit) return;
     if (inputBusy()) return;
     lastOptPointerCommit = { side, at: performance.now() };
-    commitSide(side);
+    if (commitSide(side)) n1Arm(side, press.x, press.y);   // 这一下真的起了飞卡：N1 从这一刻盯同选项 ≤10px
   });
   el.addEventListener("pointercancel", (e) => {
     if (optPress && optPress.id === e.pointerId) optPress = null;
   });
-  on(el, () => {
+  on(el, (e) => {
     const now = performance.now();
     if (lastOptPointerCommit.side === side && (now - lastOptPointerCommit.at) < 700) {
       lastOptPointerCommit = { side: null, at: 0 };
       return;
     }
-    commitSide(side);
+    // pointerup 没赶上（S-1：WebKit 跨重绘不合成 click 的同类反例）时，click 自己提交；
+    // 它也是一次「直接点选项」，照设参照点（没有坐标的合成 click 传 0,0，量不出距离就不会误吞）。
+    if (commitSide(side)) n1Arm(side, e.clientX || 0, e.clientY || 0);
   });
 }
 bindOpt("opt-left", "left");
@@ -1411,8 +1418,10 @@ window.__zz = {
   get view() { return document.body.dataset.view; },
   get short() { return document.body.dataset.short || ""; },
   get animating() { return ui.animating; },
+  get busy() { return inputBusy(); },          // 当前是否处在飞卡/入场闭锁中（供用例判断「还在飞出途中」）
   get n1Swallowed() { return n1Swallowed; },   // N1 重复点按过滤器吞掉的次数（见 n1RepeatTap）
   get n1Reason() { return n1Reason; },         // 最后一次被 N1 吞掉的原因，供用例区分 N1 与 inputBusy
+  get n1Ref() { return n1Ref ? { ...n1Ref } : null; },   // 当前这次飞卡的 N1 参照点（null = N1 不生效）
   get debugGoal() { return DEBUG_GOAL; },
   dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
