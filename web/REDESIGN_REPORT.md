@@ -285,12 +285,12 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - 第 8 轮（工程审核 r7 @fb1439a 退回，P1×1 P2×2 P3×6；2026-10-19 UTC+8）：
   - P1-1 工具记录：第 7 轮 PR 描述里「cc 的产出没有进分支」「全部由 agy 完成」不实。cddd03d 是 cc（step-5-preview）的 app.js 改动；3f0fca8、de2baad 里有 cc 草稿的原样行（经 agy 带入）；另查出第 6 轮 313b18b 也含 cc 写的 P3-2 测试段。逐提交表见 PR 描述「CLI/模型」与 pstack_trail/r7/CLI_PER_COMMIT.md，更正说明 r7/P1-1_correction.md。
   - P2-1：飞出中途重新开局 / 导入时，dispatch 结尾那句 `ui.kbDir = null; ui.preview = false` 被 epoch 跳过，新局 T01 继承旧局的 ← 预览（#opt-left 高亮，第一次 ← 直接提交）。修：resetCardMotion() 同时清 kbDir / preview 和左右选项的 .on；restore() 末尾补一次 render()。e2e flyout_reset_preview（3 引擎 × 重新开局 / 导入）：去掉这次清理 6/6 挂，修后 6/6 过。
-  - P3-1：flyout_reset_touch 加逐帧 transform 采样（M1 飞出中重新开局、M2 飞出中导入、M3 回弹中重新开局、M4 飞出中 __zz.restore）。去掉 flyOut tick 的 epoch 早退：M1/M2 3 引擎 6 条挂；去掉 rebound tick 的：M3 3 条挂（残留 15–17 帧位移）；restore 里去掉 resetCardMotion()：M4 3 条挂。hideToast / clearQueue 对调是**等价变异**：两者之间（clearQueue、epoch++、resetCardMotion，含 reduced-motion 下 rebound 同步调的 render）没有任何代码会同步弹 toast，render 不弹 toast，所以对调后状态完全相同，不写假测试；去掉任一个的变异仍各自被杀（见下「验证」）。
+  - P3-1：flyout_reset_touch 加逐帧 transform 采样（M1 飞出中重新开局、M2 飞出中导入、M3 回弹中重新开局、M4 飞出中 __zz.restore）。去掉 flyOut tick 的 epoch 早退：M1/M2 3 引擎 6 条挂；去掉 rebound tick 的：M3 3 条挂（残留 15–17 帧位移）；restore 里去掉 resetCardMotion()：M4 3 条挂。hideToast / clearQueue 对调是**等价变异**：两者之间（clearQueue、epoch++、resetCardMotion，含 reduced-motion 下 rebound 同步调的 render）没有任何代码会同步弹 toast，render 不弹 toast，所以对调后状态完全相同，不写假测试；去掉任一个的变异仍各自被杀：去掉 newGame + importCode 的 hideToast，toast_reset 18 条挂；去掉 clearQueue，flyout_reset_q 6 条挂；对调后 flyout_reset_q + flyout_reset_touch 36/36、toast_reset 27/27 全过。
   - P3-2：D6 第二次点骨片改在落定 + 100ms（两帧 rAF 的 drainArmed 窗口之后、250ms 停留之内）。只去掉 carveBusy 里的「看队列长度」：D6 在 chromium / firefox / webkit 都挂。
   - P3-3：刻字卡键位行「K/Enter刻」改为「K刻」（Enter 在刻字阶段弹锁定提示，Q9）；键位浮层把「Enter 刻」换成「S 先不刻」。hints_by_phase 加 390×844 / 360×800 / 1280×720 不宣称 Enter 刻、文本不溢出的断言。
   - P3-4：flyout_qa 去掉没用到的 settledAt 采集，文件头注释改为指向独立记录器 window.__settles。
   - P3-5：起拖预算仍是 320ms，只按页面自己的中位 rAF 间隔放大（320 × max(1, 中位/16.67)），≤3 帧的结构断言保留。帧时钟正常时预算就是 320ms；人为加的固定延迟不改变帧间隔，照样被抓。干净 30/30 ×2；4 个 CPU 占满时 30/30（webkit 原始 323ms、中位 17.0ms → 预算 326ms）；重放起拖推迟 150ms 的变异 6/6 挂。
   - P2-2：和 fix/web-mobile-next（29933da）的冲突点更新在 PR 描述里，本 PR 不处理。P3-6（toast 位置）归 PR10。
   - VERSION 597aa0d3a640（干净树构建两次一致）。
-  - 验证：单测、全量 3 引擎 e2e 计数见下一条提交。
+  - 验证：单测 35/35；全量 3 引擎串行 e2e 650/650、0 跳过（07cac3d，10/19 21:04:41–21:51:13 UTC+8）；之后只改本报告。coder 在独立 worktree（6d0eb61）复核了全部变异，见 pstack_trail/r8/verify/summary.txt。
 
