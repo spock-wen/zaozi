@@ -501,7 +501,14 @@ for (const [engine] of Object.entries(ENGINES)) {
 
       // Wait for automatic reload after controllerchange
       await page.waitForFunction(() => !!sessionStorage.getItem("zz_sw_reloaded"), null, { timeout: 10000 });
-      await page.waitForFunction(() => document.body.dataset.cardReady === "1");
+      if (navCount < 2) {
+        await page.waitForEvent("framenavigated", {
+          predicate: (f) => f === page.mainFrame(),
+          timeout: 5000,
+        }).catch(() => {});
+      }
+      await page.waitForLoadState("load");
+      await page.waitForFunction(() => document.body.dataset.cardReady === "1", null, { timeout: 10000 });
 
       const finalActions = await page.evaluate(() => window.__zz.actions.length);
       assert.equal(finalActions, 2, "Save must be intact with action count 2");

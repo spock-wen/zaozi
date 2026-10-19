@@ -198,17 +198,30 @@ function artHTML(card) {
 function toast(m) {
   const t = $("toast");
   const view = document.body.dataset.view;
-  const dims = $("dims");
-  if ((view === "mobile" || view === "tablet-portrait") && dims) {
-    const dr = dims.getBoundingClientRect();
-    t.style.top = (dr.bottom + 8) + "px";
-    t.style.bottom = "auto";
+  const dims = (view === "desktop" ? $("dims-desktop") : null) || $("dims");
+  const bc = $("bonecorner");
+  const bcShown = bc && !bc.hidden && getComputedStyle(bc).display !== "none";
+
+  let top = 60;
+  if (dims && dims.getBoundingClientRect().height > 0) {
+    top = dims.getBoundingClientRect().bottom + 8;
   } else {
-    t.style.top = "";
-    t.style.bottom = "";
+    const tb = $("topbar");
+    if (tb) top = tb.getBoundingClientRect().bottom + 8;
   }
-  t.textContent = m; t.classList.add("on");
-  clearTimeout(toast._t); toast._t = setTimeout(() => {
+  if (bcShown) {
+    const bcr = bc.getBoundingClientRect();
+    if (top < bcr.bottom + 8 && top + 42 > bcr.top) {
+      top = bcr.bottom + 8;
+    }
+  }
+
+  t.style.top = top + "px";
+  t.style.bottom = "auto";
+  t.textContent = m;
+  t.classList.add("on");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => {
     t.classList.remove("on");
     t.style.top = "";
     t.style.bottom = "";

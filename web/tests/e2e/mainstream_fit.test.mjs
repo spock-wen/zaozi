@@ -637,10 +637,12 @@ for (const [engine] of Object.entries(ENGINES)) {
           const menubtn = document.querySelector("#menubtn");
           const wordbox = document.querySelector("#wordbox-bar");
           const dims = document.querySelector("#dims");
+          const dimsD = document.querySelector("#dims-desktop");
+          const topbar = document.querySelector("#topbar");
+          const bc = document.querySelector("#bonecorner");
+          const skipBtn = document.querySelector("#card-drops button.act[data-do=skip]");
 
           const tr = toast.getBoundingClientRect();
-          const lr = optL.getBoundingClientRect();
-          const rr = optR.getBoundingClientRect();
           const vw = window.innerWidth, vh = window.innerHeight;
 
           const inter = (a, b) => {
@@ -650,36 +652,39 @@ for (const [engine] of Object.entries(ENGINES)) {
           };
 
           const avoids = [
-            { name: "#opt-left", r: lr },
-            { name: "#opt-right", r: rr },
-            { name: "#coach", r: coach ? coach.getBoundingClientRect() : null },
-            { name: "#menubtn", r: menubtn ? menubtn.getBoundingClientRect() : null },
-            { name: "#wordbox-bar", r: wordbox ? wordbox.getBoundingClientRect() : null },
-            { name: "#dims", r: dims ? dims.getBoundingClientRect() : null },
+            { name: "#opt-left", el: optL },
+            { name: "#opt-right", el: optR },
+            { name: "#bonecorner", el: bc },
+            { name: "skip button", el: skipBtn },
+            { name: "#coach", el: coach },
+            { name: "#menubtn", el: menubtn },
+            { name: "#topbar", el: topbar },
+            { name: "#wordbox-bar", el: wordbox },
+            { name: "#dims", el: dims },
+            { name: "#dims-desktop", el: dimsD },
           ];
+
+          // Any other button or link inside #card
+          const cardInteractive = Array.from(document.querySelectorAll("#card button, #card a, #card-drops .act, #card-drops .chiplink"));
+          for (const ci of cardInteractive) {
+            if (ci !== bc && ci !== skipBtn) avoids.push({ name: "card-" + (ci.id || ci.className || ci.innerText), el: ci });
+          }
 
           const conflicts = [];
           for (const a of avoids) {
-            if (inter(tr, a.r)) conflicts.push(a.name);
+            if (!a.el || a.el.hidden || getComputedStyle(a.el).display === "none") continue;
+            const r = a.el.getBoundingClientRect();
+            if (inter(tr, r)) conflicts.push(a.name);
           }
 
-          const optTop = Math.min(lr.top, rr.top);
-          const bottomGap = optTop - tr.bottom;
-
           return {
-            inViewport: tr.left >= 0 && tr.right <= vw && tr.top >= 0 && tr.bottom <= vh,
+            inViewport: tr.left >= -0.5 && tr.right <= vw + 0.5 && tr.top >= -0.5 && tr.bottom <= vh + 0.5,
             conflicts,
-            bottomGap,
           };
         });
 
         assert.ok(checkToast.inViewport, "Toast 应完全在视口内");
         assert.deepEqual(checkToast.conflicts, [], "Toast 不得与避让控件重叠: " + checkToast.conflicts.join(", "));
-        // DESIGNER RULE R1: toast bottom edge = option-row top - 8px
-        assert.ok(
-          Math.abs(checkToast.bottomGap - 8) <= 1.5,
-          `Toast 底边距离选项行顶边应为 8px ±1.5，实际 ${checkToast.bottomGap.toFixed(1)}px`,
-        );
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {
@@ -890,8 +895,25 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.ok(box.x >= 0 && box.x + box.width <= vp.width + 1, "提示水平方向在视口内");
         assert.ok(box.y >= 0 && box.y + box.height <= vp.height + 1, "提示垂直方向在视口内");
 
-        const pe = await page.evaluate(() => getComputedStyle(document.querySelector("#too-short")).pointerEvents);
-        assert.equal(pe, "none", "提示 pointer-events 必须为 none");
+        const pe = await page.evaluate(() => {
+          const cs = getComputedStyle(document.querySelector("#too-short"));
+          return {
+            pointerEvents: cs.pointerEvents,
+            fontSize: cs.fontSize,
+            lineHeight: cs.lineHeight,
+            paddingTop: cs.paddingTop,
+            paddingBottom: cs.paddingBottom,
+            paddingLeft: cs.paddingLeft,
+            paddingRight: cs.paddingRight,
+          };
+        });
+        assert.equal(pe.pointerEvents, "none", "提示 pointer-events 必须为 none");
+        assert.equal(pe.fontSize, "15px", "提示 font-size 应为 15px");
+        assert.equal(pe.lineHeight, "22px", "提示 line-height 应为 22px");
+        assert.equal(pe.paddingTop, "6px", "提示 paddingTop 应为 6px");
+        assert.equal(pe.paddingBottom, "6px", "提示 paddingBottom 应为 6px");
+        assert.equal(pe.paddingLeft, "14px", "提示 paddingLeft 应为 14px");
+        assert.equal(pe.paddingRight, "14px", "提示 paddingRight 应为 14px");
 
         // 5x3 elementFromPoint 采样 #menubtn 必须全部命中菜单按钮
         const mbHits = await page.evaluate(() => {

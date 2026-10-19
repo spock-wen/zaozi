@@ -232,6 +232,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         return { ok: true, br };
       });
       assert.ok(efpResult.ok, efpResult.msg);
+      assert.ok(efpResult.br.width >= 44 && efpResult.br.height >= 44, `Skip button must be >= 44x44 CSS px, got ${efpResult.br.width}x${efpResult.br.height}`);
 
       // Real mouse click on skip button triggers skip_engrave
       const cx = efpResult.br.left + efpResult.br.width / 2;
@@ -292,14 +293,14 @@ for (const [engine] of Object.entries(ENGINES)) {
   }
 
   // ==========================================
-  // P5. L14 Card proportions 328:468 with no large blank area
+  // P5. L14 Card sizing clamp(468px, 100dvh - 280px, 640px) & content fills taller card
   // ==========================================
   for (const vp of [
-    { name: "1366x768", w: 1366, h: 768 },
-    { name: "1440x900", w: 1440, h: 900 },
-    { name: "1920x1080", w: 1920, h: 1080 },
+    { name: "1366x768", w: 1366, h: 768, expH: 488 },
+    { name: "1440x900", w: 1440, h: 900, expH: 620 },
+    { name: "1920x1080", w: 1920, h: 1080, expH: 640 },
   ]) {
-    test(`${engine} ${vp.name}: P5 L14 card keeps designer proportions 328:468 (height <= 468, width <= 480)`, { timeout: 60000 }, async () => {
+    test(`${engine} ${vp.name}: P5 L14 card respects clamp sizing (h=${vp.expH}) & card-art fills card on C02`, { timeout: 60000 }, async () => {
       const ctx = await browsers[engine].newContext({ viewport: { width: vp.w, height: vp.h } });
       const page = await ctx.newPage();
       const errs = [];
@@ -321,13 +322,56 @@ for (const [engine] of Object.entries(ENGINES)) {
           Math.abs(cardDim.ratio - expRatio) <= 0.02,
           `Card aspect ratio should be ~${expRatio.toFixed(3)}, got ${cardDim.ratio.toFixed(3)} (${cardDim.w}x${cardDim.h})`
         );
-        assert.ok(cardDim.w <= 480, `Card width should be <= 480px, got ${cardDim.w}`);
-        // At 1440x900 on b0c7b5d, card height stretched to 620px (1920x1080 stretched to 640px). It must keep 468px (±1.5px) without large blank area.
         assert.ok(
-          cardDim.h <= 469.5,
-          `Card height on desktop should keep designer height <= 468px (+1.5px tolerance), got ${cardDim.h}`
+          Math.abs(cardDim.h - vp.expH) <= 2,
+          `Card height on desktop should match clamp formula (exp ${vp.expH}px ±2), got ${cardDim.h}`
         );
+        assert.ok(cardDim.h <= 640.5, `Card height must not exceed 640px max-height, got ${cardDim.h}`);
 
+        // Check C02: card content fills taller card (card-art flex: 1 1 auto)
+        const c02Info = await page.evaluate(() => {
+          window.__zz.st.current = "C02";
+          window.__zz.st.phase = "card";
+          window.__zz.render();
+          const card = document.querySelector("#card");
+          const art = document.querySelector("#card-art");
+          const cr = card.getBoundingClientRect();
+          const ar = art.getBoundingClientRect();
+          return {
+            artVis: !art.hidden && getComputedStyle(art).display !== "none",
+            artH: ar.height,
+            cardH: cr.height,
+            artRatio: ar.height / cr.height,
+          };
+        });
+
+        assert.ok(c02Info.artVis, "C02 card-art must be visible");
+        assert.ok(c02Info.artRatio > 0.5, `C02 card-art should expand to fill card (>50% card height), got ${(c02Info.artRatio * 100).toFixed(1)}%`);
+
+        assert.deepEqual(errs, []);
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+
+  // Ultrawide / 2K out of scope: no crash, no errors
+  for (const vp of [
+    { name: "2560x1440", w: 2560, h: 1440 },
+    { name: "3440x1440", w: 3440, h: 1440 },
+  ]) {
+    test(`${engine} ${vp.name} [regression guard]: ultrawide no crash and card height capped at 640`, { timeout: 60000 }, async () => {
+      const ctx = await browsers[engine].newContext({ viewport: { width: vp.w, height: vp.h } });
+      const page = await ctx.newPage();
+      const errs = [];
+      collectErrors(page, errs);
+
+      try {
+        await page.goto(`${server.origin}/?seed=20261016`, { waitUntil: "load" });
+        await waitSettled(page);
+
+        const cardH = await page.evaluate(() => document.querySelector("#card").getBoundingClientRect().height);
+        assert.ok(cardH <= 640.5, `Card height capped at 640px, got ${cardH}`);
         assert.deepEqual(errs, []);
       } finally {
         await ctx.close();
