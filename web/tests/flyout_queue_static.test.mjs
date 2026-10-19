@@ -153,6 +153,7 @@ const EXPECTED_COMMITSIDE = {
 };
 
 const EXPECTED_DISPATCH = {
+  drainStep: 2,
   onUp: 2,
   commitSide: 1,
   handleKey: 5,

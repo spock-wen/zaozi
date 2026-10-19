@@ -1008,10 +1008,31 @@ addEventListener("keydown", (e) => {
       && !e.target.closest("#card, #wordbox, .optbtn")) return;
   if (inputBusy()) {
     if (e.key === "Escape" || e.code === "Space") { handleKey(e); return; }   // Esc/Space 保持原有即时行为
+    // K/S pressed during a fly-out are not card keys and are not queued (unchanged)
     const cardKey = e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter" || !!INPUT.card.keys[e.code];
     if (!cardKey || e.ctrlKey || e.metaKey || e.altKey) return;               // 其它键不排队、不拦、不处理
     e.preventDefault();
     if (!e.repeat) enqueueInput({ kind: "key", key: e.key, code: e.code });  // 自动重复只拦默认，不入队
+    return;
+  }
+  if (st.phase === "engrave" && cardEntryBusy()) {
+    if (e.key === "Escape") { handleKey(e); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === INPUT.engrave.key) {
+      e.preventDefault();
+      if (!e.repeat) enqueueInput({ kind: "carve" });
+      return;
+    }
+    if (e.code === "KeyS") {
+      e.preventDefault();
+      if (!e.repeat) enqueueInput({ kind: "skip" });
+      return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
+      e.preventDefault();
+      if (!e.repeat) enqueueInput({ kind: "key", key: e.key, code: e.code });
+      return;
+    }
     return;
   }
   handleKey(e);
@@ -1053,8 +1074,14 @@ function handleKey(e) {
     if (e.key === "Enter" && ui.kbDir) { e.preventDefault(); commitSide(ui.kbDir); return; }
     const a = INPUT.card.keys[e.code]; if (a && !e.repeat) { e.preventDefault(); dispatch(a); }
   } else if (st.phase === "engrave") {
-    if (e.code === INPUT.engrave.key) { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
-    else if (e.code === "KeyS") dispatch(INPUT.engrave.skip);
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
+      toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+    } else if (e.code === INPUT.engrave.key) {
+      ui.engraved = true;
+      dispatch({ type: "engrave", trace: st.pendingTrace.target });
+    } else if (e.code === "KeyS") {
+      dispatch(INPUT.engrave.skip);
+    }
   } else if (st.phase === "winter" && e.key === "Enter") { e.preventDefault(); winterCarve(); }
 }
 // 离散输入的排队与重放：唯一入队口 enqueueInput、唯一启动口 armDrain，逐项重放一次只放一个。
@@ -1093,7 +1120,14 @@ const drainStep = () => {
       ui.drainArmed = false;
       const item = ui.keyQueue.shift();
       if (!item) return;
-      if (item.kind === "press" || item.kind === "side") {
+      if (item.kind === "carve") {
+        ui.engraved = true;
+        dispatch({ type: "engrave", trace: st.pendingTrace.target });
+        clearQueue();
+      } else if (item.kind === "skip") {
+        dispatch(INPUT.engrave.skip);
+        clearQueue();
+      } else if (item.kind === "press" || item.kind === "side") {
         toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
         clearQueue();
       } else if (item.kind === "key") {
@@ -1232,8 +1266,19 @@ on($("wordbox"), (e) => {
   if (inputBusy()) enqueueInput({ kind: "drop", slot: Number(b.dataset.slot) });
   else dropSlot(Number(b.dataset.slot));
 });
-on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") dispatch({ type: "skip_engrave" }); });
-on($("bonecorner"), () => { if (st.phase === "engrave") { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
+on($("card"), (e) => {
+  const b = e.target.closest("[data-do]"); if (!b) return;
+  if (b.dataset.do === "skip") {
+    if (st.phase === "engrave" && cardEntryBusy()) enqueueInput({ kind: "skip" });
+    else dispatch({ type: "skip_engrave" });
+  }
+});
+on($("bonecorner"), () => {
+  if (st.phase === "engrave") {
+    if (cardEntryBusy()) enqueueInput({ kind: "carve" });
+    else { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
+  }
+});
 on($("opt-left"), () => { if (inputBusy()) enqueueInput({ kind: "side", dir: "left" }); else commitSide("left"); });
 on($("opt-right"), () => { if (inputBusy()) enqueueInput({ kind: "side", dir: "right" }); else commitSide("right"); });
 on($("winter"), (e) => {

@@ -233,4 +233,37 @@ for (const [engine] of Object.entries(ENGINES)) {
       await ctx.close();
     }
   });
+
+  test(`${engine} 1280: 飞出期间排队→→，卡落定后停留窗口内现场按←←，排队键必须先于现场键执行（M22）`, async (t) => {
+    const { ctx, page, errs } = await setup(engine);
+    try {
+      const a0 = await actionsLen(page);
+      await page.keyboard.press("ArrowLeft");
+      await page.keyboard.press("ArrowLeft");
+      await page.waitForTimeout(30);
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowRight");
+
+      await page.waitForFunction(() => {
+        const c = document.getElementById("card");
+        return !window.__zz.animating && !c.getAnimations().some((a) => a.playState === "running") && c.style.transform === "";
+      }, null, { timeout: 3000, polling: 5 });
+
+      await page.waitForTimeout(80);
+      await page.keyboard.press("ArrowLeft");
+      await page.keyboard.press("ArrowLeft");
+      await settle(page);
+
+      const newActions = await page.evaluate((n0) => window.__zz.actions.slice(n0).map((a) => a.side || a.type), a0);
+      t.diagnostic(`动作序列: ${JSON.stringify(newActions)}`);
+      assert.deepEqual(
+        newActions,
+        ["left", "right", "left"],
+        `排队的 →→ 必须在现场 ←← 之前执行（现场输入在队列非空时必须排在队尾），实测序列: ${JSON.stringify(newActions)}`
+      );
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
 }
