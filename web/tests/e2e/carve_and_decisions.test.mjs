@@ -47,10 +47,9 @@ for (const [engine] of Object.entries(ENGINES)) {
   // T5. Carve phase visibility rule across all 17 mainstream sizes
   // ==========================================
   for (const vp of MAINSTREAM_17) {
-    const isDesk = vp.w >= 1024 || vp.isDesktop;
-    const testTitle = isDesk
-      ? `${engine} ${vp.name} [regression guard]: T5 carve phase usable entries visible & >=44x44, options hidden`
-      : `${engine} ${vp.name}: T5 carve phase usable entries visible & >=44x44, options hidden`;
+    // NOTE: T5 desktop variants fail on base b0c7b5d (options not hidden during T03
+    // engrave), so they carry no "[regression guard]" label.
+    const testTitle = `${engine} ${vp.name}: T5 carve phase usable entries visible & >=44x44, options hidden`;
 
     test(testTitle, { timeout: 60000 }, async () => {
       const ctx = await browsers[engine].newContext({ viewport: { width: vp.w, height: vp.h } });
