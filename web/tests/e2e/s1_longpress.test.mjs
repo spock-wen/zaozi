@@ -105,4 +105,125 @@ for (const [engine] of Object.entries(ENGINES)) {
       await ctx.close();
     }
   });
+
+  test(`${engine} 1280x800 mouse: quick click on #opt-left commits exactly once (no double-fire)`, async () => {
+    const ctx = await browsers[engine].newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.evaluate(() => localStorage.clear());
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz && document.body.dataset.cardReady === "1", null, { timeout: 10000 });
+
+      assert.equal(await page.evaluate(() => window.__zz.st.current), "T01", "开局应为 T01");
+      const initCount = await page.evaluate(() => window.__zz.actions.length);
+
+      await page.click("#opt-left");
+
+      await page.waitForFunction(
+        () => document.body.dataset.cardReady === "1" && window.__zz.st.current === "T02",
+        null,
+        { timeout: 5000 },
+      );
+
+      const n = await page.evaluate(() => window.__zz.actions.length);
+      const cur = await page.evaluate(() => window.__zz.st.current);
+      assert.equal(n, initCount + 1, `应恰好提交 1 次动作，实际为 ${n}`);
+      assert.equal(cur, "T02", `卡面应推进到 T02，实际为 ${cur}`);
+
+      await page.waitForTimeout(1000);
+      const nAfter = await page.evaluate(() => window.__zz.actions.length);
+      const curAfter = await page.evaluate(() => window.__zz.st.current);
+      assert.equal(nAfter, initCount + 1, `等待 1000ms 后动作数仍应为 ${initCount + 1}，实际为 ${nAfter}`);
+      assert.equal(curAfter, "T02", `等待 1000ms 后卡面仍应为 T02，实际为 ${curAfter}`);
+      assert.deepEqual(errs, [], "页面不应有未捕获异常");
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test(`${engine} 390x844 touch: quick tap on #opt-left commits exactly once (no double-fire)`, async () => {
+    const ctx = await browsers[engine].newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+    });
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.evaluate(() => localStorage.clear());
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz && document.body.dataset.cardReady === "1", null, { timeout: 10000 });
+
+      assert.equal(await page.evaluate(() => window.__zz.st.current), "T01", "开局应为 T01");
+      const initCount = await page.evaluate(() => window.__zz.actions.length);
+
+      await page.locator("#opt-left").tap();
+
+      await page.waitForFunction(
+        () => document.body.dataset.cardReady === "1" && window.__zz.st.current === "T02",
+        null,
+        { timeout: 5000 },
+      );
+
+      const n = await page.evaluate(() => window.__zz.actions.length);
+      const cur = await page.evaluate(() => window.__zz.st.current);
+      assert.equal(n, initCount + 1, `应恰好提交 1 次动作，实际为 ${n}`);
+      assert.equal(cur, "T02", `卡面应推进到 T02，实际为 ${cur}`);
+
+      await page.waitForTimeout(1000);
+      const nAfter = await page.evaluate(() => window.__zz.actions.length);
+      const curAfter = await page.evaluate(() => window.__zz.st.current);
+      assert.equal(nAfter, initCount + 1, `等待 1000ms 后动作数仍应为 ${initCount + 1}，实际为 ${nAfter}`);
+      assert.equal(curAfter, "T02", `等待 1000ms 后卡面仍应为 T02，实际为 ${curAfter}`);
+      assert.deepEqual(errs, [], "页面不应有未捕获异常");
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test(`${engine} 1280x800 keyboard: focus #opt-left and press Enter commits exactly once (no double-fire)`, async () => {
+    const ctx = await browsers[engine].newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    const errs = [];
+    collectErrors(page, errs);
+
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.evaluate(() => localStorage.clear());
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz && document.body.dataset.cardReady === "1", null, { timeout: 10000 });
+
+      assert.equal(await page.evaluate(() => window.__zz.st.current), "T01", "开局应为 T01");
+      const initCount = await page.evaluate(() => window.__zz.actions.length);
+
+      await page.focus("#opt-left");
+      await page.keyboard.press("Enter");
+
+      await page.waitForFunction(
+        () => document.body.dataset.cardReady === "1" && window.__zz.st.current === "T02",
+        null,
+        { timeout: 5000 },
+      );
+
+      const n = await page.evaluate(() => window.__zz.actions.length);
+      const cur = await page.evaluate(() => window.__zz.st.current);
+      assert.equal(n, initCount + 1, `应恰好提交 1 次动作，实际为 ${n}`);
+      assert.equal(cur, "T02", `卡面应推进到 T02，实际为 ${cur}`);
+
+      await page.waitForTimeout(1000);
+      const nAfter = await page.evaluate(() => window.__zz.actions.length);
+      const curAfter = await page.evaluate(() => window.__zz.st.current);
+      assert.equal(nAfter, initCount + 1, `等待 1000ms 后动作数仍应为 ${initCount + 1}，实际为 ${nAfter}`);
+      assert.equal(curAfter, "T02", `等待 1000ms 后卡面仍应为 T02，实际为 ${curAfter}`);
+      assert.deepEqual(errs, [], "页面不应有未捕获异常");
+    } finally {
+      await ctx.close();
+    }
+  });
 }

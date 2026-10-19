@@ -433,7 +433,7 @@ body[data-view="desktop"] #log{font-size:14px;line-height:1.5;}
 body[data-view="desktop"] #log li{overflow-wrap:anywhere;}
 /* 桌面教学气泡沉到卡区底部右下：卡角「刻」在卡的右上，气泡在底部就不可能在
    任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
-body[data-view="desktop"] #coachcol{display:block;position:absolute;right:8px;bottom:8px;width:300px;z-index:30;pointer-events:none;}
+body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}
 body[data-view="desktop"] #wordbox{min-height:0;}
 body[data-view="desktop"] #cardcol{flex:0 1 auto;min-width:0;}
 body[data-view="desktop"] .optbtn{width:192px;flex:0 1 auto;min-width:120px;}
