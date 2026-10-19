@@ -486,8 +486,7 @@ function keyboardMode() { return hasFinePointer() && document.body.dataset.view 
 
 function renderCoach() {
   const el = $("coach"), col = $("coachcol");
-  col.style.cssText = "";               // 先清掉上次矮屏的定位，常规档交回 CSS
-  el.style.fontSize = "";
+  col.style.cssText = "";               // 先清掉上次的定位，交回 placeCoach 重算
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
   const step = card && isTutorialCard(card.id) ? tutorialStepOf(card.id) : null;
   if (!step) { el.hidden = true; dropHTML(el); return; }
@@ -495,7 +494,7 @@ function renderCoach() {
   const desktop = document.body.dataset.view === "desktop";
   const text = desktop && step.coach_desktop ? step.coach_desktop : step.coach;
   patchHTML(el, text);
-  if (desktop && document.body.dataset.short) placeCoach(step);
+  if (desktop) placeCoach(step);        // 桌面所有档位（N/A/B）同一条摆放规则
 }
 // 目标若在 #card 内（#bonecorner / #card-drops），卡可能正处入场过渡（.card 的 transform 160ms）
 // 或拖拽中——此时 getBoundingClientRect 读到的是被 transform 挪走的盒（T03 #coach 曾因此偏 ~190px，
@@ -507,44 +506,41 @@ function targetRect(el) {
   const left = cw.left + el.offsetLeft, top = cw.top + el.offsetTop;
   return { left, top, right: left + el.offsetWidth, bottom: top + el.offsetHeight, width: el.offsetWidth, height: el.offsetHeight };
 }
-// 矮屏教学气泡：放在卡外侧的空沟里（默认右侧），不压卡、不压字匣、不压目标。
-// 竖向对齐目标（字匣提示 → 气泡底边 = 字匣底边；其余对齐目标/卡竖向中线）。
+// 桌面教学气泡：一律贴在卡右侧的空沟里——所有桌面尺寸同一条规则，不按视口微调：
+//   左缘 = 卡（#cardwrap 槽）右缘 + 24；
+//   右缘 ≤ 舞台右缘 − 16（舞台右缘即侧栏左缘；侧栏收起/没有时即视口右缘）；
+//   宽 ≤ 320，沟放不下就收宽（字号保持 14px，文字换行、不裁切）；
+//   底缘 = 卡底 − 8（FIX_SPEC §Z3 / RULES_fix2_v2 §13 / R18）。
+// 因此气泡整个在卡外，任何视口都不会压到卡（也就压不到卡右上角的「刻」）。
 function placeCoach(step) {
   const col = $("coachcol"), el = $("coach");
   // 用 #cardwrap（不被拖拽/飞出动画改 transform）当卡的槽位，别用 #card——
   // 否则切卡瞬间（卡片 transform 还在 160ms 过渡里）读到的是移动中的卡，气泡会算到卡上面。
   const sb = $("stage").getBoundingClientRect(), cb = $("cardwrap").getBoundingClientRect();
-  const GAP = 16, MAXW = 320, MINW = 240;
-  const rightStart = cb.right + GAP - sb.left;
-  const rightAvail = sb.width - GAP - rightStart;
-  const leftAvail = cb.left - GAP - sb.left - GAP;
-  let left, width;
-  if (rightAvail >= MINW) { left = rightStart; width = Math.min(MAXW, rightAvail); }
-  else if (leftAvail >= MINW) { width = Math.min(MAXW, leftAvail); left = cb.left - GAP - sb.left - width; }
-  else { width = Math.min(MAXW, cb.width); left = cb.left - sb.left; el.style.fontSize = "13px"; }  // 两边都不够：垫到卡上方
-  col.style.left = left + "px"; col.style.right = "auto"; col.style.width = width + "px";
-  const sel = step.teach === "drop" ? "#wordbox-bar" : step.teach === "engrave" ? "#bonecorner" : null;
-  const tel = sel ? document.querySelector(sel) : null;
-  const tb = tel ? targetRect(tel) : null;
-  const ref = tb || cb, h = el.getBoundingClientRect().height;
-  let top = step.teach === "drop" && tb ? tb.bottom - h : ref.top + ref.height / 2 - h / 2;
-  // 气泡在卡外侧（横向）会与同侧选项按钮重叠——「左右拖卡做选择」这些步的目标就落在选项上，
-  // 竖向错开它们（先滑到下方、再试上方），保证气泡不盖住任何目标。
-  top = slideClearOfTargets(top, h, sb.left + left, width);
-  top = Math.max(sb.top + GAP, Math.min(Math.max(sb.top + GAP, sb.bottom - h - GAP), top));
-  col.style.top = (top - sb.top) + "px"; col.style.bottom = "auto";
-}
-// 竖向位置若与目标（卡、左右选项、字匣、卡上落字框、卡角刻）相交，就滑到最近的空白处。
-// 只考虑横向会撞的那些目标；找不到空位就保持原位（由外层夹到舞台内）。
-function slideClearOfTargets(top, h, vx, w) {
-  const rects = [$("opt-left"), $("opt-right"), $("wordbox-bar"), $("card-drops"), $("bonecorner"), $("cardwrap")]
-    .filter((e) => e && !e.hidden && getComputedStyle(e).display !== "none")
-    .map((e) => targetRect(e))                 // 卡内目标也要取「未变换」矩形（同 placeCoach）
-    .filter((r) => Math.min(vx + w, r.right) - Math.max(vx, r.left) > 0);
-  const hits = (t) => rects.some((r) => Math.min(t + h, r.bottom) - Math.max(t, r.top) > 0);
-  if (!hits(top)) return top;
-  for (const r of rects) for (const cand of [r.bottom + 8, r.top - 8 - h]) if (!hits(cand)) return cand;
-  return top;
+  const GAP = 24, EDGE = 16, MAXW = 320, MINW = 160;
+  let left = cb.right + GAP, width = Math.min(MAXW, sb.right - EDGE - left);   // 视口坐标
+  if (width < MINW) {                  // 右沟窄到放不下可读的文字（侧栏开着、窗口又窄）：改贴卡左侧
+    width = Math.min(MAXW, cb.left - GAP - sb.left - EDGE);
+    left = cb.left - GAP - width;
+  }
+  if (width < MINW) { width = Math.min(MAXW, cb.width); left = cb.left; }      // 两边都不够：垫到卡上方
+  col.style.left = (left - sb.left) + "px"; col.style.right = "auto"; col.style.width = width + "px";
+  // 底边 = 卡底 − 8（所有桌面尺寸同一条规则，FIX_SPEC §Z3 / RULES_fix2_v2 §13 / R18）
+  col.style.bottom = (sb.bottom - (cb.bottom - 8)) + "px";
+  col.style.top = "auto";
+
+  // 若气泡盖住按键提示/卡角刻/顶栏，按 R18 L15「按键提示不被教学气泡压住」上报而非悄悄挪动
+  for (const sel of ["#keys", "#bonecorner", "#topbar"]) {
+    const tel = document.querySelector(sel);
+    if (!tel || tel.hidden || getComputedStyle(tel).display === "none") continue;
+    const tr = targetRect(tel);
+    const cr = el.getBoundingClientRect();
+    const ix = Math.min(cr.right, tr.right) - Math.max(cr.left, tr.left);
+    const iy = Math.min(cr.bottom, tr.bottom) - Math.max(cr.top, tr.top);
+    if (ix > 0 && iy > 0) {
+      console.warn(`[placeCoach] 教学气泡覆盖目标 ${sel} (R18 L15):`, { coach: cr, target: tr });
+    }
+  }
 }
 function renderWordbox() {
   patchHTML($("wordbox"), st.wordBox.map((ch, i) => {
@@ -1225,6 +1221,7 @@ on($("goals-slip"), () => {
 on($("sidebar-tab"), () => {
   const collapsed = $("sidebar").classList.toggle("collapsed");
   localStorage.setItem(SIDEBAR_KEY, collapsed ? "0" : "1");
+  renderCoach();      // 舞台右缘随侧栏开合移动：教学气泡要按新卡位重算（贴着卡右缘 +24）
 });
 on($("wb-handle"), () => { $("drawer").hidden = false; renderSide(); });
 on($("drawer-mask"), () => { $("drawer").hidden = true; });

@@ -431,8 +431,11 @@ body[data-view="desktop"] .slot span{font-size:14px;line-height:20px;text-align:
 body[data-view="desktop"] .slot.used span{font-size:14px;line-height:20px;white-space:nowrap;}
 body[data-view="desktop"] #log{font-size:14px;line-height:1.5;}
 body[data-view="desktop"] #log li{overflow-wrap:anywhere;}
-/* 桌面教学气泡沉到卡区底部右下：卡角「刻」在卡的右上，气泡在底部就不可能在
-   任何视口压到它（1024 侧栏收起时按卡右浮会压住「刻」，W2）。点击透传，防误挡。 */
+/* 桌面教学气泡：定位由 placeCoach()（app.js）按卡槽矩形算——左缘 = 卡右缘 + 24、
+   右缘 ≤ 舞台右缘 − 16（即侧栏左缘 − 16，侧栏收起时即视口右缘 − 16）、宽 ≤ 320、
+   底缘 = 卡底 − 8，所有桌面尺寸同一条规则；气泡整个在卡外，也就压不到卡右上角的「刻」（W2）。
+   下面这条只是 JS 算出来之前的首帧兜底（贴在舞台右下、距侧栏 16），render 后即被
+   placeCoach() 覆盖。点击透传，防误挡。 */
 body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}
 body[data-view="desktop"] #wordbox{min-height:0;}
 body[data-view="desktop"] #cardcol{flex:0 1 auto;min-width:0;}
