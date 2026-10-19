@@ -1,12 +1,13 @@
 // e2e 矮屏交叠回归（QA FINAL_REPORT 92cf10a 缺陷 D2 / D3）。
 // D2：视口高 <492 时「窗口太矮」提示（#too-short）不得压住卡（含卡头 #card .card-head）。
 // D3：B 档键位浮层（#keyhelp-pop，首进自动弹 / 点「?」手动开）不得压住左右选项（#opt-right/#opt-left），
-//     且 6 条键位在 492–600 全程全部可见、浮层不滚动。
+//     且键位在 492–600 全程全部可见、浮层不滚动（普通卡 4 行 / 刻字 6 行）。
 // BREAKPOINTS §矮屏「硬规则」：所有点击目标 ≥44×44 且没被别的元素盖住。
 // 几何用例只取 getBoundingClientRect 视口坐标，断言两框无交叠（两轴重叠长度都 >0 才算交叠）。
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { commit } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -104,21 +105,21 @@ for (const engine of Object.keys(ENGINES)) {
   }
 }
 
-// ---------- D3：B 档键位浮层 6 行全可见、不滚动、不压左右选项（自动弹 + 点「?」） ----------
+// ---------- D3：B 档键位浮层全可见、不滚动、不压左右选项（普通 4 行 / 刻字 6 行） ----------
 for (const engine of Object.keys(ENGINES)) {
   for (const vp of [{ w: 1024, h: 600 }, { w: 1024, h: 513 }, { w: 1024, h: 491 }, { w: 1280, h: 491 }]) {
-    test(`${engine} D3 ${vp.w}×${vp.h}: 键位浮层 6 行全可见、不滚动、不压左右选项（自动弹 + 「?」）`, async () => {
+    test(`${engine} D3 ${vp.w}×${vp.h}: 键位浮层全可见、不滚动、不压左右选项（普通 4 行 / 刻字 6 行）`, async () => {
       const { ctx, page, errs } = await open(engine, { width: vp.w, height: vp.h });
       try {
         const pop = page.locator("#keyhelp-pop");
         const btn = page.locator("#keyhelp-btn");
-        const assertClear = async (label) => {
+        const assertClear = async (label, expectedRows = 4) => {
           const g = await snap(page);
           assert.equal(g.pop.hidden, false, `${label}：键位浮层应打开`);
           assert.ok(inViewport(g.pop, g.vw, g.vh), `${label}：浮层应在视口内：${box(g.pop)}`);
 
-          // 6 行全可见、不滚动：scrollHeight 不得超过 clientHeight（无裁切/无滚动条）
-          assert.equal(g.rows.length, 6, `${label}：浮层应列全部 6 条键位，实际 ${g.rows.length} 行`);
+          // expectedRows 行全可见、不滚动：scrollHeight 不得超过 clientHeight（无裁切/无滚动条）
+          assert.equal(g.rows.length, expectedRows, `${label}：浮层应列 ${expectedRows} 条键位，实际 ${g.rows.length} 行`);
           assert.ok(
             g.popScrollH <= g.popClientH,
             `${label}：浮层不应滚动，scrollH=${g.popScrollH} clientH=${g.popClientH}`,
@@ -143,15 +144,24 @@ for (const engine of Object.keys(ENGINES)) {
         const bb = await btn.boundingBox();
         assert.ok(bb.width >= 44 && bb.height >= 44, `「?」点击区应 ≥44×44，实际 ${bb.width}×${bb.height}`);
 
-        // 每个存档首次进入自动弹一次
+        // 每个存档首次进入自动弹一次：普通卡阶段 4 行
         assert.ok(await pop.isVisible(), "首进应自动弹出键位浮层");
-        await assertClear("自动弹");
+        await assertClear("自动弹", 4);
 
         // 点外面收起后，点「?」手动再开（贴左缘、避开卡/选项/提示，B 档可点目标都不在此）
         await page.mouse.click(10, Math.round(vp.h / 2));
         assert.ok(!(await pop.isVisible()), "点浮层外应收起");
         await btn.click();
-        await assertClear("点「?」");
+        await assertClear("点「?」", 4);
+
+        // 推进到 T03（刻字阶段）：浮层展示全部 6 行键位，几何依然全可见、不滚动、不压左右选项
+        await commit(page, "left");   // T01 → T02
+        await commit(page, "right");  // T02 → T03
+        if (await pop.isHidden()) {
+          await btn.click();
+        }
+        await pop.waitFor({ state: "visible" });
+        await assertClear("刻字阶段点「?」", 6);
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {

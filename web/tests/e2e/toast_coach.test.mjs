@@ -22,6 +22,7 @@ after(async () => {
 // 本用例自己的视口：两个手机（带触控）+ 两个桌面。
 const VIEWPORTS = [
   { name: "360x640", width: 360, height: 640, view: "mobile" },
+  { name: "390x664", width: 390, height: 664, view: "mobile" },
   { name: "390x844", width: 390, height: 844, view: "mobile" },
   { name: "1280x800", width: 1280, height: 800, view: "desktop" },
   { name: "1280x600", width: 1280, height: 600, view: "desktop" },
@@ -46,19 +47,28 @@ for (const engine of Object.keys(ENGINES)) {
         assert.equal(await current(page), "T03");
         assert.equal(await phase(page), "engrave");
 
-        // 真实「按一下卡」触发锁拖 toast
+        // 真实「按一下卡」触发锁拖 toast（移动端走触控 tap，桌面端走鼠标）
         const box = await page.locator("#card").boundingBox();
+        const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
         const t0 = Date.now();
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        await page.mouse.down();
-        await page.mouse.up();
+        if (vp.view === "mobile") {
+          await page.touchscreen.tap(cx, cy);
+        } else {
+          await page.mouse.move(cx, cy);
+          await page.mouse.down();
+          await page.mouse.up();
+        }
         assert.ok(
           await page.locator("#toast").evaluate((e) => e.classList.contains("on")),
           "按下卡后 #toast 应显示（锁拖提示）",
         );
 
-        // 立刻刻字（不做长等待）：切到 T04，toast 必须马上收起
-        await page.locator("#bonecorner").click();
+        // 立刻刻字（不做长等待）：切到 T04，toast 必须马上收起（移动端 tap，桌面端 click）
+        if (vp.view === "mobile") {
+          await page.locator("#bonecorner").tap();
+        } else {
+          await page.locator("#bonecorner").click();
+        }
 
         await page.waitForFunction(() => window.__zz.st.current !== "T03", null, { timeout: 5000 });
         await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
