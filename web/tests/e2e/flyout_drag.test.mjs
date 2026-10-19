@@ -20,7 +20,7 @@ buildDist();
 let server, browsers = {}, codes = null;
 before(async () => {
   server = await startServer();
-  for (const [name, type] of Object.entries(ENGINES)) browsers[name] = await type.launch();
+  await Promise.all(Object.entries(ENGINES).map(async ([name, type]) => { browsers[name] = await type.launch(); }));
   codes = await gen2Codes(Object.values(browsers)[0], server.origin, SEED);   // 抽屉例要一张下一张能落字的卡
 });
 after(async () => {
@@ -73,6 +73,28 @@ async function startRecorder(page) {
     window.__raf = requestAnimationFrame(loop);
   });
 }
+
+// 独立落定记录器（P2-2）：不读被测代码自己写的 __zz.settledAt，而在 rAF 里自己判「这一帧卡真落定了」：
+// 没有 __zz.animating、没有在跑的卡动画、#card 的 transform 为空、且不带 .dragging。
+// 按「卡|动作数」记下第一帧的时刻（window.__settles），与 flyout_qa.test.mjs 同一套判据。
+async function startSettleRecorder(page) {
+  await page.evaluate(() => {
+    if (window.__settleRaf) cancelAnimationFrame(window.__settleRaf);
+    window.__settles = {};
+    const loop = () => {
+      const z = window.__zz, card = document.getElementById("card");
+      const settled = !!z && !z.animating
+        && (card ? !card.getAnimations().some((a) => a.playState === "running") : true)
+        && (card ? (card.style.transform === "" || card.style.transform === "none") : true)
+        && (card ? !card.classList.contains("dragging") : true);
+      const key = (z?.st?.current ?? "?") + "|" + (z?.actions?.length ?? 0);
+      if (settled && window.__settles[key] == null) window.__settles[key] = performance.now();
+      window.__settleRaf = requestAnimationFrame(loop);
+    };
+    window.__settleRaf = requestAnimationFrame(loop);
+  });
+}
+const settlesOf = (page) => page.evaluate(() => window.__settles || {});
 
 // 稳：动画停、入场过渡停、队列空，且连续 400ms 都如此。
 async function settle(page) {
@@ -153,19 +175,38 @@ function appliedOnSettled(t, frames, n0, total, label) {
   assert.deepEqual(problems, [], `[${label}] 排队输入必须先等当前卡落定并绘制才生效：${problems.join(" ; ")}`);
 }
 
-// P3-2：锁定提示何时出现，不能靠固定 sleep 猜。装上 MutationObserver，
-// 记录 #toast 变 on 的那一刻的 performance.now() 与当时的 window.__zz.settledAt（卡落定的时刻）。
+// P3-2：锁定提示何时出现，不能靠固定 sleep 猜。装上 MutationObserver，记录 #toast 变 on 的那一刻的
+// performance.now() 与当时是哪张卡（「卡|动作数」，独立落定记录器的键）。落定时刻不取 __zz.settledAt
+// ——那是被测代码自己记的（P2-2），改用 startSettleRecorder 独立记下的 window.__settles。
 const watchToast = (page) => page.evaluate(() => {
   window.__toastHits = [];
   const el = document.getElementById("toast");
   const rec = () => {
     if (el.classList.contains("on") && /骨片/.test(el.textContent || "")) {
-      window.__toastHits.push({ t: performance.now(), settledAt: window.__zz.settledAt, text: el.textContent });
+      const z = window.__zz;
+      window.__toastHits.push({
+        t: performance.now(),
+        cardKey: (z?.st?.current ?? "?") + "|" + (z?.actions?.length ?? 0),
+        text: el.textContent,
+      });
     }
   };
   new MutationObserver(rec).observe(el, { attributes: true, attributeFilter: ["class"], childList: true, characterData: true, subtree: true });
 });
 const toastHits = (page) => page.evaluate(() => window.__toastHits || []);
+
+// 锁定骨片提示必须等目标卡「独立落定并绘制」满 DWELL_MS（250ms）才出现：落定时刻取自页内独立记录器，
+// 所以证明的是「卡真的落定了 250ms」，而不是「代码以为自己落定了 250ms」。留 5ms 判据余量（≥245ms）。
+function assertHintAfterSettle(t, hits, settles, label) {
+  t.diagnostic(`${label} 锁定提示：${JSON.stringify(hits)}｜独立落定：${JSON.stringify(settles)}`);
+  assert.ok(hits.length >= 1, `排队输入进入刻字卡应弹出包含「骨片」的锁定提示（${label}）`);
+  const hit = hits[0];
+  const indSettle = settles[hit.cardKey];
+  assert.ok(indSettle > 0, `提示出现时的那张卡必须已有独立落定时间戳（${hit.cardKey}），否则证明不了等满了最短停留`);
+  const gap = hit.t - indSettle;
+  assert.ok(gap >= 245, `锁定提示必须等卡独立落定 ≥250ms 才出现（${hit.cardKey}：落定=${indSettle.toFixed(1)}，提示=${hit.t.toFixed(1)}，实测 ${gap.toFixed(1)}ms）`);
+  assert.ok(gap < 2500, `锁定提示不该拖到落定 2.5s 以后（实测 ${gap.toFixed(1)}ms，独立落定记录可能没被更新）`);
+}
 
 for (const [engine] of Object.entries(ENGINES)) {
   for (const mode of ["mouse", "touch"]) {
@@ -200,9 +241,23 @@ for (const [engine] of Object.entries(ENGINES)) {
         if (fDrag < 0) fDrag = frames.findIndex((f) => !f.busy && Math.abs(f.dx) > 0.5);
         assert.ok(fStart >= 0, "应记录到飞出开始的帧");
         assert.ok(fDrag > fStart, "应记录到起拖的帧（.dragging 或松手前 translateX≠0）");
-        const lag = Math.round(frames[fDrag].t - frames[fStart].t);
-        t.diagnostic(`起拖滞后 ${lag}ms`);
-        assert.ok(lag <= 320, `起拖应在飞出开始后 ≤320ms（实际 ${lag}ms）`);
+
+        // P3-2（r7）：负载下 rAF 被节流，240ms 的飞出本身就被拉长，裸比「飞出开始→起拖」会误红。
+        // 改用页面自己的计时：飞出/入场这一段（第一个 busy 帧到起拖前最后一个 busy 帧）设计时长就是
+        // 240ms，只把它自测超出 240ms 的那部分（overrun）从总滞后里扣掉，剩下的才套 320ms 预算；
+        // 另外用帧数直接卡住「起拖紧跟飞出结束」：drainStep 对仍按住的 press 会 finish() 掉入场过渡，
+        // 再过两帧 rAF 就 beginDrag，所以起拖不应落在飞出/入场结束 3 帧以后。
+        let fFlyEnd = -1;
+        for (let i = fStart; i < fDrag; i++) if (frames[i].busy) fFlyEnd = i;
+        const rawLag = Math.round(frames[fDrag].t - frames[fStart].t);
+        const flyMs = fFlyEnd >= 0 ? Math.round(frames[fFlyEnd].t - frames[fStart].t) : 0;
+        const overrun = Math.max(0, flyMs - 240);
+        const lag = rawLag - overrun;
+        const gapFrames = fDrag - fFlyEnd;
+        t.diagnostic(`起拖滞后：原始 ${rawLag}ms｜飞出/入场实测 ${flyMs}ms（设计 240ms，超 ${overrun}ms）｜补偿后 ${lag}ms｜起拖距飞出结束 ${gapFrames} 帧`);
+        assert.ok(fFlyEnd >= 0, "应记录到飞出/入场结束的帧（起拖前的最后一个 busy 帧）");
+        assert.ok(gapFrames <= 3, `起拖应在飞出/入场结束后 ≤3 帧内开始（实测 ${gapFrames} 帧）`);
+        assert.ok(lag <= 320, `起拖应在飞出开始后 ≤320ms（仅扣掉飞出自测超出的 ${overrun}ms，实测 ${lag}ms）`);
 
         const fCommit = frames.findIndex((f) => f.n >= n0 + 2);
         assert.ok(fCommit > 0, "应记录到第二次提交");
@@ -291,81 +346,87 @@ for (const [engine] of Object.entries(ENGINES)) {
   });
 
   // P3-2：飞出期间排队进 T03（phase "engrave"）的输入不能再被静默丢弃：press/side 弹锁定骨片提示，
-  // key 按空闲行为交给 handleKey。提示必须等目标卡「落定并绘制」再满 DWELL_MS 才出现，所以不猜固定时长，
-  // 而是等 #toast.on 且文案含「骨片」，并用 MutationObserver 量它离落定（__zz.settledAt）有多久。
+  // 提示必须等目标卡「落定并绘制」再满 DWELL_MS 才出现，用独立落定记录器（window.__settles）量它离落定有多久。
   test(`${engine} 1280 mouse: 飞出进教学T03（刻字卡）时排队的拖拽，落定后满 250ms 才弹出锁定骨片提示（P3-2）`, async (t) => {
     const ctx = await browsers[engine].newContext({ viewport: VP_DESK });
     const page = await ctx.newPage();
     const errs = [];
     collectErrors(page, errs);
-    await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
-    await page.waitForFunction(() => !!window.__zz);
-    await settle(page);
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz);
 
-    await press(page, ["ArrowLeft", "ArrowLeft"]);
-    await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
-    await settle(page);
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+      await settle(page);
 
-    const box = await cardBox(page);
-    await watchToast(page);                       // 起飞前装好：要量的是「落定 → 提示」这段
-    await press(page, ["ArrowRight", "ArrowRight"]);
-    await page.waitForTimeout(30);
+      const box = await cardBox(page);
+      await startSettleRecorder(page);              // 独立落定记录：要量的是「卡真落定 → 提示」这段
+      await watchToast(page);                       // 起飞前装好：要量的是「落定 → 提示」这段
+      await press(page, ["ArrowRight", "ArrowRight"]);
+      await page.waitForTimeout(30);
 
-    await page.mouse.move(box.cx, box.cy);
-    await page.mouse.down();
-    await page.mouse.move(box.cx + 60, box.cy);   // 未到阈值，整项作为「松过手的 press」留在队列里
-    await page.mouse.up();
+      await page.mouse.move(box.cx, box.cy);
+      await page.mouse.down();
+      await page.mouse.move(box.cx + 60, box.cy);   // 未到阈值，整项作为「松过手的 press」留在队列里
+      await page.mouse.up();
 
-    await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
-    await page.waitForFunction(() => {
-      const el = document.getElementById("toast");
-      return !!el && el.classList.contains("on") && /骨片/.test(el.textContent || "");
-    }, null, { timeout: 3000 });
-    await settle(page);
+      await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
+      await page.waitForFunction(() => {
+        const el = document.getElementById("toast");
+        return !!el && el.classList.contains("on") && /骨片/.test(el.textContent || "");
+      }, null, { timeout: 3000 });
+      await settle(page);
 
-    const hits = await toastHits(page);
-    t.diagnostic(`T03 落定后锁定提示：${JSON.stringify(hits)}`);
-    assert.ok(hits.length >= 1, "排队拖入刻字卡应弹出包含「骨片」的锁定提示");
-    const gap = hits[0].t - hits[0].settledAt;
-    assert.ok(hits[0].settledAt > 0, "落定时应记下 settledAt，否则证明不了等满了最短停留");
-    assert.ok(gap >= 250, `锁定提示必须等卡落定 ≥250ms 才出现（settledAt=${hits[0].settledAt.toFixed(1)}，提示=${hits[0].t.toFixed(1)}，实测 ${gap.toFixed(1)}ms）`);
-    assert.ok(gap < 2500, `锁定提示不该拖到落定 2.5s 以后（实测 ${gap.toFixed(1)}ms，settledAt 可能没被更新）`);
-    assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
-    await ctx.close();
+      const hits = await toastHits(page);
+      assertHintAfterSettle(t, hits, await settlesOf(page), "T03 排队拖拽");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
   });
 
-  // P3-2 键位变体：能入队的只有方向/Enter/字匣键（input_map 的 card.keys），它们在刻字阶段都没有对应行为，
-  // 所以 handleKey 的空闲行为就是「什么都不做」：不报错、不推进教学、不弹锁定提示（那是 press/side 的待遇）。
-  test(`${engine} 1280 mouse: 飞出进教学T03（刻字卡）时排队的按键按空闲行为处理，不报错也不推进（P3-2 键位变体）`, async (t) => {
+  // P3-2 键位变体：飞出期间能入队的只有方向/Enter/字匣键（input_map 的 card.keys），它们在刻字阶段都没有
+  // 对应行为。drainStep 的刻字分支把它们和 press/side 同等对待：只弹一次锁定骨片提示（04123a2/cddd03d：
+  // 「排队攒下的 ←/→/Enter/拖拽到这里只弹一次锁定提示」），不报错、不推进教学、不多一个动作。
+  // 提示同样必须等 T03 独立落定满 250ms 才出现（下面用独立落定记录器量，不读 __zz.settledAt）。
+  test(`${engine} 1280 mouse: 飞出进教学T03（刻字卡）时排队的按键只弹一次锁定骨片提示，不报错也不推进（P3-2 键位变体）`, async (t) => {
     const ctx = await browsers[engine].newContext({ viewport: VP_DESK });
     const page = await ctx.newPage();
     const errs = [];
     collectErrors(page, errs);
-    await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
-    await page.waitForFunction(() => !!window.__zz);
-    await settle(page);
+    try {
+      await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+      await page.waitForFunction(() => !!window.__zz);
 
-    await press(page, ["ArrowLeft", "ArrowLeft"]);
-    await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
-    await settle(page);
+      await press(page, ["ArrowLeft", "ArrowLeft"]);
+      await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+      await settle(page);
 
-    const n0 = await actionsLen(page);
-    await watchToast(page);
-    await press(page, ["ArrowRight", "ArrowRight", "ArrowRight"]);   // 第 3 次按在飞出期间 → 入队
-    const queued = await page.evaluate(() => window.__zz.queued);
-    t.diagnostic(`飞出期间排队项：${queued}`);
+      const n0 = await actionsLen(page);
+      await startSettleRecorder(page);              // 独立落定记录：要量的是「卡真落定 → 提示」这段
+      await watchToast(page);
+      await press(page, ["ArrowRight", "ArrowRight", "ArrowRight"]);   // 第 3 次按在飞出期间 → 入队
+      const queued = await page.evaluate(() => window.__zz.queued);
+      t.diagnostic(`飞出期间排队项：${queued}`);
 
-    await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
-    await settle(page);
+      await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
+      await page.waitForFunction(() => {
+        const el = document.getElementById("toast");
+        return !!el && el.classList.contains("on") && /骨片/.test(el.textContent || "");
+      }, null, { timeout: 3000 });
+      await settle(page);
 
-    const st = await page.evaluate(() => ({ cur: window.__zz.st.current, phase: window.__zz.st.phase, n: window.__zz.actions.length }));
-    t.diagnostic(`T03 落定后：current=${st.cur} phase=${st.phase} 新增动作=${st.n - n0}`);
-    assert.equal(st.cur, "T03", "排队的 → 在刻字阶段没有对应行为，教学应停在 T03");
-    assert.equal(st.phase, "engrave", "T03 应仍是刻字阶段");
-    assert.equal(st.n - n0, 1, "除起飞提交T02外，排队的第3次→在刻字阶段不应产生任何额外动作");
-    assert.deepEqual(await sidesFrom(page, n0), ["right"], "只应有起飞提交 T02 的那一次 right");
-    assert.deepEqual(await toastHits(page), [], "按键走 handleKey 的空闲行为，不该弹锁定骨片提示");
-    assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
-    await ctx.close();
+      const st = await page.evaluate(() => ({ cur: window.__zz.st.current, phase: window.__zz.st.phase, n: window.__zz.actions.length }));
+      t.diagnostic(`T03 落定后：current=${st.cur} phase=${st.phase} 新增动作=${st.n - n0}`);
+      assert.equal(st.cur, "T03", "排队的 → 在刻字阶段没有对应行为，教学应停在 T03");
+      assert.equal(st.phase, "engrave", "T03 应仍是刻字阶段");
+      assert.equal(st.n - n0, 1, "除起飞提交T02外，排队的第3次→在刻字阶段不应产生任何额外动作");
+      assert.deepEqual(await sidesFrom(page, n0), ["right"], "只应有起飞提交 T02 的那一次 right");
+      assertHintAfterSettle(t, await toastHits(page), await settlesOf(page), "T03 排队按键");
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
   });
 }
