@@ -288,6 +288,19 @@ async function runMidFlyoutReset(engine, mode) {
           animating: window.__zz.animating,
           dx: window.__zz.dx,
         };
+        window.__postResetTransforms = [];
+        window.__sampleActive = true;
+        const sample = () => {
+          const c = document.getElementById("card");
+          if (c) {
+            window.__postResetTransforms.push({
+              t: performance.now(),
+              transform: c.style.transform,
+            });
+          }
+          if (window.__sampleActive) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
       }
     }, true);
   }, { mode, code });
@@ -321,6 +334,19 @@ async function runMidFlyoutReset(engine, mode) {
 
   // 等待新局 T01 完全落定
   await still();
+
+  // 断言：从重置到落定期间采样到的每一帧，#card transform 绝不能再次出现旧飞出的位移（杀 P9_tick）
+  const postResetTransforms = await page.evaluate(() => {
+    window.__sampleActive = false;
+    return window.__postResetTransforms || [];
+  });
+  assert.ok(postResetTransforms.length >= 2, `${mode}: 重置后落定前必须采样到至少 2 帧 rAF，实为 ${postResetTransforms.length}`);
+  const staleFrames = postResetTransforms.filter((f) => f.transform !== "");
+  assert.equal(
+    staleFrames.length,
+    0,
+    `${mode}: 重置后 #card transform 绝不能再次出现旧飞出的位移，采样到 ${staleFrames.length} 帧残留: ${JSON.stringify(staleFrames.slice(0, 3))}`
+  );
 
   // 断言：落定后 __zz.animating false, #card transform "" and opacity "", card centre on-screen
   const cardSettle = await page.evaluate(() => {
@@ -364,6 +390,177 @@ async function runMidFlyoutReset(engine, mode) {
   await ctx.close();
 }
 
+async function runMidReboundReset(engine) {
+  const ctx = await browsers[engine].newContext({
+    viewport: VP_TOUCH,
+    hasTouch: true,
+    isMobile: engine !== "firefox",
+    deviceScaleFactor: 3,
+  });
+  const page = await ctx.newPage();
+  const errs = [];
+  collectErrors(page, errs);
+
+  const clk = async (x, y) => { await page.touchscreen.tap(x, y); };
+  const ctr = (s) => page.evaluate((sel) => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  }, s);
+  const still = async () => {
+    await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
+    await page.waitForTimeout(400);
+  };
+
+  await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+  await page.waitForFunction(() => !!window.__zz);
+  await page.waitForTimeout(500);
+  await still();
+
+  const menuBtnPos = await ctr("#menubtn");
+  await clk(menuBtnPos[0], menuBtnPos[1]);
+  await page.waitForTimeout(50);
+  const newBtnPos = await ctr("#menu-pop [data-menu=new]");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(100);
+
+  // 挂载重置监听与 rAF 采样
+  await page.evaluate(() => {
+    window.__midReset = null;
+    document.addEventListener("click", (e) => {
+      if (e.target.closest?.("[data-menu=new]")) {
+        window.__midReset = {
+          t: performance.now(),
+          animating: window.__zz.animating,
+        };
+        window.__postResetTransforms = [];
+        window.__sampleActive = true;
+        const sample = () => {
+          const c = document.getElementById("card");
+          if (c) {
+            window.__postResetTransforms.push({
+              t: performance.now(),
+              transform: c.style.transform,
+            });
+          }
+          if (window.__sampleActive) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      }
+    }, true);
+  });
+
+  // 在卡片上小幅度拖拽（40px < threshold 80px），松手触发 rebound (dur 320ms)
+  await page.evaluate(() => {
+    const c = document.getElementById("card");
+    const r = c.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    c.dispatchEvent(new PointerEvent("pointerdown", { clientX: cx, clientY: cy, pointerId: 1, isPrimary: true, bubbles: true }));
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: cx + 40, clientY: cy, pointerId: 1, isPrimary: true, bubbles: true }));
+    window.dispatchEvent(new PointerEvent("pointerup", { clientX: cx + 40, clientY: cy, pointerId: 1, isPrimary: true, bubbles: true }));
+  });
+
+  // 回弹 dur=320ms：在 40ms 内触发 重新开局
+  await page.waitForTimeout(40);
+  await clk(menuBtnPos[0], menuBtnPos[1]);
+  await clk(newBtnPos[0], newBtnPos[1]);
+
+  await page.waitForTimeout(100);
+  const mid = await page.evaluate(() => window.__midReset);
+  assert.ok(mid != null, "回弹中途重置必须命中重置项并触发事件");
+  assert.equal(mid.animating, true, "重置发生瞬间 __zz.animating 必须仍为 true (回弹动画中)");
+
+  await still();
+
+  const postReset = await page.evaluate(() => {
+    window.__sampleActive = false;
+    return window.__postResetTransforms || [];
+  });
+  assert.ok(postReset.length >= 2, `回弹重置后必须采样到至少 2 帧 rAF，实为 ${postReset.length}`);
+  const staleFrames = postReset.filter((f) => f.transform !== "");
+  assert.equal(staleFrames.length, 0, `回弹重置后 #card transform 绝不能残留回弹位移，发现 ${staleFrames.length} 帧残留`);
+
+  const cardSettle = await page.evaluate(() => ({
+    animating: window.__zz.animating,
+    transform: document.getElementById("card").style.transform,
+  }));
+  assert.equal(cardSettle.animating, false, "落定后 animating 必须为 false");
+  assert.equal(cardSettle.transform, "", "落定后 card transform 必须为空");
+
+  assert.deepEqual(errs, [], "页面不应有未捕获报错：" + errs.join(" | "));
+  await ctx.close();
+}
+
+async function runMidFlyoutRestore(engine) {
+  const ctx = await browsers[engine].newContext({
+    viewport: VP_TOUCH,
+    hasTouch: true,
+    isMobile: engine !== "firefox",
+    deviceScaleFactor: 3,
+  });
+  const page = await ctx.newPage();
+  const errs = [];
+  collectErrors(page, errs);
+
+  const clk = async (x, y) => { await page.touchscreen.tap(x, y); };
+  const ctr = (s) => page.evaluate((sel) => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  }, s);
+  const still = async () => {
+    await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
+    await page.waitForTimeout(400);
+  };
+
+  await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+  await page.waitForFunction(() => !!window.__zz);
+  await page.evaluate((s) => window.__zz.newGame(s), SEED);
+  await page.waitForTimeout(500);
+  await still();
+
+  // 触点 #opt-left 起飞
+  const optLeftPos = await ctr("#opt-left");
+  await clk(optLeftPos[0], optLeftPos[1]);
+  // 50ms 后处于飞出动画中
+  await page.waitForTimeout(50);
+
+  const beforeRestore = await page.evaluate(() => ({
+    animating: window.__zz.animating,
+    transform: document.getElementById("card").style.transform,
+  }));
+  assert.equal(beforeRestore.animating, true, "调用 restore 前卡片必须处于飞出动画中");
+
+  // 调用 [hook] window.__zz.restore 调试钩子
+  const restored = await page.evaluate(() => window.__zz.restore());
+  assert.ok(restored, "window.__zz.restore() 必须成功读回存档");
+
+  // 断言：卡片运动态与动画标志立即被重置
+  const afterRestore = await page.evaluate(() => {
+    const c = document.getElementById("card");
+    return {
+      animating: window.__zz.animating,
+      transform: c.style.transform,
+      opacity: c.style.opacity,
+    };
+  });
+  assert.equal(afterRestore.animating, false, "restore 后 __zz.animating 必须被 resetCardMotion 重置为 false");
+  assert.equal(afterRestore.transform, "", "restore 后 #card transform 必须被 resetCardMotion 重置为空字符串");
+  assert.equal(afterRestore.opacity, "", "restore 后 #card opacity 必须被 resetCardMotion 重置为空字符串");
+
+  // 断言：卡片可触控 (tappable)，再次触点选项可正常响应并起飞
+  await clk(optLeftPos[0], optLeftPos[1]);
+  await page.waitForTimeout(50);
+  const retriggered = await page.evaluate(() => window.__zz.animating || window.__zz.queued > 0);
+  assert.ok(retriggered, "restore 后卡片必须立即可被触控并触发动作");
+
+  await still();
+  assert.deepEqual(errs, [], "页面不应有未捕获报错：" + errs.join(" | "));
+  await ctx.close();
+}
+
 for (const [engine] of Object.entries(ENGINES)) {
   test(`${engine} 375 touch: 清队(重新开局)后飞出中触点卡片正常入队且T03停稳250ms后出拦截提示`, async () => {
     await runScenario(engine, "重新开局");
@@ -384,4 +581,13 @@ for (const [engine] of Object.entries(ENGINES)) {
   test(`${engine} 375 touch: M2 飞出中途导入存档重置卡片运动态且新局触点正常入队`, async () => {
     await runMidFlyoutReset(engine, "导入");
   });
+
+  test(`${engine} 375 touch: M3 回弹中途重新开局重置卡片运动态且不再写回位移`, async () => {
+    await runMidReboundReset(engine);
+  });
+
+  test(`${engine} 375 touch: M4 [hook] window.__zz.restore 飞出中途调用重置卡片运动态且卡片可触控`, async () => {
+    await runMidFlyoutRestore(engine);
+  });
 }
+
