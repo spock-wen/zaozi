@@ -538,6 +538,18 @@ body[data-short] #topbar #dims-desktop .dim{width:auto;flex:1 1 0;min-width:0;}
 /* 字匣在矮屏是居中胶囊：去掉顶边框（border-box 下 1px 会把 A/B 撑到 61/57，
    设计要 60/56 = 格 48 + 上下内边距 12/8），四角同半径。 */
 body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;max-width:100%;justify-self:center;margin:0 auto;}
+body[data-view="desktop"][data-short] #goals-slip,
+body[data-view="tablet-landscape"][data-short] #goals-slip{font-size:14px;}
+body[data-view="desktop"][data-short] #topbar .dim,
+body[data-view="tablet-landscape"][data-short] #topbar .dim{font-size:14px;}
+body[data-view="desktop"][data-short] #gen-line,
+body[data-view="tablet-landscape"][data-short] #gen-line{font-size:14px;}
+body[data-view="desktop"][data-short] #topright,
+body[data-view="tablet-landscape"][data-short] #topright{font-size:14px;}
+body[data-view="desktop"][data-short] #keys,
+body[data-view="tablet-landscape"][data-short] #keys{font-size:14px;}
+body[data-view="desktop"][data-short] .card-drops,
+body[data-view="tablet-landscape"][data-short] .card-drops{font-size:14px;}
 
 /* 顶栏「?」键位浮层（B 档；键盘模式才显示）。
    6 条键位排成两列网格（3 行 × 2 列），高度由内容撑开、不封顶不滚动。
@@ -660,14 +672,31 @@ body[data-view="tablet-landscape"] .card-drops .chiplink,
 body[data-view="tablet-landscape"] #gesture-hint,
 body[data-view="tablet-landscape"] #keys,
 body[data-view="tablet-landscape"] .dim,
+body[data-view="tablet-landscape"] .slot span,
+body[data-view="tablet-landscape"] .slot.used span,
+body[data-view="tablet-landscape"] .tally,
+body[data-view="tablet-landscape"] .zl,
+body[data-view="tablet-landscape"] #pick .season-note,
+body[data-view="tablet-landscape"] #pick .desc,
+body[data-view="tablet-landscape"] #pick .cand .mng,
+body[data-view="desktop"] #goals-slip,
+body[data-view="tablet-landscape"] #goals-slip,
+body[data-view="desktop"] #pick .pickslot span,
+body[data-view="tablet-landscape"] #pick .pickslot span,
+body[data-view="tablet-landscape"] #menu-pop .grp,
+body[data-view="tablet-landscape"] #menu-pop .seed{font-size:14px;}
+
+body[data-view="desktop"] #pick .cand,
+body[data-view="desktop"] #pick .pickslot,
+body[data-view="tablet-landscape"] #pick .cand,
+body[data-view="tablet-landscape"] #pick .pickslot{font-size:18px;}
+
 body[data-view="desktop"] .slot span,
 body[data-view="desktop"] .slot.used span,
 body[data-view="tablet-landscape"] .slot span,
 body[data-view="tablet-landscape"] .slot.used span{line-height:20px;white-space:nowrap;}
 body[data-view="desktop"] #pick .cand .mng,
 body[data-view="tablet-landscape"] #pick .cand .mng{line-height:18px;white-space:nowrap;}
-body[data-view="tablet-landscape"] #menu-pop .grp,
-body[data-view="tablet-landscape"] #menu-pop .seed{font-size:14px;}
 
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:1ms !important;transition-duration:120ms !important;}
