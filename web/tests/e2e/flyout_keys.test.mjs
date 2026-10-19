@@ -159,7 +159,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  test(`${engine} 1280: 飞出期间轻点 Space 不留下按住状态`, async () => {
+  test(`[guard] ${engine} 1280: 飞出期间轻点 Space 不留下按住状态`, async () => {
     const { ctx, page, errs } = await setup(engine);
     try {
       const n0 = await actionsLen(page);
@@ -193,7 +193,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  test(`${engine} 1280: 飞出后进入刻字时，飞出期间按的键不带进刻字界面`, async () => {
+  test(`[guard] ${engine} 1280: 飞出后进入刻字时，飞出期间按的键不带进刻字界面`, async () => {
     const { ctx, page, errs } = await setup(engine);
     try {
       let reached = false;
@@ -234,7 +234,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     }
   });
 
-  test(`${engine} 1280: 飞出期间排队→→，卡落定后停留窗口内现场按←←，排队键必须先于现场键执行（M22）`, async (t) => {
+  test(`[guard] ${engine} 1280: 飞出期间排队→→，卡落定后停留窗口内现场按←←，排队键必须先于现场键执行（M22）`, async (t) => {
     const { ctx, page, errs } = await setup(engine);
     try {
       const a0 = await actionsLen(page);

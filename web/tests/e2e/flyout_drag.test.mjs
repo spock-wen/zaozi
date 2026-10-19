@@ -310,7 +310,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     });
   }
 
-  test(`[guard] ${engine} 1280: 飞出期间开目标面板，队列整体作废`, async (t) => {
+  test(`${engine} 1280: 飞出期间开目标面板，队列整体作废`, async (t) => {
     const { ctx, page, errs } = await setup(engine);
     try {
       const n0 = await actionsLen(page);

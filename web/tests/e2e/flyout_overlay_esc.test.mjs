@@ -201,7 +201,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     } finally { await ctx.close(); }
   });
 
-  test(`${engine} 1024x600: 键位说明浮层开着时按 Esc 只关浮层并保留队列（P2-4）`, async (t) => {
+  test(`[guard] ${engine} 1024x600: 键位说明浮层开着时按 Esc 只关浮层并保留队列（P2-4）`, async (t) => {
     const ctx = await browsers[engine].newContext({ viewport: { width: 1024, height: 600 } });
     const page = await ctx.newPage();
     const errs = [];

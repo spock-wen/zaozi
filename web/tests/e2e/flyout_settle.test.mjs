@@ -362,7 +362,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   });
 
   // F4：handleKey 的 Escape 分支只把 ui.menuOpen 置 false，没调 renderMenu()，☰ 菜单不收起。
-  test(`${engine} 1280: 飞出期间点卡角「刻」不替玩家刻字（飞出后进入刻字也一样）`, async () => {
+  test(`[guard] ${engine} 1280: 飞出期间点卡角「刻」不替玩家刻字（飞出后进入刻字也一样）`, async () => {
     const { ctx, page, errs } = await setupFresh(engine);
     try {
       let reached = false;
