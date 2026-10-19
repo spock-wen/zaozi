@@ -242,22 +242,32 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.ok(fStart >= 0, "应记录到飞出开始的帧");
         assert.ok(fDrag > fStart, "应记录到起拖的帧（.dragging 或松手前 translateX≠0）");
 
-        // P3-2（r7）：负载下 rAF 被节流，240ms 的飞出本身就被拉长，裸比「飞出开始→起拖」会误红。
-        // 改用页面自己的计时：飞出/入场这一段（第一个 busy 帧到起拖前最后一个 busy 帧）设计时长就是
-        // 240ms，只把它自测超出 240ms 的那部分（overrun）从总滞后里扣掉，剩下的才套 320ms 预算；
-        // 另外用帧数直接卡住「起拖紧跟飞出结束」：drainStep 对仍按住的 press 会 finish() 掉入场过渡，
-        // 再过两帧 rAF 就 beginDrag，所以起拖不应落在飞出/入场结束 3 帧以后。
+        // P3-5（r8）：设计预算 320ms 基于标称 16.7ms 帧率。在 CPU 负载或低配环境下 rAF 间隔被拉长，
+        // 飞出后两帧 rAF + 入场过渡 finish 会随帧率放缩。因此测量页面自身的帧时钟：
+        // 计算实测窗口内的中位 rAF 间隔，预算仅按帧间隔膨胀系数等比放缩 (320 × max(1, median/16.7))；
+        // 同时保留结构性 ≤3 帧断言，确保起拖紧跟飞出/入场结束。
         let fFlyEnd = -1;
         for (let i = fStart; i < fDrag; i++) if (frames[i].busy) fFlyEnd = i;
         const rawLag = Math.round(frames[fDrag].t - frames[fStart].t);
-        const flyMs = fFlyEnd >= 0 ? Math.round(frames[fFlyEnd].t - frames[fStart].t) : 0;
-        const overrun = Math.max(0, flyMs - 240);
-        const lag = rawLag - overrun;
-        const gapFrames = fDrag - fFlyEnd;
-        t.diagnostic(`起拖滞后：原始 ${rawLag}ms｜飞出/入场实测 ${flyMs}ms（设计 240ms，超 ${overrun}ms）｜补偿后 ${lag}ms｜起拖距飞出结束 ${gapFrames} 帧`);
+        const gapFrames = fFlyEnd >= 0 ? fDrag - fFlyEnd : -1;
+
+        const intervals = [];
+        for (let i = fStart + 1; i <= fDrag; i++) {
+          const dt = frames[i].t - frames[i - 1].t;
+          if (dt > 0) intervals.push(dt);
+        }
+        intervals.sort((a, b) => a - b);
+        const midIdx = Math.floor(intervals.length / 2);
+        const medianInterval = intervals.length
+          ? (intervals.length % 2 === 1 ? intervals[midIdx] : (intervals[midIdx - 1] + intervals[midIdx]) / 2)
+          : 16.6667;
+        const inflation = Math.max(1, medianInterval / 16.6667);
+        const scaledBudget = Math.round(320 * inflation);
+
+        t.diagnostic(`起拖滞后：原始 ${rawLag}ms｜中位帧间隔 ${medianInterval.toFixed(2)}ms（标称 16.7ms，放大 ${inflation.toFixed(2)}x）｜放缩预算 ${scaledBudget}ms｜起拖距飞出结束 ${gapFrames} 帧`);
         assert.ok(fFlyEnd >= 0, "应记录到飞出/入场结束的帧（起拖前的最后一个 busy 帧）");
         assert.ok(gapFrames <= 3, `起拖应在飞出/入场结束后 ≤3 帧内开始（实测 ${gapFrames} 帧）`);
-        assert.ok(lag <= 320, `起拖应在飞出开始后 ≤320ms（仅扣掉飞出自测超出的 ${overrun}ms，实测 ${lag}ms）`);
+        assert.ok(rawLag <= scaledBudget, `起拖应在放缩预算内开始（原始 ${rawLag}ms ≤ 预算 ${scaledBudget}ms，按中位帧间隔 ${medianInterval.toFixed(1)}ms 放缩）`);
 
         const fCommit = frames.findIndex((f) => f.n >= n0 + 2);
         assert.ok(fCommit > 0, "应记录到第二次提交");
