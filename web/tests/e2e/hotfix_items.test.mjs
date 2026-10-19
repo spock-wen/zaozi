@@ -43,7 +43,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   ]) {
     const testTitle = vp.isMobile
       ? `${engine} ${vp.name}: N1 double-tap within 70ms commits exactly once`
-      : `${engine} ${vp.name} [regression guard]: N1 double-click within 70ms commits exactly once`;
+      : `${engine} ${vp.name}: N1 double-click within 70ms commits exactly once`;
 
     test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({
@@ -97,7 +97,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   ]) {
     const testTitle = vp.isMobile
       ? `${engine} ${vp.name}: N2 T03 engrave options hidden and tapping does nothing`
-      : `${engine} ${vp.name} [regression guard]: N2 T03 engrave options hidden and tapping does nothing`;
+      : `${engine} ${vp.name}: N2 T03 engrave options hidden and tapping does nothing`;
 
     test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({
@@ -163,7 +163,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   ]) {
     const testTitle = vp.isMobile
       ? `${engine} ${vp.name}: O1 click wordbox during fly-out ignored`
-      : `${engine} ${vp.name} [regression guard]: O1 click wordbox during fly-out ignored`;
+      : `${engine} ${vp.name}: O1 click wordbox during fly-out ignored`;
 
     test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({
@@ -212,7 +212,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   ]) {
     const testTitle = vp.isMobile
       ? `${engine} ${vp.name}: O2 press ArrowLeft twice and hold during flyout commits at most 1`
-      : `${engine} ${vp.name} [regression guard]: O2 press ArrowLeft twice and hold during flyout commits at most 1`;
+      : `${engine} ${vp.name}: O2 press ArrowLeft twice and hold during flyout commits at most 1`;
 
     test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({
@@ -254,7 +254,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   ]) {
     const testTitle = vp.isMobile
       ? `${engine} ${vp.name}: Escape key closes menu popup and resets aria-expanded`
-      : `${engine} ${vp.name} [regression guard]: Escape key closes menu popup and resets aria-expanded`;
+      : `${engine} ${vp.name}: Escape key closes menu popup and resets aria-expanded`;
 
     test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({
@@ -367,7 +367,7 @@ for (const [engine] of Object.entries(ENGINES)) {
   ]) {
     const testTitle = vp.isMobile
       ? `${engine} ${vp.name}: aria-label, data-ready on drag past thr, long press no highlight`
-      : `${engine} ${vp.name} [regression guard]: aria-label, data-ready on drag past thr, long press no highlight`;
+      : `${engine} ${vp.name}: aria-label, data-ready on drag past thr, long press no highlight`;
 
     test(testTitle, async () => {
       const ctx = await browsers[engine].newContext({

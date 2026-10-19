@@ -190,7 +190,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       ? `${engine} ${vp.name} [regression guard]: N3 card text not clipped for all cards T01..T05, C01..C10`
       : `${engine} ${vp.name}: N3 card text not clipped for all cards T01..T05, C01..C10`;
 
-    test(testTitle, { timeout: 60000 }, async () => {
+    test(testTitle, { timeout: 90000 }, async () => {
       const ctx = await browsers[engine].newContext({ viewport: { width: vp.w, height: vp.h } });
       const page = await ctx.newPage();
       const errs = [];
@@ -204,34 +204,90 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         for (const cid of cardsToCheck) {
           const res = await page.evaluate((id) => {
+            // N3 strengthened (engineering review of b81125d found real clipping/overlap
+            // at 375x667 & 390x664, e.g. #card-drops rendered on top of #card-text lines).
+            // For every text node inside #card (#card-title, #card-text, .card-head speaker/
+            // season, #card-drops) walk each *line* via Range.getClientRects() and require:
+            //   1) the line rect is fully inside the card's visible box
+            //      (card rect ∩ every ancestor's overflow clip rect),
+            //   2) the line rect is inside the viewport,
+            //   3) no other visible #card child overlaps the line rect
+            //      (catches card-drops covering card-text lines).
+            const TOL = 1.5;
+            const fmt = (r) => `[${r.left.toFixed(1)}, ${r.top.toFixed(1)}, ${r.right.toFixed(1)}, ${r.bottom.toFixed(1)}]`;
+            const contains = (outer, inner) =>
+              inner.left >= outer.left - TOL && inner.right <= outer.right + TOL &&
+              inner.top >= outer.top - TOL && inner.bottom <= outer.bottom + TOL;
+            const inter = (a, b) => ({
+              left: Math.max(a.left, b.left),
+              top: Math.max(a.top, b.top),
+              right: Math.min(a.right, b.right),
+              bottom: Math.min(a.bottom, b.bottom),
+            });
+            const hits = (a, b) =>
+              a.left < b.right - TOL && b.left < a.right - TOL && a.top < b.bottom - TOL && b.top < a.bottom - TOL;
+
             window.__zz.st.current = id;
             window.__zz.st.phase = "card";
             window.__zz.render();
 
             const card = document.querySelector("#card");
-            const text = document.querySelector("#card-text");
+            if (!card) return { ok: false, msg: `${id}: #card missing` };
             const cr = card.getBoundingClientRect();
-            const tr = text.getBoundingClientRect();
 
-            if (!text || text.hidden || getComputedStyle(text).display === "none") {
-              return { ok: false, msg: `${id}: #card-text is hidden` };
+            // Card's visible box: intersect every ancestor that clips overflow.
+            let vbox = { left: cr.left, top: cr.top, right: cr.right, bottom: cr.bottom };
+            for (let p = card.parentElement; p && p !== document.body; p = p.parentElement) {
+              const cs = getComputedStyle(p);
+              if (cs.overflow !== "visible" || cs.overflowX !== "visible" || cs.overflowY !== "visible") {
+                const pr = p.getBoundingClientRect();
+                vbox = inter(vbox, { left: pr.left, top: pr.top, right: pr.right, bottom: pr.bottom });
+              }
             }
-            if (tr.width <= 0 || tr.height <= 0) {
-              return { ok: false, msg: `${id}: #card-text has 0 size` };
+
+            const boxes = [];
+            for (const sel of [".card-head", "#card-title", "#card-text", "#card-drops"]) {
+              const el = document.querySelector(sel);
+              if (!el) return { ok: false, msg: `${id}: ${sel} missing` };
+              if (el.hidden || getComputedStyle(el).display === "none" || getComputedStyle(el).visibility === "hidden") continue;
+              boxes.push({ el, label: sel });
             }
-            // Text must be fully inside card
-            if (tr.top < cr.top - 1.5 || tr.bottom > cr.bottom + 1.5 || tr.left < cr.left - 1.5 || tr.right > cr.right + 1.5) {
-              return {
-                ok: false,
-                msg: `${id}: #card-text overflows card [top:${tr.top.toFixed(1)}, bottom:${tr.bottom.toFixed(1)}] vs card [top:${cr.top.toFixed(1)}, bottom:${cr.bottom.toFixed(1)}]`,
-              };
-            }
-            // Check text not clipped by parent
-            if (text.scrollHeight > text.clientHeight + 1) {
-              return {
-                ok: false,
-                msg: `${id}: #card-text scrollHeight (${text.scrollHeight}) > clientHeight (${text.clientHeight})`,
-              };
+            // Every other visible #card child is a potential overlapper.
+            const others = Array.from(card.children)
+              .filter((el) => !boxes.some((b) => b.el === el) && !el.hidden && getComputedStyle(el).display !== "none")
+              .map((el) => ({ el, label: el.id || el.className || el.tagName }));
+
+            for (const b of boxes) {
+              const walker = document.createTreeWalker(b.el, NodeFilter.SHOW_TEXT);
+              let lines = 0;
+              while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (!node.nodeValue.trim()) continue;
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                for (const rect of range.getClientRects()) {
+                  if (rect.width <= 0 || rect.height <= 0) continue;
+                  lines++;
+                  if (!contains(cr, rect)) {
+                    return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} not inside card ${fmt(cr)}` };
+                  }
+                  if (!contains(vbox, rect)) {
+                    return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} clipped by ancestor overflow (visible ${fmt(vbox)})` };
+                  }
+                  if (rect.left < -0.5 || rect.top < -0.5 || rect.right > window.innerWidth + 0.5 || rect.bottom > window.innerHeight + 0.5) {
+                    return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} outside viewport` };
+                  }
+                  for (const o of [...boxes, ...others]) {
+                    if (o.el === b.el || b.el.contains(o.el)) continue;
+                    const orr = o.el.getBoundingClientRect();
+                    if (orr.width <= 0 || orr.height <= 0) continue;
+                    if (hits(rect, orr)) {
+                      return { ok: false, msg: `${id}: ${b.label} line ${fmt(rect)} overlapped by ${o.label} ${fmt(orr)}` };
+                    }
+                  }
+                }
+              }
+              if (lines === 0) return { ok: false, msg: `${id}: ${b.label} has no visible text lines` };
             }
             return { ok: true };
           }, cid);
