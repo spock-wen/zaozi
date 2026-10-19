@@ -237,9 +237,17 @@ function clearToast() {
   }
   clearTimeout(toast._t);
 }
+// N1 重复点按过滤器的状态（判定函数 n1RepeatTap 在 bindOpt 上方）。
+// lastOptTap 记「上一次真的点在某个选项上的点按」——不管它后来是被提交、被 inputBusy 挡下，
+// 还是被 N1 自己吞掉，都刷新，这样连点的第二、第三下都归它管。
+let lastOptTap = { side: null, x: 0, y: 0, t: 0 };
+let n1Swallowed = 0;             // 被 N1 吞掉的点按数（调试计数，window.__zz.n1Swallowed）
+let n1Reason = null;             // 最后一次吞掉的原因（window.__zz.n1Reason），供用例区分「N1 吞的」与「inputBusy 挡的」
 function resetInputState() {
   clearToast();
   clearTimeout(ui.holdT);
+  n1Swallowed = 0; n1Reason = null;
+  lastOptTap = { side: null, x: 0, y: 0, t: 0 };
   ui.dragging = false; ui.dragged = false; ui.hold = false; ui.kbDir = null; ui.animating = false; ui.dx = 0;
   const c = cardEl();
   if (c) {
@@ -1227,6 +1235,25 @@ on($("bonecorner"), () => { if (st.phase === "engrave") { clearToast(); ui.engra
 // 在 pointerup 上若未起拖且仍在按钮内，即提交；随后的 click 借时间窗口去重，确保仅触发一次。
 let lastOptPointerCommit = { side: null, at: 0 };
 let optPress = null;
+// N1 (Q5=B): same option ≤10px ≤70ms → swallow.
+// 卡飞出过程中的「同一个选项按钮上、离上一次点按 ≤10px 且间隔 ≤70ms」的第二次点按是重复点击
+// （手指双击/回弹），整次吞掉：不提交、也不入队。故意做得很窄——点在另一个选项上、
+// 同选项但偏离 >10px、或间隔 >70ms，都不归它管，照原路走（本分支上仍由 inputBusy() 的
+// 飞出闭锁挡下；inputBusy 与 S-1 的 pointerup+700ms 去重语义都不动）。
+// 兼容方向（designer §10，稍后落地，不是现在）：飞出过程中的输入将改为「按下即入队」，
+// 进刻字阶段再按 K/S 跑队列、箭头只显示一次闭锁提示，队列不丢弃。所以这里刻意只做一道
+// 纯过滤器——只看「这一按是不是重复」，没有任何丢弃/入队逻辑；将来队列拿到的就是 N1 没吞掉的每一次点按。
+const N1_MAX_DIST = 10, N1_MAX_MS = 70;
+function n1RepeatTap(side, x, y) {
+  const now = performance.now();
+  const dt = now - lastOptTap.t, d = Math.hypot(x - lastOptTap.x, y - lastOptTap.y);
+  const repeat = lastOptTap.side === side && dt <= N1_MAX_MS && d <= N1_MAX_DIST;
+  lastOptTap = { side, x, y, t: now };
+  if (!repeat) return false;
+  n1Swallowed++;
+  n1Reason = `n1:same-option d=${d.toFixed(1)}px dt=${Math.round(dt)}ms`;
+  return true;
+}
 function bindOpt(id, side) {
   const el = $(id);
   if (!el) return;
@@ -1241,6 +1268,14 @@ function bindOpt(id, side) {
     if (ui.dragging) return;
     const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
     if (dist > 20) return;
+    // N1 重复点按过滤器：放在 hit / inputBusy 之前，只认「按下点在同一个选项按钮上」，
+    // 不依赖抬起时卡片是否已经飞出移位（选项按钮不在 #card 里，不随飞出位移）。
+    if (n1RepeatTap(side, press.x, press.y)) {
+      // 这次点按没有提交，但它后面照样会合成一个 click：借 S-1 那条既有的 700ms 去重把它挡掉，
+      // 否则这条 click 会绕过 N1 走到 commitSide（本分支被 inputBusy 挡下，将来看起来就是白入队一次）。
+      lastOptPointerCommit = { side, at: performance.now() };
+      return;
+    }
     const hit = el.contains(e.target) || document.elementFromPoint(e.clientX, e.clientY)?.closest("#" + id);
     if (!hit) return;
     if (inputBusy()) return;
@@ -1376,6 +1411,8 @@ window.__zz = {
   get view() { return document.body.dataset.view; },
   get short() { return document.body.dataset.short || ""; },
   get animating() { return ui.animating; },
+  get n1Swallowed() { return n1Swallowed; },   // N1 重复点按过滤器吞掉的次数（见 n1RepeatTap）
+  get n1Reason() { return n1Reason; },         // 最后一次被 N1 吞掉的原因，供用例区分 N1 与 inputBusy
   get debugGoal() { return DEBUG_GOAL; },
   dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
