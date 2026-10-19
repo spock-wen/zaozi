@@ -541,7 +541,12 @@ function renderWordbox() {
     const used = st.dropped.includes(ch);
     const card = (st.phase === "card") ? curCard() : null;
     const ok = card && !used && usable(ch) && card.drops.some((d) => d.char === ch);
-    return `<button class="slot ${ok ? "ok" : ""} ${used ? "used" : ""}" data-slot="${i}" ${st.phase !== "card" ? "disabled" : ""}>${gimg(ch)}<span>${i + 1}·${ch}${used ? " · 已落" : ""}</span></button>`;
+    // 标签只放「序号·字」：N 档格宽固定 52（BREAKPOINTS §字匣），塞不下「 · 已落」。
+    // 「已落」由 .used 的删除线 + 灰化表达，读屏用 aria-label 补全（A/B/手机档格子自适应宽，
+    // 那边也曾因这句文字溢出格子——LEFTOVERS D3/H5「不出容器」）。
+    const label = `${i + 1}·${ch}`;
+    const usedAttr = used ? ` aria-label="${label}，已落"` : "";
+    return `<button class="slot ${ok ? "ok" : ""} ${used ? "used" : ""}" data-slot="${i}" ${st.phase !== "card" ? "disabled" : ""}${usedAttr}>${gimg(ch)}<span>${label}</span></button>`;
   }).join(""));
 }
 function sideHTML() {
@@ -793,9 +798,16 @@ function keyhelpHTML() {
 }
 // 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
 // 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。
+// cardSettling 只兜「飞出 rAF 结束、过渡对象还没建好的那一帧」。卡上真的没有在跑的入场过渡时
+// 必须把这个闭锁放掉：它一旦卡死，renderShort()→armKeyhelpReshow()→whenCardEntryDone()
+// （无动画可等，立刻 resolve）→renderShort()… 就变成只跑微任务的自旋，把事件循环饿死
+// （页面全卡、page.evaluate 永不返回），inputBusy() 也会被永久摁住。
 let cardSettling = false;
 function cardEntryBusy() {
-  return ui.animating || cardSettling;
+  if (ui.animating) return true;
+  if (!cardSettling) return false;
+  if (!$("card").getAnimations().some((a) => a.playState === "running")) cardSettling = false;
+  return cardSettling;
 }
 function inputBusy() {
   return st.phase !== "card" || ui.animating || ui.dragging || cardEntryBusy();
@@ -831,7 +843,11 @@ function whenCardEntryDone() {
 let keyhelpSettle = null;             // 入场中被隐去时挂的「稳住后再显形」等待
 function armKeyhelpReshow() {
   if (keyhelpSettle) return;
-  keyhelpSettle = whenCardEntryDone().then(() => { keyhelpSettle = null; renderShort(); });
+  // 必须先让出一帧再重查：whenCardEntryDone() 在「没有动画可等」时会同步 resolve，若在这里
+  // 直接重入 renderShort()→armKeyhelpReshow()，就形成只跑微任务的自旋循环（饿死事件循环）。
+  keyhelpSettle = whenCardEntryDone()
+    .then(() => new Promise((r) => requestAnimationFrame(() => r())))
+    .then(() => { keyhelpSettle = null; renderShort(); });
 }
 let keyhelpCloseT = 0;
 function scheduleKeyhelpClose() {

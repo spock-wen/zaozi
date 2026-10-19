@@ -510,6 +510,10 @@ body[data-short] #gesture-hint{display:none;}
    N = 格 52 + 上下内边距 12（BREAKPOINTS §矮屏 表：N 字匣 64（格 52））。 */
 body[data-view="desktop"]:not([data-short]) .wb-handle{display:none;}
 body[data-view="desktop"]:not([data-short]) #wordbox-bar{border-top:0;padding:6px 8px;min-height:64px;}
+/* N 档格宽回到设计稿的固定网格：格 52、格距 8、点击区 ≥44（BREAKPOINTS §字匣「格 N 52」）。
+   基础规则是 min-width:52 + 自适应宽（A/B/手机/平板要让 13px 不换行的格文字不出格，
+   LEFTOVERS D3/H5），N 档若也跟着自适应，「1·水 · 已落」会把格撑到 83，网格就散了。 */
+body[data-view="desktop"]:not([data-short]) .slot{width:52px;}
 
 /* 字匣：A 60（格 48）/ B 56（格 48） */
 body[data-short="A"] #wordbox-bar,
