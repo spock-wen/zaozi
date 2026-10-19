@@ -91,7 +91,7 @@ for (const engine of Object.keys(ENGINES)) {
           assert.ok(keysTextNormal.trim().length > 0, "普通阶段 tier N #keys 文本应非空");
           assert.ok(gestureTextNormal.trim().length > 0, "普通阶段 tier N #gesture-hint 文本应非空");
 
-          for (const forbidden of ["K 刻字", "K/Enter", "骨片"]) {
+          for (const forbidden of ["K 刻字", "K刻", "骨片"]) {
             assert.ok(!keysTextNormal.includes(forbidden), `普通阶段 #keys 不应包含「${forbidden}」，实际为：${keysTextNormal}`);
           }
           assert.ok(!gestureTextNormal.includes("K 刻字"), `普通阶段 #gesture-hint 不应包含「K 刻字」，实际为：${gestureTextNormal}`);
@@ -107,7 +107,7 @@ for (const engine of Object.keys(ENGINES)) {
           // 正向检查：可见的键位行内容非空
           assert.ok(keysTextNormal.trim().length > 0, "普通阶段 tier A #keys 文本应非空");
 
-          for (const forbidden of ["K 刻字", "K/Enter", "骨片"]) {
+          for (const forbidden of ["K 刻字", "K刻", "骨片"]) {
             assert.ok(!keysTextNormal.includes(forbidden), `普通阶段 #keys 不应包含「${forbidden}」，实际为：${keysTextNormal}`);
           }
         } else if (vp.tier === "B") {
@@ -127,7 +127,7 @@ for (const engine of Object.keys(ENGINES)) {
           // P3-2：在 some/!some 检查前先断言 popRows.length > 0
           assert.ok(popRows.length > 0, "普通阶段 keyhelp 浮层行数应大于 0");
 
-          for (const forbidden of ["K 刻字", "K/Enter", "刻字（或点卡角骨片）", "骨片"]) {
+          for (const forbidden of ["K 刻字", "K刻", "刻字（或点卡角骨片）", "骨片"]) {
             assert.ok(!popText.includes(forbidden), `普通阶段 keyhelp 浮层不应包含「${forbidden}」，实际为：${popText}`);
           }
           const hasKRow = popRows.some((r) => r.key === "K");
@@ -153,9 +153,11 @@ for (const engine of Object.keys(ENGINES)) {
           await assertVisible(gestureLocator, "刻字阶段 tier N #gesture-hint");
           assert.ok(keysTextEngrave.includes("K 刻字"), `刻字阶段 tier N #keys 应包含「K 刻字」，实际为：${keysTextEngrave}`);
           assert.ok(gestureTextEngrave.includes("K 刻字"), `刻字阶段 tier N #gesture-hint 应包含「K 刻字」，实际为：${gestureTextEngrave}`);
+          assert.ok(!keysTextEngrave.includes("Enter 刻"), `刻字阶段 tier N #keys 不应声明 Enter 刻，实际为：${keysTextEngrave}`);
         } else if (vp.tier === "A") {
           await assertVisible(keysLocator, "刻字阶段 tier A #keys");
-          assert.ok(keysTextEngrave.includes("K/Enter"), `刻字阶段 tier A #keys 应包含「K/Enter」，实际为：${keysTextEngrave}`);
+          assert.ok(keysTextEngrave.includes("K刻"), `刻字阶段 tier A #keys 应包含「K刻」，实际为：${keysTextEngrave}`);
+          assert.ok(!keysTextEngrave.includes("Enter"), `刻字阶段 tier A #keys 绝不应声明 Enter 刻，实际为：${keysTextEngrave}`);
         } else if (vp.tier === "B") {
           if (await page.locator("#keyhelp-pop").isHidden()) {
             await page.locator("#keyhelp-btn").click();
@@ -172,7 +174,9 @@ for (const engine of Object.keys(ENGINES)) {
           const hasKRow = popRows.some((r) => r.key === "K" && r.desc.includes("刻"));
           assert.ok(hasKRow, "刻字阶段 keyhelp 浮层应包含按键为 K 的刻字行");
           const hasEnterRow = popRows.some((r) => r.key === "Enter" && r.desc.includes("刻"));
-          assert.ok(hasEnterRow, "刻字阶段 keyhelp 浮层应包含按键为 Enter 的刻字行");
+          assert.ok(!hasEnterRow, "刻字阶段 keyhelp 浮层绝不应声明按键为 Enter 的刻字行");
+          const hasSRow = popRows.some((r) => r.key === "S" && r.desc.includes("先不刻"));
+          assert.ok(hasSRow, "刻字阶段 keyhelp 浮层应包含按键为 S 的先不刻行");
 
           // 断言浮层中包含 K 的提示行对用户真实可见
           const kRowLocator = page.locator("#keyhelp-pop .kh-row").filter({ has: page.locator("b", { hasText: "K" }) });
@@ -186,3 +190,63 @@ for (const engine of Object.keys(ENGINES)) {
     });
   }
 }
+
+// P3-3: 校验 390x844, 360x800 和 1280x720 视口下 T03 提示不宣称 Enter 刻且文本无溢出 (scrollWidth <= clientWidth)
+const FIT_VIEWPORTS = [
+  { name: "390x844", width: 390, height: 844, isMobile: true },
+  { name: "360x800", width: 360, height: 800, isMobile: true },
+  { name: "1280x720", width: 1280, height: 720, isMobile: false },
+];
+
+for (const engine of Object.keys(ENGINES)) {
+  for (const vp of FIT_VIEWPORTS) {
+    test(`${engine} ${vp.name}: T03 刻字阶段按键提示不宣称 Enter 刻且文本无溢出 (scrollWidth <= clientWidth)`, async () => {
+      const ctx = await browsers[engine].newContext({
+        viewport: { width: vp.width, height: vp.height },
+        hasTouch: vp.isMobile,
+      });
+      const page = await ctx.newPage();
+      const errs = [];
+      collectErrors(page, errs);
+
+      try {
+        await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+        await page.evaluate(() => localStorage.clear());
+        await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+        await page.waitForFunction(() => !!window.__zz && window.__zz.st?.phase === "card");
+
+        // 前进到 T03（刻字阶段）
+        await commit(page, "left");
+        await commit(page, "right");
+        assert.equal(await current(page), "T03");
+        assert.equal(await phase(page), "engrave");
+
+        if (vp.isMobile) {
+          // 移动端：手势提示行与卡下落字框
+          const hint = page.locator("#gesture-hint");
+          const hintText = (await hint.textContent()) || "";
+          assert.ok(!hintText.includes("Enter 刻") && !hintText.includes("Enter刻"), `手势提示不应宣称 Enter 刻：${hintText}`);
+          const hintFits = await hint.evaluate((el) => el.scrollWidth <= el.clientWidth);
+          assert.ok(hintFits, `#gesture-hint 文本无溢出 (scrollWidth <= clientWidth)`);
+
+          const drops = page.locator(".card-drops");
+          const dropsFits = await drops.evaluate((el) => el.scrollWidth <= el.clientWidth);
+          assert.ok(dropsFits, `.card-drops 文本无溢出 (scrollWidth <= clientWidth)`);
+        } else {
+          // 桌面 1280x720 (tier A)：底部键位行
+          const keys = page.locator("#keys");
+          const keysText = (await keys.textContent()) || "";
+          assert.ok(keysText.includes("K刻"), `1280x720 tier A #keys 应包含「K刻」：${keysText}`);
+          assert.ok(!keysText.includes("Enter"), `1280x720 tier A #keys 不应包含 Enter 刻：${keysText}`);
+          const keysFits = await keys.evaluate((el) => el.scrollWidth <= el.clientWidth);
+          assert.ok(keysFits, `#keys 键位行文本无溢出 (scrollWidth <= clientWidth)`);
+        }
+
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}
+

@@ -737,7 +737,7 @@ function renderKeys() {
   if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
   const engrave = st.phase === "engrave";
   if (tier === "A") {
-    setText(el, engrave ? "←→选 1–3落字 Space分量 K/Enter刻" : "←→选 1–3落字 Space分量");
+    setText(el, engrave ? "←→选 1–3落字 Space分量 K刻" : "←→选 1–3落字 Space分量");
   } else {
     setText(el, engrave
       ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
@@ -752,7 +752,7 @@ function keyhelpHTML() {
     ["Space", "按住看分量"],
     ...(st.phase === "engrave" ? [
       ["K", "刻字（或点卡角骨片）"],
-      ["Enter", "刻"],
+      ["S", "先不刻"],
     ] : []),
     ["Esc", "关浮层"],
   ];
