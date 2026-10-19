@@ -162,17 +162,29 @@ async function gotoT02(page) {
   await settle(page);
 }
 
-// 捕获阶段 pointerdown：记下命中与卡是否在入场中
+// 捕获阶段 pointerdown 与 click：记下命中与卡是否在入场中
 async function armPointerWatch(page, sel) {
   await page.evaluate((s) => {
     window.__pd = [];
-    document.addEventListener("pointerdown", (e) => {
+    window.__clicks = [];
+    const checkEntering = () => {
       const card = document.getElementById("card");
+      return (card ? card.getAnimations().some((a) => a.playState === "running") : false) || (window.__zz ? !!window.__zz.animating : false);
+    };
+    document.addEventListener("pointerdown", (e) => {
       window.__pd.push({
         t: performance.now(),
         inside: !!e.target.closest?.(s),
         target: e.target.id || e.target.className || e.target.tagName,
-        entering: (card ? card.getAnimations().some((a) => a.playState === "running") : false) || (window.__zz ? !!window.__zz.animating : false),
+        entering: checkEntering(),
+      });
+    }, true);
+    document.addEventListener("click", (e) => {
+      window.__clicks.push({
+        t: performance.now(),
+        inside: !!e.target.closest?.(s),
+        target: e.target.id || e.target.className || e.target.tagName,
+        entering: checkEntering(),
       });
     }, true);
   }, sel);
@@ -414,20 +426,24 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         const res = await page.evaluate(() => ({
           pd: window.__pd || [],
+          clicks: window.__clicks || [],
           settleT: window.__settles?.T03,
           actLog: window.__actLog || [],
           engraves: window.__zz.actions.filter((a) => a.type === "engrave"),
         }));
 
         const hit = res.pd.find((p) => p.inside);
-        if (!hit || !hit.entering) {
-          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)}`;
+        const clickHit = res.clicks.find((c) => c.inside);
+        if (!hit || !hit.entering || !clickHit || !clickHit.entering) {
+          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)} clicks=${JSON.stringify(res.clicks)}`;
           continue;
         }
 
         hitSuccess = true;
         assert.ok(hit.inside, "指针事件必须命中 #bonecorner");
         assert.ok(hit.entering, "指针事件必须在入场动画未完成时触发");
+        assert.ok(clickHit.inside, "click 事件必须命中 #bonecorner");
+        assert.ok(clickHit.entering, "click 事件必须在入场动画未完成时触发");
         assert.ok(res.settleT != null, "应记录到 T03 落定时间");
         assert.equal(res.engraves.length, 1, "正好只刻一次（exactly one engrave）");
         const engraveAct = res.actLog.find((a) => a.type === "engrave");
@@ -471,20 +487,24 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         const res = await page.evaluate(() => ({
           pd: window.__pd || [],
+          clicks: window.__clicks || [],
           settleT: window.__settles?.T03,
           actLog: window.__actLog || [],
           engraves: window.__zz.actions.filter((a) => a.type === "engrave"),
         }));
 
         const hit = res.pd.find((p) => p.inside);
-        if (!hit || !hit.entering) {
-          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)}`;
+        const clickHit = res.clicks.find((c) => c.inside);
+        if (!hit || !hit.entering || !clickHit || !clickHit.entering) {
+          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)} clicks=${JSON.stringify(res.clicks)}`;
           continue;
         }
 
         hitSuccess = true;
         assert.ok(hit.inside, "指针事件必须命中 #bonecorner");
         assert.ok(hit.entering, "指针事件必须在入场动画未完成时触发");
+        assert.ok(clickHit.inside, "click 事件必须命中 #bonecorner");
+        assert.ok(clickHit.entering, "click 事件必须在入场动画未完成时触发");
         assert.ok(res.settleT != null, "应记录到 T03 落定时间");
         assert.equal(res.engraves.length, 1, "正好只刻一次（exactly one engrave）");
         const engraveAct = res.actLog.find((a) => a.type === "engrave");
@@ -528,20 +548,24 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         const res = await page.evaluate(() => ({
           pd: window.__pd || [],
+          clicks: window.__clicks || [],
           settleT: window.__settles?.T03,
           actLog: window.__actLog || [],
           skips: window.__zz.actions.filter((a) => a.type === "skip_engrave"),
         }));
 
         const hit = res.pd.find((p) => p.inside);
-        if (!hit || !hit.entering) {
-          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)}`;
+        const clickHit = res.clicks.find((c) => c.inside);
+        if (!hit || !hit.entering || !clickHit || !clickHit.entering) {
+          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)} clicks=${JSON.stringify(res.clicks)}`;
           continue;
         }
 
         hitSuccess = true;
         assert.ok(hit.inside, "指针事件必须命中 [data-do='skip']");
         assert.ok(hit.entering, "指针事件必须在入场动画未完成时触发");
+        assert.ok(clickHit.inside, "click 事件必须命中 [data-do='skip']");
+        assert.ok(clickHit.entering, "click 事件必须在入场动画未完成时触发");
         assert.ok(res.settleT != null, "应记录到 T03 落定时间");
         assert.equal(res.skips.length, 1, "正好只跳过一次（exactly one skip_engrave）");
         const skipAct = res.actLog.find((a) => a.type === "skip_engrave");
@@ -591,18 +615,24 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         const res = await page.evaluate(() => ({
           pd: window.__pd || [],
+          clicks: window.__clicks || [],
           settleT: window.__settles?.T03,
           actLog: window.__actLog || [],
           engraves: window.__zz.actions.filter((a) => a.type === "engrave"),
         }));
 
         const hit1 = res.pd[0];
-        if (!hit1 || !hit1.inside || !hit1.entering) {
-          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)}`;
+        const click1 = res.clicks[0];
+        if (!hit1 || !hit1.inside || !hit1.entering || !click1 || !click1.inside || !click1.entering) {
+          lastDiagnostic = `Attempt ${attempt}: pd=${JSON.stringify(res.pd)} clicks=${JSON.stringify(res.clicks)}`;
           continue;
         }
 
         hitSuccess = true;
+        assert.ok(hit1.inside, "第一次指针事件必须命中 #bonecorner");
+        assert.ok(hit1.entering, "第一次指针事件必须在入场动画未完成时触发");
+        assert.ok(click1.inside, "第一次 click 事件必须命中 #bonecorner");
+        assert.ok(click1.entering, "第一次 click 事件必须在入场动画未完成时触发");
         assert.ok(res.settleT != null, "应记录到 T03 落定时间");
         assert.equal(res.engraves.length, 1, "两次点击总共只刻一次（exactly ONE engrave total）");
         const engraveAct = res.actLog.find((a) => a.type === "engrave");

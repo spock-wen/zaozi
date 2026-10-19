@@ -9,7 +9,7 @@
 //   - 点卡后 queued ≥ 1。
 //   - 刻字卡 T03 落定后，拦截提示「先点卡角骨片刻下这件事」在独立落定时间 ≥ +245ms 后显形。
 // 对照与飞出中途覆盖：
-//   - [guard] 清队前队列为空。
+//   - 清队前队列为空。
 //   - M1 "飞出中途重新开局"：触点 #opt-left 起飞，~50ms 内真实触点打开 ☰ 并点「重新开局」
 //     （断言重置发生瞬间 __zz.animating 仍为 true）；落定后断言 __zz.animating 为 false、
 //     #card transform/opacity 为空、卡片中心在屏幕内；下一次起飞中触点卡片正常入队 (queued ≥ 1) 且 action log 无多余记录。
@@ -118,7 +118,7 @@ async function runScenario(engine, variant) {
       });
     }
   } else {
-    // [guard] 对照：队列为空时重新开局
+    // 对照：队列为空时重新开局
     await imp(codes.T03);
     const qBefore = await page.evaluate(() => __zz.queued);
     assert.equal(qBefore, 0, `对照组清队前队列应为空，实为 ${qBefore}`);
@@ -373,7 +373,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     await runScenario(engine, "导入T01");
   });
 
-  test(`${engine} 375 touch: [guard] 空队列清队对照组飞出中触点卡片正常入队`, async () => {
+  test(`${engine} 375 touch: 空队列清队对照组飞出中触点卡片正常入队`, async () => {
     await runScenario(engine, "guard");
   });
 
