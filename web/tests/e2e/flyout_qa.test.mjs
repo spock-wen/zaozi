@@ -28,6 +28,8 @@ const VP_TOUCH = { width: 390, height: 844 };
 
 // seed=20261016 下第 2 代 C04 卡（字匣 slot 0 含「1·水」且为 .slot.ok）的直达存档码
 const C04_CODE = "ZZ1.1dw0bxd.eyJ2IjoxLCJzZWVkIjoyMDI2MTAxNiwiYWN0aW9ucyI6W3sidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6InJpZ2h0In0seyJ0eXBlIjoiZW5ncmF2ZSIsInRyYWNlIjoi5LyRIn0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImRyb3AiLCJzbG90IjowfSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoic2tpcF9lbmdyYXZlIn0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJza2lwX2VuZ3JhdmUifSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoid2ludGVyX2VuZCJ9LHsidHlwZSI6ImhlaXIifSx7InR5cGUiOiJwaWNrX3RvZ2dsZSIsImNoYXIiOiLmsLQifSx7InR5cGUiOiJwaWNrX3RvZ2dsZSIsImNoYXIiOiLml6UifSx7InR5cGUiOiJwaWNrX3RvZ2dsZSIsImNoYXIiOiLkuroifSx7InR5cGUiOiJiZWdpbl9nZW5lcmF0aW9uIiwicGlja3MiOlsi5rC0Iiwi5pelIiwi5Lq6Il19LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJza2lwX2VuZ3JhdmUifV19";
+// seed=20261010 下 C06 卡（slot 0 含「水」；左出下一张卡为 C04，C04 具有「水」落字槽）的直达存档码
+const C06_CODE = "ZZ1.gsw3u1.eyJ2IjoxLCJzZWVkIjoyMDI2MTAxMCwiYWN0aW9ucyI6W3sidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJlbmdyYXZlIiwidHJhY2UiOiLkvJEifSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In0seyJ0eXBlIjoiY2hvb3NlIiwic2lkZSI6ImxlZnQifSx7InR5cGUiOiJjaG9vc2UiLCJzaWRlIjoibGVmdCJ9LHsidHlwZSI6ImNob29zZSIsInNpZGUiOiJsZWZ0In1dfQ";
 
 let server, browsers = {};
 
@@ -46,7 +48,7 @@ after(async () => {
 async function setup(engine, opts = {}) {
   const touch = !!opts.touch;
   const ctx = await browsers[engine].newContext({
-    viewport: touch ? VP_TOUCH : VP_DESK,
+    viewport: opts.viewport || (touch ? VP_TOUCH : VP_DESK),
     hasTouch: touch,
     isMobile: touch && engine !== "firefox",
     reducedMotion: opts.reducedMotion,
@@ -82,7 +84,7 @@ async function settle(page) {
     }
     const now = performance.now();
     if (!window.__settleFrom) window.__settleFrom = now;
-    return now - window.__settleFrom >= 400;
+    return now - window.__settleFrom >= 200;
   }, null, { timeout: 8000, polling: 40 }).catch(() => {});
 }
 
@@ -93,6 +95,7 @@ async function startRecorder(page) {
     window.__commits = [];
     window.__settleEvents = [];
     window.__keyEvents = [];
+    window.__settles = {};
 
     document.addEventListener("keydown", (e) => {
       window.__keyEvents.push({
@@ -109,11 +112,23 @@ async function startRecorder(page) {
 
     const loop = () => {
       const z = window.__zz;
+      const card = document.getElementById("card");
       const n = z ? z.actions.length : 0;
       const cur = z?.st?.current;
       const settledAt = z?.settledAt ?? 0;
       const t = performance.now();
       const delta = n - prevN;
+
+      const noAnim = !z?.animating;
+      const noRunningAnim = card ? !card.getAnimations().some((a) => a.playState === "running") : true;
+      const noTransform = card ? (card.style.transform === "" || card.style.transform === "none") : true;
+      const notDragging = card ? !card.classList.contains("dragging") : true;
+      const settled = noAnim && noRunningAnim && noTransform && notDragging;
+
+      const cardKey = cur + "|" + n;
+      if (settled && window.__settles[cardKey] == null) {
+        window.__settles[cardKey] = performance.now();
+      }
 
       if (delta > 0) {
         window.__commits.push({
@@ -123,6 +138,7 @@ async function startRecorder(page) {
           cur,
           prevCur,
           settledAt,
+          cardKeyBefore: prevCur + "|" + prevN,
           acts: z.actions.slice(prevN).map((a) =>
             a.side === "drop" ? `drop${a.slot}` : (a.side || a.type)
           ),
@@ -157,6 +173,7 @@ async function stopRecorder(page, startN) {
       frames: window.__frames,
       commits: window.__commits,
       settleEvents: window.__settleEvents,
+      settles: window.__settles,
       keyEvents: window.__keyEvents,
       actions: z ? z.actions.slice(n0).map((a) =>
         a.side === "drop" ? `drop${a.slot}` : (a.side || a.type)
@@ -215,17 +232,19 @@ for (const [engine] of Object.entries(ENGINES)) {
         "第 3 张卡上应保持排队的第 3 次 ← 产生的左侧预览（#opt-left 带 on）"
       );
 
-      // 断言 3：排队的提交必须在目标卡落定（window.__zz.settledAt）≥250ms 之后发生
+      // 断言 3：排队的提交必须在目标卡独立落定 ≥250ms 之后发生（独立测得）
       assert.ok(rec.commits.length >= 2, "应至少记录到 2 次提交");
       const queuedCommit = rec.commits[1];
+      const targetKey = queuedCommit.cardKeyBefore;
+      const indSettle = rec.settles[targetKey];
       assert.ok(
-        queuedCommit.settledAt > 0,
-        `排队提交时目标卡必须已有落定时间戳 settledAt（实测 settledAt: ${queuedCommit.settledAt}）`
+        indSettle > 0,
+        `排队提交时目标卡必须已有独立落定时间戳（${targetKey}）`
       );
-      const gap = queuedCommit.t - queuedCommit.settledAt;
+      const gap = queuedCommit.t - indSettle;
       assert.ok(
         gap >= 245,
-        `排队提交必须在目标卡落定 ≥250ms 后发生（实测 gap: ${Math.round(gap)}ms, commit.t=${Math.round(queuedCommit.t)}, settledAt=${Math.round(queuedCommit.settledAt)}）`
+        `排队提交必须在目标卡独立落定 ≥250ms 后发生（实测 gap: ${Math.round(gap)}ms, commit.t=${Math.round(queuedCommit.t)}, indSettle=${Math.round(indSettle)}）`
       );
 
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
@@ -349,17 +368,78 @@ for (const [engine] of Object.entries(ENGINES)) {
       );
       assert.equal(rec.actions[0], "left", "第一个提交动作必须为起飞的 left");
 
-      // 断言 3：如果落字被应用到下一张卡，必须在下一张卡落定 ≥250ms 之后
+      // 断言 3：如果落字被应用到下一张卡，必须在下一张卡独立落定 ≥250ms 之后（独立测得）
       if (rec.actions.length === 2) {
         const dropCommit = rec.commits.find((c) => c.acts.some((a) => a.startsWith("drop")));
         assert.ok(dropCommit, "必须存在落字提交记录");
-        assert.ok(dropCommit.settledAt > 0, "落字提交时目标卡必须已有 settledAt");
-        const gap = dropCommit.t - dropCommit.settledAt;
+        const targetKey = dropCommit.cardKeyBefore;
+        const indSettle = rec.settles[targetKey];
+        assert.ok(indSettle > 0, `落字提交时目标卡必须已有独立落定时刻（${targetKey}）`);
+        const gap = dropCommit.t - indSettle;
         assert.ok(
           gap >= 245,
           `落字动作必须在下一张卡停稳 ≥250ms 后发生（实测 gap: ${Math.round(gap)}ms）`
         );
       }
+
+      assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // F2 变体 (下一张卡存在落字槽): 飞出期间排队的落字必须在下一张卡独立落定 ≥250ms 后被应用（A3）
+  // --------------------------------------------------------------------------
+  test(`${engine} 1280: F2变体 下一张卡存在匹配落字槽时，飞出期间排队的落字必须生效（A3）`, async () => {
+    const { ctx, page, errs } = await setup(engine, { code: C06_CODE });
+    try {
+      await settle(page);
+      const slotLocator = page.locator("#wordbox [data-slot=\"0\"]");
+      assert.ok((await slotLocator.count()) > 0, "字匣必须具有 slot 0（水）");
+      const box = await slotLocator.boundingBox();
+      assert.ok(box, "字匣格子必须具有可见布局区域");
+
+      const n0 = await page.evaluate(() => window.__zz.actions.length);
+      await startRecorder(page);
+
+      // ←← 起飞
+      await page.keyboard.press("ArrowLeft");
+      await page.keyboard.press("ArrowLeft");
+
+      // 起飞后约 60ms 点击字匣格子 slot 0
+      await page.waitForTimeout(60);
+      const animatingAtClick = await page.evaluate(() => !!window.__zz.animating);
+      assert.equal(animatingAtClick, true, "点击时卡片必须正在飞出中（ui.animating === true）");
+
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+      await page.waitForTimeout(2000);
+      await settle(page);
+      const rec = await stopRecorder(page, n0);
+
+      // 断言 1：方向提交只有起飞那一次
+      const sideCommits = rec.actions.filter((a) => a === "left" || a === "right");
+      assert.equal(sideCommits.length, 1, `方向提交必须仅有 1 次（实测 ${sideCommits.length}，动作: ${JSON.stringify(rec.actions)}）`);
+
+      // 断言 2：动作序列必须严格包含落字，即 ["left", "drop0"]
+      assert.deepEqual(
+        rec.actions,
+        ["left", "drop0"],
+        `排队的落字必须被下一张卡（C04）执行，动作序列应为 ["left", "drop0"]，实测为: ${JSON.stringify(rec.actions)}`
+      );
+
+      // 断言 3：落字动作必须在下一张卡独立落定 ≥250ms 后发生
+      const dropCommit = rec.commits.find((c) => c.acts.some((a) => a.startsWith("drop")));
+      assert.ok(dropCommit, "必须存在落字提交记录");
+      const targetKey = dropCommit.cardKeyBefore;
+      const indSettle = rec.settles[targetKey];
+      assert.ok(indSettle > 0, `落字提交时目标卡必须已有独立落定时刻（${targetKey}）`);
+      const gap = dropCommit.t - indSettle;
+      assert.ok(
+        gap >= 245,
+        `落字动作必须在下一张卡停稳 ≥250ms 后发生（实测 gap: ${Math.round(gap)}ms）`
+      );
 
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
     } finally {
@@ -426,12 +506,14 @@ for (const [engine] of Object.entries(ENGINES)) {
       );
       assert.equal(rec.actions[0], expectedSide, `第一个提交动作必须为起飞的 ${expectedSide}`);
 
-      // 断言 3：如果落字被应用到下一张卡，必须在下一张卡落定 ≥250ms 之后
+      // 断言 3：如果落字被应用到下一张卡，必须在下一张卡独立落定 ≥250ms 之后（独立测得）
       if (rec.actions.length === 2) {
         const dropCommit = rec.commits.find((c) => c.acts.some((a) => a.startsWith("drop")));
         assert.ok(dropCommit, "必须存在落字提交记录");
-        assert.ok(dropCommit.settledAt > 0, "落字提交时目标卡必须已有 settledAt");
-        const gap = dropCommit.t - dropCommit.settledAt;
+        const targetKey = dropCommit.cardKeyBefore;
+        const indSettle = rec.settles[targetKey];
+        assert.ok(indSettle > 0, `落字提交时目标卡必须已有独立落定时刻（${targetKey}）`);
+        const gap = dropCommit.t - indSettle;
         assert.ok(
           gap >= 245,
           `落字动作必须在下一张卡停稳 ≥250ms 后发生（实测 gap: ${Math.round(gap)}ms）`
