@@ -182,7 +182,7 @@ function loadGlyphs() {
   }).catch((e) => toast("字形包没加载上：" + e.message));
 }
 const glyphURL = (ch) => GLYPH[CHARS[ch]?.glyph_id] || "";
-const gimg = (ch) => (glyphURL(ch) ? `<img src="${glyphURL(ch)}" alt="${ch}" loading="lazy">` : `<span>${ch}</span>`);
+const gimg = (ch) => (glyphURL(ch) ? `<img src="${glyphURL(ch)}" alt="${ch}" loading="lazy" draggable="false">` : `<span>${ch}</span>`);
 function artHTML(card) {
   const art = CARD_ART.cards[card.id]; if (!art) return "";
   const b = CARD_ART.base;
@@ -196,7 +196,17 @@ function artHTML(card) {
 // ---------- 交互助手 ----------
 function toast(m) {
   const t = $("toast"); t.textContent = m; t.classList.add("on");
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 1800);
+  const tl = $("toast-live"); if (tl) tl.textContent = m;
+  clearTimeout(toast._t); toast._t = setTimeout(() => {
+    t.classList.remove("on");
+    if (tl) tl.textContent = "";
+  }, 1800);
+}
+function hideToast() {                          // D1：切卡/换阶段时立刻收起，别让 toast 盖住下一张卡的 #coach
+  const t = $("toast"); clearTimeout(toast._t);
+  t.classList.remove("on");
+  t.style.transition = "none"; void t.offsetWidth; t.style.transition = "";  // 跳过 .3s 淡出，立即变透明
+  const tl = $("toast-live"); if (tl) tl.textContent = "";
 }
 function deferInteract(el, ms = 350) {         // 防「天亮了」穿透到下一屏的按钮
   el.style.pointerEvents = "none";
@@ -207,10 +217,12 @@ function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closes
 // ---------- 派发 / 存档 ----------
 function dispatch(a) {
   try {
+    const prevCurrent = st.current, prevPhase = st.phase;   // D1
     st = step(st, a);
     actions.push(a);
     afterAction(a);
     saveNow();
+    if (st.current !== prevCurrent || st.phase !== prevPhase) hideToast();  // D1：换卡/换阶段即收起 toast
   } catch (e) { toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();
@@ -238,6 +250,7 @@ function restore() {
   if (!d) return false;
   try {
     st = run({ seed: d.seed }, d.actions);
+    hideToast();
     seed = d.seed; actions = d.actions.slice();
     toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
     return true;
@@ -252,6 +265,7 @@ function restore() {
   }
 }
 function newGame(s) {
+  hideToast();
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
   ui.pickFocus = null; ui.pickTapped = null; ui.presses.clear(); ui.swallow = [];
@@ -276,7 +290,9 @@ function importCode() {
   let d;
   try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
   try {
-    st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
+    st = run({ seed: d.seed }, d.actions);
+    hideToast();
+    seed = d.seed; actions = d.actions.slice();
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
     ui.lastDims = null; saveNow(); render(); closeDlg();
     toast(`导入成功：种子 ${seed}，${actions.length} 步`);
@@ -388,7 +404,9 @@ function renderCard() {
   ol.classList.toggle("on", side === "left"); or.classList.toggle("on", side === "right");
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
   setText($("gesture-hint"), keyboardMode()
-    ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
+    ? (st.phase === "engrave"
+        ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
+        : "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量")
     : "左右拖卡做选择 · 长按看分量");
 }
 function hasFinePointer() { return matchMedia("(hover:hover) and (pointer:fine)").matches; }
@@ -591,7 +609,8 @@ function renderPick() {
   if (el.dataset.pickBuilt !== "1") { buildPickSkeleton(el); el.dataset.pickBuilt = "1"; }
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
-  setText(el.querySelector("h2"), `出发挑字 · 第 ${st.generation ?? 2} 代`);
+  // 挑字页标题显示即将开始的代：此刻 st.generation 还是刚结束的那一代（begin_generation 之后才 +1），与交棒按钮（n+1）保持一致。
+  setText(el.querySelector("h2"), `出发挑字 · 第 ${(st.generation ?? 1) + 1} 代`);
   // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
   setText(el.querySelector(".season-note"), document.body.dataset.view === "desktop"
     ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
@@ -688,20 +707,28 @@ function renderKeys() {
   const tier = document.body.dataset.short || "";
   const el = $("keys");
   if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
-  setText(el, tier === "A"
-    ? "←→选 1–3落字 Space分量 K/Enter刻"
-    : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层");
+  const engrave = st.phase === "engrave";
+  if (tier === "A") {
+    setText(el, engrave ? "←→选 1–3落字 Space分量 K/Enter刻" : "←→选 1–3落字 Space分量");
+  } else {
+    setText(el, engrave
+      ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
+      : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · Esc 关浮层");
+  }
 }
 // 矮屏 B 顶栏「?」浮层：列出全部键位。首次进入某存档自动弹一次（3 秒后收起）。
 function keyhelpHTML() {
-  return [
+  const rows = [
     ["← →", "选字；再按同向或 Enter 提交"],
     ["1–3", "落字"],
     ["Space", "按住看分量"],
-    ["K", "刻字（或点卡角骨片）"],
-    ["Enter", "刻"],
+    ...(st.phase === "engrave" ? [
+      ["K", "刻字（或点卡角骨片）"],
+      ["Enter", "刻"],
+    ] : []),
     ["Esc", "关浮层"],
-  ].map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
+  ];
+  return rows.map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
 }
 // 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
 // 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。
@@ -845,7 +872,7 @@ function threshold() { return DRAG_RATIO * cardEl().getBoundingClientRect().widt
 function onDown(e) {
   if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
   if (st.phase !== "card" || ui.animating) return;
-  // 真正起拖时才清掉页面上已有的文字选区（鼠标）：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
+  // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
   // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
   if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
   ui.dragging = true; ui.dragged = false; ui.startX = e.clientX;
@@ -957,7 +984,6 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
 function commitSide(dir) {
-  const thr = threshold();
   flyOut((dir === "left" ? -1 : 1) * 620, () => dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action));
 }
 

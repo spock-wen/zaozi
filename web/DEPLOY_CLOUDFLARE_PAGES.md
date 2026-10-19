@@ -31,3 +31,12 @@ npm run e2e          # 三引擎 e2e（串行；同一 checkout 里不要并行�
 - `python3 web/tools/qa/sticky_blocked.py <report.md>`（默认读同目录 `BLOCKED_LEDGER.tsv`）
 - 历次复测的 `tools/qa/web/<sha>/run_all.sh` 用 `REPO` 环境变量指向要跑 e2e 的目录：
   合入后应为 `<zaozi 克隆>/web`，例如 `REPO=/workspace/qa-zaozi/web bash run_all.sh`；不设时沿用原默认 `/workspace/qa-zaozi-web-repo`（zaozi-web 克隆）。
+
+## 查看合入前的历史（按路径）
+subtree 不 squash，zaozi-web 的完整历史在合并提交 `c249971` 的第二个父提交下，但那边的路径**没有** `web/` 前缀。在**仓库根**执行：
+```sh
+git log c249971^2 -- <去掉 web/ 前缀的路径>
+# 例：现在的 web/web/app.js  → git log c249971^2 -- web/app.js
+#     现在的 web/REDESIGN_REPORT.md → git log c249971^2 -- REDESIGN_REPORT.md
+```
+（在 `web/` 子目录里执行时，git 会把路径当成相对当前目录，查不到；要在仓库根执行。）合入之后的改动照常用 `git log -- web/<路径>` 查看。
