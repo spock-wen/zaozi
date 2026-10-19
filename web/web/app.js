@@ -1205,9 +1205,48 @@ on($("wordbox"), (e) => {
   }
 });
 on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") { clearToast(); dispatch({ type: "skip_engrave" }); } });
-on($("bonecorner"), () => { if (st.phase === "engrave") { clearToast(); ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
-on($("opt-left"), () => commitSide("left"));
-on($("opt-right"), () => commitSide("right"));
+// 左右选项：支持 pointerup 提交并与 click 去重（S-1）。
+// WebKit 在切卡/重绘（setText 换 text 节点）跨越按下与抬起时，不会为按钮合成 click。
+// 在 pointerup 上若未起拖且仍在按钮内，即提交；随后的 click 借时间窗口去重，确保仅触发一次。
+let lastOptPointerCommit = { side: null, at: 0 };
+let optPress = null;
+function bindOpt(id, side) {
+  const el = $(id);
+  if (!el) return;
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    optPress = { side, id: e.pointerId, x: e.clientX, y: e.clientY };
+  });
+  el.addEventListener("pointerup", (e) => {
+    if (!optPress || optPress.side !== side || optPress.id !== e.pointerId) return;
+    const press = optPress;
+    optPress = null;
+    if (ui.dragging) return;
+    const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+    if (dist > 20) return;
+    const hit = el.contains(e.target) || document.elementFromPoint(e.clientX, e.clientY)?.closest("#" + id);
+    if (!hit) return;
+    if (inputBusy()) return;
+    lastOptPointerCommit = { side, at: performance.now() };
+    commitSide(side);
+  });
+  el.addEventListener("pointercancel", (e) => {
+    if (optPress && optPress.id === e.pointerId) optPress = null;
+  });
+  on(el, () => {
+    const now = performance.now();
+    if (lastOptPointerCommit.side === side && (now - lastOptPointerCommit.at) < 700) {
+      lastOptPointerCommit = { side: null, at: 0 };
+      return;
+    }
+    commitSide(side);
+  });
+}
+bindOpt("opt-left", "left");
+bindOpt("opt-right", "right");
+addEventListener("pointerup", (e) => {
+  if (optPress && optPress.id === e.pointerId) optPress = null;
+});
 on($("winter"), (e) => {
   const d = e.target.closest("[data-tally],[data-comp],[data-base],[data-pos],[data-do]"); if (!d) return;
   const w = ui.winter;
