@@ -119,6 +119,7 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
   transition:transform 120ms ease-out,box-shadow 120ms ease-out;
 }
 .card.engrave .bonecorner{display:flex;}
+.card.engrave #card-title,.card.engrave .card-head{margin-right:48px;}
 .bonecorner:active{transform:scale(.92);box-shadow:0 0 0 3px rgba(181,67,46,.45);}
 .bonecorner.done{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);pointer-events:none;}
 .card.engrave .bonecorner:not(.done):hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.3);border-color:var(--night-line);}
@@ -134,7 +135,10 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 }
 .optbtn.on{background:var(--bone-100);color:var(--ink);border-color:var(--zhu-600);box-shadow:inset 0 0 0 1px var(--zhu-600);}
 .optbtn[data-ready]{background:var(--zhu-600);color:var(--paper-50);box-shadow:0 0 0 2px var(--paper-50);}
-.optbtn:disabled{background:transparent;color:var(--paper-200);border:1px dashed var(--bone-crack);cursor:not-allowed;visibility:hidden;}
+.optbtn:disabled{background:transparent;color:var(--paper-200);border:1px dashed var(--bone-crack);cursor:not-allowed;}
+/* 选卡用的左右选项只在选卡阶段出现（PM 10/19 10:20）：刻字等阶段藏起、禁用（JS）、visibility:hidden 同时移出 Tab 顺序和点击。
+   只点名 #opt-left / #opt-right，不再对所有 .optbtn 一刀切；刻字入口（卡角「刻」、卡内「先不刻」）不受影响。 */
+body:not([data-phase="card"]) #opt-left,body:not([data-phase="card"]) #opt-right{visibility:hidden;}
 
 #gesture-hint{font-size:13px;color:var(--paper-200);text-align:center;min-height:16px;}
 
@@ -192,7 +196,7 @@ body[data-view="mobile"] .optbtn,body[data-view="tablet-portrait"] .optbtn{
   overflow:hidden;overflow-wrap:anywhere;text-wrap:balance;
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-box-pack:center;-webkit-line-clamp:2;
 }
-body[data-view="mobile"] .optbtn:disabled,body[data-view="tablet-portrait"] .optbtn:disabled{visibility:hidden;}
+body:not([data-phase="card"]) #opt-left,body:not([data-phase="card"]) #opt-right{visibility:hidden;}
 body[data-view="mobile"] #opt-left,body[data-view="tablet-portrait"] #opt-left{grid-area:l;}
 body[data-view="mobile"] #opt-right,body[data-view="tablet-portrait"] #opt-right{grid-area:r;}
 body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;height:40px;min-height:40px;}
@@ -388,8 +392,9 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
   background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s;pointer-events:none;
-  width:max-content;max-width:min(90vw,320px);}
+  width:max-content;max-width:min(calc(100vw - 32px),320px);white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:22px;}
 #toast.on{opacity:1;visibility:visible;transition:opacity .3s,visibility 0s;}  /* D1：收起后连命中/绘制一起退出，不在 #coach 上留透明盒 */
+#toast.hold{visibility:hidden !important;transition:none !important;}
 #rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
 
 /* ---------- 平板竖屏（600–1023 竖） ---------- */
@@ -418,7 +423,6 @@ body[data-view="desktop"] #sidebar{grid-column:2/3;grid-row:2/4;display:block;wi
 body[data-view="desktop"] #sidebar.collapsed,body[data-view="tablet-landscape"] #sidebar.collapsed{width:0;}
 body[data-view="desktop"] #dims-desktop{display:flex;width:480px;max-width:100%;justify-content:space-between;margin-bottom:4px;}
 body[data-view="desktop"] #dims-desktop .dim{flex:0 0 auto;width:110px;}
-body[data-view="desktop"] #gesture-hint{color:var(--night-line);}
 body[data-view="desktop"] #gesture-hint:empty{display:none;}
 /* 卡槽宽 = 卡高 × 328/468（同 tablet-landscape 注释）：让 #cardwrap 盒 = 卡盒，
    卡在槽内居中、字匣（居中在网格列）正好在卡下，矮屏 A/B 也沿用此比例。 */

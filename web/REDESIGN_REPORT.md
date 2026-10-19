@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`597aa0d3a640`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`e0b7411113ab`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -217,7 +217,7 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - On the c7fdcfc code: 12 of 18 drag scenarios fail: chromium 1280 (a)(b)(c) and 390 (b)(c); firefox (b)(c) at both sizes (on (b) the drag commits but leaves the selection); webkit 1280 (a)(c) and 390 (c). Failures were dragstart, pointercancel, the card not following, or selection left behind. This matches 测试's c7fdcfc baseline (qa/sel2.mjs). The 6 guard tests pass on both versions, as intended. With the fix: 24/24.
 - Unit 28/28. Full 3-engine e2e (one serial run on 67553f4): 308/308. card_outside_select_drag then gained the dragstart / pointercancel / leftover-selection and credits Ctrl+A assertions (test-only, after that run started); re-run alone on the final code: 24/24.
 
-## Post-merge (spock-wen/zaozi, branch fix/web-post-merge, main b0c7b5d merged in; VERSION e4dfd127ccf1 on #8; merged to main 3e0edbe; fix/web-flyout-keys VERSION 597aa0d3a640)
+## Post-merge (spock-wen/zaozi, branch fix/web-post-merge, main b0c7b5d merged in; VERSION e4dfd127ccf1 on #8; merged to main 3e0edbe; fix/web-flyout-keys VERSION 597aa0d3a640; fix/web-mobile-next VERSION e0b7411113ab)
 - Generation off by one (PM ruling) (0073f15): the pick screen title used `st.generation`, which during the pick is still the generation that just ended (begin_generation adds 1 later), so it read 第 1 代 while the button said 交给第 2 代. It now shows the generation about to start, `(st.generation ?? 1) + 1`, matching the hand-off button. The first game still shows 第 1 代 (it has no pick screen). Regression test gen_label (3 engines, 1280): first game 第 1 代; after each hand-off the pick title says 第 N 代 with the same N as the button; after setting out the top bar says 第 N 代. Fails on the old code (title 第 1 代 after 交给第 2 代).
 - Review P2-12 (74f884e): the small glyph images get `draggable="false"` (in gimg, so this covers every glyph image: 字匣, pick, winter, sidebar) and CSS `#wordbox img{-webkit-user-drag:none;user-select:none}`. Regression test wordbox_img_drag (3 engines, 1280, mouse drag from a 字匣 glyph image): no un-prevented native dragstart; img draggable=false. Fails 3/3 on the old code.
 - Docs: corrected the round 23 description of when the selection is cleared (see above).
@@ -278,7 +278,7 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
   - P3-1：[guard] 按 9462842 的 app.js 实测重标：本 PR 的测试里正好 24 条在 9462842 上过，全部标 [guard]（flyout_drag「未到阈值丢弃」6 + 「开抽屉作废」3、flyout_keys 9、overlay_esc 键位气泡 Esc 3、flyout_settle 点「刻」3）；「开目标面板作废」×3 在 9462842 上挂，去掉标签；其余本 PR 测试在 9462842 上都挂。第 6 轮写的「12 条 [guard]」不准，以此为准。
   - P3-2：起拖时延测试不再裸比 320ms：(1) 起拖必须在飞出/入场最后一个忙帧后 ≤3 帧；(2) 总时延只扣掉飞出自身超出 240ms 的那部分后 ≤320ms。产品阈值没动。把重放起拖推迟 150ms 的变异 6/6 挂（12 帧）。
   - P3-3：刻字阶段 ←/→/Enter（现场或排队）弹一次锁定提示；K 刻、S 跳过不变；上一张飞出期间按的 K/S 不是出卡键，不入队（注释写明）。flyout_carve C1/C2，变异 M25 与去掉 handleKey 提示各杀一条。
-  - P3-4：刻字卡入场中、或队列里还有项时，点骨片 / 先不刻 / 按 K、S 一律入队（carveBusy），落定 + 2 帧 + 250ms 后执行队列里第一个刻 / 跳过；队列里只有方向 / 拖拽时只弹一次提示。flyout_carve D1–D6（鼠标 1280、触屏 390）；6a88f4d 上全挂，去掉骨片门、carveBusy 不看队列、只看队头三个变异各杀对应例。
+  - P3-4：刻字卡入场中、或队列里还有项时，点骨片 / 先不刻 / 按 K、S 一律入队（carveBusy），落定 + 2 帧 + 250ms 后按顺序执行排队的刻 / 跳过、不清队（原句「执行第一个刻/跳过」已由 U2 作废覆盖）；队列里只有方向 / 拖拽时只弹一次提示。flyout_carve D1–D6（鼠标 1280、触屏 390）；6a88f4d 上全挂，去掉骨片门、carveBusy 不看队列、只看队头三个变异各杀对应例。
   - VERSION a60808d67606（干净树构建两次一致）。
   - 验证：单测 35/35；全量 3 引擎串行 e2e 629/629、0 跳过（2878ca7，10/19 18:04–18:49 UTC+8）；之后只改了 flyout_carve / flyout_reset_touch 两个测试文件，在 2254226 上重跑 39/39。
   - 没改：N1（同一选项第二次轻点会排一次提交）等 PM。S-1（webkit 鼠标在飞出中按下选项、飞出结束后才松开时不派发 click，b81125d 起就有）记为债，见 PR 描述。

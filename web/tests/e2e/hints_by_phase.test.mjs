@@ -151,7 +151,7 @@ for (const engine of Object.keys(ENGINES)) {
           assert.ok(!keysTextEngrave.includes("Enter 刻"), `刻字阶段 tier N #keys 不应声明 Enter 刻，实际为：${keysTextEngrave}`);
         } else if (vp.tier === "A") {
           await assertVisible(keysLocator, "刻字阶段 tier A #keys");
-          assert.ok(keysTextEngrave.includes("K刻"), `刻字阶段 tier A #keys 应包含「K刻」，实际为：${keysTextEngrave}`);
+          assert.ok(keysTextEngrave.includes("K 刻字") || keysTextEngrave.includes("K刻"), `刻字阶段 tier A #keys 应包含「K 刻字」或「K刻」，实际为：${keysTextEngrave}`);
           assert.ok(!keysTextEngrave.includes("Enter"), `刻字阶段 tier A #keys 绝不应声明 Enter 刻，实际为：${keysTextEngrave}`);
         } else if (vp.tier === "B") {
           if (await page.locator("#keyhelp-pop").isHidden()) {
@@ -231,7 +231,7 @@ for (const engine of Object.keys(ENGINES)) {
           // 桌面 1280x720 (tier A)：底部键位行
           const keys = page.locator("#keys");
           const keysText = (await keys.textContent()) || "";
-          assert.ok(keysText.includes("K刻"), `1280x720 tier A #keys 应包含「K刻」：${keysText}`);
+          assert.ok(keysText.includes("K 刻字") || keysText.includes("K刻"), `1280x720 tier A #keys 应包含「K 刻字」或「K刻」：${keysText}`);
           assert.ok(!keysText.includes("Enter"), `1280x720 tier A #keys 不应包含 Enter 刻：${keysText}`);
           const keysFits = await keys.evaluate((el) => el.scrollWidth <= el.clientWidth);
           assert.ok(keysFits, `#keys 键位行文本无溢出 (scrollWidth <= clientWidth)`);

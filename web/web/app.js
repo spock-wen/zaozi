@@ -50,6 +50,7 @@ const ui = {
   presses: new Map(),                 // 挑字：每次按下（按 pointerId 分），值是 { token, node, key }
   swallow: [],                        // 已被 pointerup 处理、等待吞掉其合成 click 的 press token 队列
   lastDims: null,
+  engraveHinted: false,               // 刻字阶段锁定提示是否已弹出：每进一次刻字阶段最多一次。在进入刻字阶段（换卡或换阶段）及 newGame/restore/importCode 时复位为 false（REREVIEW P3 D5 / RULES §10.3b）
   keyhelpOpen: false,                 // 矮屏 B：顶栏「?」键位浮层
   sheetOpen: false,                   // 「看全文」模态浮层
 };
@@ -198,53 +199,100 @@ function artHTML(card) {
 }
 
 // ---------- 交互助手 ----------
-// toast 位置为工程兜底，待设计师确认（R1 已撤回）
+// toast 避让（设计 RULES_fix2 v2 R1′ + §12 重排多行）：
+// toast 连同 4px 外边距不压任何可点元素和受保护区，整块在视口内；候选位置按顺序取第一个合格的。
+const TOAST_AVOID = "button,a[href],[data-do],[data-tally],[data-comp],[data-base],[data-pos],[role=button],input,select,textarea,canvas,#xcv,.cand,.pickslot,#wb-handle,"
+  + "#topbar,#dims,#dims-desktop,#wordbox-bar,#too-short,#keys,#sidebar,#coach,#menu-pop,#keyhelp-pop,#dlgbox,#banner";
+const TOAST_LAYERS = ["savedlg", "pick", "elder", "endseq", "winter", "drawer"];   // 全屏层（z 高→低）：开着时只看最上面那一层
+function toastVis(e) { return !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== "hidden"; }
+function toastMs(m) { return Math.min(6000, 1800 + Math.max(0, [...String(m)].length - 20) * 60); }
+
+function placeToast(t) {
+  const M = 4;
+  const vw = (window.visualViewport && visualViewport.width > 0) ? Math.min(innerWidth, visualViewport.width) : innerWidth;
+  const vh = (window.visualViewport && visualViewport.height > 0) ? Math.min(innerHeight, visualViewport.height) : innerHeight;
+  const layer = TOAST_LAYERS.map($).find(toastVis) || null;
+  const gh = $("gesture-hint"), gestOnly = !layer && toastVis(gh) && gh.dataset.kind === "gesture";
+  const els = [...(layer || document).querySelectorAll(TOAST_AVOID)];
+  if (layer) els.push($("too-short"));
+  else if (toastVis(gh) && !gestOnly) els.push(gh);
+  const av = els.filter((e) => e && e !== t && !t.contains(e) && toastVis(e))
+    .map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+  t.style.top = ""; t.style.bottom = "";
+  const r0 = t.getBoundingClientRect(), w = r0.width, h = r0.height, x = (vw - w) / 2;
+  const sat = (parseFloat(getComputedStyle($("topbar")).paddingTop) || 4) - 4;
+  const minY = layer ? sat : 0;
+  const bad = (y) => x < 0 || x + w > vw || y < minY || y + h > vh || av.some((a) => x < a.right + M && x + w > a.left - M && y < a.bottom + M && y + h > a.top - M);
+  const view = document.body.dataset.view, ol = $("opt-left");
+  const c = [!layer && (view === "mobile" || view === "tablet-portrait") && toastVis(ol) ? ol.getBoundingClientRect().top - 8 - h : r0.top];
+  if (gestOnly) { const q = gh.getBoundingClientRect(); c.push(q.top + (q.height - h) / 2); }
+  const startY = Math.ceil(layer ? sat + 8 : ($("topbar")?.getBoundingClientRect().bottom || 0) + 8);
+  for (let y = startY; y + h <= vh; y += 4) c.push(y);
+  for (const rawY of c) {
+    const y = Math.round(rawY);
+    if (!bad(y)) { t.style.bottom = "auto"; t.style.top = y + "px"; return true; }
+  }
+  return false;
+}
+
+function srSay(m) {
+  const s = $("toast-live") || $("sr-live"); if (!s) return;
+  s.textContent = ""; requestAnimationFrame(() => { s.textContent = m; });
+}
+
 function toast(m) {
   const t = $("toast");
-  const view = document.body.dataset.view;
-  const dims = (view === "desktop" ? $("dims-desktop") : null) || $("dims");
-  const bc = $("bonecorner");
-  const bcShown = bc && !bc.hidden && getComputedStyle(bc).display !== "none";
-
-  let top = 60;
-  if (dims && dims.getBoundingClientRect().height > 0) {
-    top = dims.getBoundingClientRect().bottom + 8;
-  } else {
-    const tb = $("topbar");
-    if (tb) top = tb.getBoundingClientRect().bottom + 8;
-  }
-  if (bcShown) {
-    const bcr = bc.getBoundingClientRect();
-    if (top < bcr.bottom + 8 && top + 42 > bcr.top) {
-      top = bcr.bottom + 8;
-    }
-  }
-
-  t.style.top = top + "px";
-  t.style.bottom = "auto";
   t.textContent = m;
-  t.classList.add("on");
-  const tl = $("toast-live"); if (tl) tl.textContent = m;
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => {
+  srSay(m);
+  if (!placeToast(t)) {
     t.classList.remove("on");
-    t.style.top = "";
-    t.style.bottom = "";
-    if (tl) tl.textContent = "";
-  }, 1800);
+    const gh = $("gesture-hint");
+    if (gh && gh.dataset.kind === "gesture" && toastVis(gh) && !TOAST_LAYERS.some((id) => toastVis($(id)))) {
+      gh.textContent = m;
+      if (gh.scrollWidth > gh.clientWidth + 1) {
+        gh.textContent = "";
+        renderCard();
+      } else {
+        clearTimeout(toast._g);
+        toast._g = setTimeout(() => { toast._g = 0; gh.textContent = ""; renderCard(); }, 1800);
+      }
+    }
+    return;
+  }
+  t.classList.add("on");
+  t.classList.toggle("hold", cardEntryBusy());
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.classList.remove("on"); }, toastMs(m));
 }
-function hideToast() {                          // D1：切卡/换阶段时立刻收起，别让 toast 盖住下一张卡的 #coach
+
+function reflowToast() {
+  const t = $("toast"); if (!t || !t.classList.contains("on")) return;
+  if (cardEntryBusy()) { t.classList.add("hold"); return; }
+  if (!placeToast(t)) { t.classList.remove("on"); t.classList.add("hold"); clearTimeout(toast._t); return; }
+  t.classList.remove("hold");
+}
+
+function hideToast() {
   const t = $("toast"); clearTimeout(toast._t);
   if (t) {
     t.classList.remove("on");
-    t.style.transition = "none"; void t.offsetWidth; t.style.transition = "";  // 跳过 .3s 淡出，立即变透明
+    t.classList.remove("hold");
+    t.style.transition = "none"; void t.offsetWidth; t.style.transition = "";
     t.style.top = "";
     t.style.bottom = "";
   }
-  const tl = $("toast-live"); if (tl) tl.textContent = "";
 }
-function clearToast() {
-  hideToast();
+function clearToast() { hideToast(); }
+
+addEventListener("resize", reflowToast);
+if (window.visualViewport) visualViewport.addEventListener("resize", reflowToast);
+let reflowRaf = 0;
+for (const ev of ["transitionend", "animationend"]) {
+  document.addEventListener(ev, () => {
+    if (!reflowRaf && $("toast")?.classList.contains("on")) {
+      reflowRaf = requestAnimationFrame(() => { reflowRaf = 0; reflowToast(); });
+    }
+  }, true);
 }
 // ---------- 「看全文」浮层（v6.2.6，FIX_SPEC §I-04 / §Z9；复审 v6.2.5 P2-3） ----------
 function fitTrace() {
@@ -388,7 +436,10 @@ function dispatch(a) {
     actions.push(a);
     afterAction(a);
     saveNow();
-    if (st.current !== prevCurrent || st.phase !== prevPhase) hideToast();  // D1：换卡/换阶段即收起 toast
+    if (st.current !== prevCurrent || st.phase !== prevPhase) {
+      hideToast();  // D1：换卡/换阶段即收起 toast
+      ui.engraveHinted = false;  // REREVIEW P3 D5 / RULES §10.3b：换卡/换阶段复位刻字提示标志
+    }
   } catch (e) { toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();
@@ -433,7 +484,7 @@ function resetCardMotion() {
   capturedPointers.clear();
 }
 function restore() {
-  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
+  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
   resetInputState();
   let d = null;
   try { d = loadFromStorage(localStorage); } catch { d = null; }
@@ -466,7 +517,7 @@ function restore() {
   return true;
 }
 function newGame(s) {
-  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
+  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
   resetInputState();
   hideToast();   // 先清队列（含挂起的重放/提交、epoch++），再收 toast：之后不会再有排队项把提示弹回来
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
@@ -496,7 +547,7 @@ function importCode() {
   try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
-    clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
+    clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
     hideToast();   // 顺序同 newGame/restore：先清队列，再收 toast
     toast(`导入成功：种子 ${seed}，${actions.length} 步`);
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
@@ -588,6 +639,18 @@ function renderTopbar() {
   $("bones-chip").hidden = false;
 }
 function renderCard() {
+  const ol = $("opt-left"), or = $("opt-right");
+  if (ol && or) {
+    const isCard = st.phase === "card";
+    ol.disabled = or.disabled = !isCard;
+    if (!isCard) {
+      ol.tabIndex = -1;
+      or.tabIndex = -1;
+    } else {
+      ol.removeAttribute("tabindex");
+      or.removeAttribute("tabindex");
+    }
+  }
   const card = $("card");
   const canCard = st.phase === "card" || st.phase === "engrave";
   $("stage").hidden = false;
@@ -619,7 +682,6 @@ function renderCard() {
   } else { drops.hidden = true; dropHTML(drops); }
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   // 左右选项：各视口在卡/刻阶段均显示（手机与平板竖屏经 CSS 排到卡下方并排）
-  const ol = $("opt-left"), or = $("opt-right");
   const showOpts = true;
   ol.hidden = !showOpts; or.hidden = !showOpts;
   if (showOpts) {
@@ -628,16 +690,38 @@ function renderCard() {
     ol.setAttribute("aria-label", "选左：" + c.left.label);
     or.setAttribute("aria-label", "选右：" + c.right.label);
   }
-  ol.disabled = or.disabled = st.phase !== "card";
+  const isCard = st.phase === "card";
+  ol.disabled = or.disabled = !isCard;
+  if (!isCard) {
+    ol.tabIndex = -1;
+    or.tabIndex = -1;
+  } else {
+    ol.removeAttribute("tabindex");
+    or.removeAttribute("tabindex");
+  }
   paintOpts();
   // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
   // R18 (L15)：电脑端按键提示只出现一处，由底部 #keys 承载，卡下 #gesture-hint 置空隐藏。
   const deskKeys = document.body.dataset.view === "desktop" && keyboardMode();
-  setText($("gesture-hint"), deskKeys ? "" : (keyboardMode()
-    ? (st.phase === "engrave"
-        ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字"
-        : "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量")
-    : "左右拖卡做选择 · 长按看分量"));
+  let ghText = "";
+  if (!deskKeys) {
+    if (st.phase === "engrave") {
+      ghText = keyboardMode() ? "K 刻字 · S 先不刻 · 卡已定住" : "卡已定住 · 点「刻」或「先不刻」";
+    } else {
+      ghText = keyboardMode()
+        ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量"
+        : "左右拖卡做选择 · 长按看分量";
+    }
+  }
+  const gh = $("gesture-hint");
+  const kind = st.phase === "engrave" ? "carve" : "gesture";
+  if (toast._g && gh.dataset.kind === "gesture" && kind === "gesture") {
+    // 兜底消息还在显示（1800ms 内）且阶段没变：不覆盖
+  } else {
+    if (toast._g && kind !== "gesture") { clearTimeout(toast._g); toast._g = 0; }
+    setText(gh, ghText);
+    gh.dataset.kind = kind;
+  }
 }
 function boneAvailable() { return st.phase === "engrave"; }
 function hasFinePointer() { return matchMedia("(hover:hover) and (pointer:fine)").matches; }
@@ -940,24 +1024,24 @@ function renderKeys() {
   const el = $("keys");
   if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
   const engrave = st.phase === "engrave";
-  if (tier === "A") {
-    setText(el, engrave ? "←→选 1–3落字 Space分量 K刻" : "←→选 1–3落字 Space分量");
+  if (engrave) {
+    setText(el, "K 刻字 · S 先不刻 · 卡已定住");
+  } else if (tier === "A") {
+    setText(el, "←→选 1–3落字 Space分量");
   } else {
-    setText(el, engrave
-      ? "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · K 刻字 · Esc 关浮层"
-      : "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · Esc 关浮层");
+    setText(el, "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · Esc 关浮层");
   }
 }
 // 矮屏 B 顶栏「?」浮层：列出全部键位。首次进入某存档自动弹一次（3 秒后收起）。
 function keyhelpHTML() {
-  const rows = [
+  const rows = st.phase === "engrave" ? [
+    ["K", "刻字（或点卡角骨片）"],
+    ["S", "先不刻"],
+    ["Esc", "关浮层"],
+  ] : [
     ["← →", "选字；再按同向或 Enter 提交"],
     ["1–3", "落字"],
     ["Space", "按住看分量"],
-    ...(st.phase === "engrave" ? [
-      ["K", "刻字（或点卡角骨片）"],
-      ["S", "先不刻"],
-    ] : []),
     ["Esc", "关浮层"],
   ];
   return rows.map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
@@ -980,6 +1064,7 @@ function setCardSettled(settled) {
   if (settled) {
     if (card) card.setAttribute("data-ready", "1");
     document.body.setAttribute("data-card-ready", "1");
+    reflowToast();
   } else {
     if (card) card.removeAttribute("data-ready");
     document.body.removeAttribute("data-card-ready");
@@ -1114,6 +1199,7 @@ function maybeAutoKeyhelp() {
 }
 
 function render() {
+  document.body.dataset.phase = st.phase;
   syncGoalEvents();
   renderTopbar();
   const d = dimsHTML();
@@ -1130,6 +1216,7 @@ function render() {
   if (ui.sheetOpen && st.phase !== "engrave") closeSheet(false);
   if (st.phase === "engrave") fitTrace();
   if (ui.sheetOpen) relayoutSheet();
+  reflowToast();
 }
 
 // ---------- 拖卡 / 键盘 ----------
@@ -1479,7 +1566,7 @@ function handleKey(e) {
 }
 // 离散输入的排队与重放：唯一入队口 enqueueInput、唯一启动口 armDrain，逐项重放一次只放一个。
 // 每项都要等当前卡落定（whenCardEntryDone）后再过两帧 rAF，保证卡先画出来、输入才生效；
-// 换阶段或弹出存档框/菜单时整队作废（那是玩家还没看到的界面，不替他按）。
+// 换到冬夜/挑字或弹出存档框/菜单时整队作废（U2/R08：进入刻字阶段不作废队列，按序逐个执行，不可执行的项才丢弃）。
 function enqueueInput(item) {
   ui.keyQueue.push(item);
   armDrain();
@@ -1510,24 +1597,39 @@ const drainStep = () => {
       return;
     }
     if (st.phase === "engrave") {
-      const idx = ui.keyQueue.findIndex((it) => it.kind === "carve" || it.kind === "skip");
-      if (idx >= 0) {
-        const item = ui.keyQueue[idx];
-        ui.keyQueue.splice(0, idx + 1);
+      let dropped = false;
+      while (ui.keyQueue.length && ui.keyQueue[0].kind !== "carve" && ui.keyQueue[0].kind !== "skip") {
+        ui.keyQueue.shift();
+        dropped = true;
+      }
+      if (!ui.keyQueue.length) {
         ui.drainArmed = false;
-        if (item.kind === "carve") { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
-        else dispatch(INPUT.engrave.skip);
-        if (ui.keyQueue.length) armDrain();
+        if (dropped && !ui.engraveHinted) {
+          ui.engraveHinted = true;
+          toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+        }
         return;
       }
-      const hint = ui.keyQueue.some((it) => it.kind === "press" || it.kind === "side" || it.kind === "key");
-      clearQueue();
+      const item = ui.keyQueue.shift();
       ui.drainArmed = false;
-      if (hint) toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+      if (item.kind === "carve") {
+        clearToast();
+        ui.engraved = true;
+        dispatch({ type: "engrave", trace: st.pendingTrace.target });
+      } else if (item.kind === "skip") {
+        clearToast();
+        dispatch(INPUT.engrave.skip);
+      }
+      if (ui.keyQueue.length) armDrain();
       return;
     }
     const item = ui.keyQueue.shift();
     if (!item) { ui.drainArmed = false; return; }
+    if (item.kind === "carve" || item.kind === "skip") {
+      if (ui.keyQueue.length) armDrain();
+      else ui.drainArmed = false;
+      return;
+    }
     if (item.kind === "press") {                                      // 排队的按下：仍按住就起成实拖（round 4 A3）
       ui.drainArmed = false;
       if (item.down) {
@@ -1553,7 +1655,8 @@ function armDrain() {
   ui.drainArmed = true;
   drainStep();
 }
-// 整队作废（Esc / 换阶段 / 弹层打开）：清空队列、取消停留计时；若正挂在「等最短停留后再提交」的实拖上，取消它并弹回原位。
+// 整队作废（Esc / 打开弹层 / 进冬夜或挑字）：清空队列、取消停留计时；进入刻字阶段不作废队列（U2 / R08）。
+// 若正挂在「等最短停留后再提交」的实拖上，取消它并弹回原位。
 function clearQueue() {
   ui.keyQueue.length = 0;
   clearTimeout(ui.dwellT); ui.dwellT = 0;
@@ -1868,6 +1971,8 @@ window.__zz = {
   get n1Ref() { return n1Ref ? { ...n1Ref } : null; },   // 当前这次飞卡的 N1 参照点（null = N1 不生效）
   get debugGoal() { return DEBUG_GOAL; },
   get settledAt() { return ui.settledAt; },
+  get engraveHinted() { return !!ui.engraveHinted; },
+  get ui() { return ui; },
   dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
   setMuted(v) { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); renderMenu(); },

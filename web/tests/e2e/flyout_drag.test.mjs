@@ -261,13 +261,17 @@ for (const [engine] of Object.entries(ENGINES)) {
         const medianInterval = intervals.length
           ? (intervals.length % 2 === 1 ? intervals[midIdx] : (intervals[midIdx - 1] + intervals[midIdx]) / 2)
           : 16.6667;
-        const inflation = Math.max(1, medianInterval / 16.6667);
+        // E1-D2: 帧间隔放缩系数必须设上限 (MAX_INFLATION = 1.25，放缩预算上限 400ms)，
+        // 防止慢机或 CI 负载下中位帧间隔过大导致预算被无限放大，从而让延迟 150ms 的变异平凡通过。
+        const MAX_INFLATION = 1.25;
+        const rawInflation = Math.max(1, medianInterval / 16.6667);
+        const inflation = Math.min(MAX_INFLATION, rawInflation);
         const scaledBudget = Math.round(320 * inflation);
 
-        t.diagnostic(`起拖滞后：原始 ${rawLag}ms｜中位帧间隔 ${medianInterval.toFixed(2)}ms（标称 16.7ms，放大 ${inflation.toFixed(2)}x）｜放缩预算 ${scaledBudget}ms｜起拖距飞出结束 ${gapFrames} 帧`);
+        t.diagnostic(`起拖滞后：原始 ${rawLag}ms｜中位帧间隔 ${medianInterval.toFixed(2)}ms（标称 16.7ms，原始放大 ${rawInflation.toFixed(2)}x，封顶放大 ${inflation.toFixed(2)}x）｜放缩预算 ${scaledBudget}ms｜起拖距飞出结束 ${gapFrames} 帧`);
         assert.ok(fFlyEnd >= 0, "应记录到飞出/入场结束的帧（起拖前的最后一个 busy 帧）");
         assert.ok(gapFrames <= 3, `起拖应在飞出/入场结束后 ≤3 帧内开始（实测 ${gapFrames} 帧）`);
-        assert.ok(rawLag <= scaledBudget, `起拖应在放缩预算内开始（原始 ${rawLag}ms ≤ 预算 ${scaledBudget}ms，按中位帧间隔 ${medianInterval.toFixed(1)}ms 放缩）`);
+        assert.ok(rawLag <= scaledBudget, `起拖应在放缩预算内开始（原始 ${rawLag}ms ≤ 预算 ${scaledBudget}ms，按中位帧间隔 ${medianInterval.toFixed(1)}ms 放缩封顶）`);
 
         const fCommit = frames.findIndex((f) => f.n >= n0 + 2);
         assert.ok(fCommit > 0, "应记录到第二次提交");
