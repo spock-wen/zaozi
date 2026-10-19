@@ -96,6 +96,19 @@
   <div id="toast"></div>
   <div id="toast-live" class="sr-only" role="status" aria-live="polite"></div>
 </div>
+
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div id="sheetmask"></div>
+  <section class="sheet-panel" id="sheetpanel" tabindex="-1">
+    <div class="sheet-hd"><h2 id="sheet-title">迹</h2><span id="sheet-sub"></span></div>
+    <div class="sheet-body" id="sheetbody" tabindex="0" aria-label="迹文全文"></div>
+    <div class="sheet-act">
+      <span id="sheetmore" hidden>下面还有，往上滑</span>
+      <button class="act skip" id="fold" data-do="trace-close">收起</button>
+      <button class="act skip" id="skip2" data-do="skip">先不刻</button>
+    </div>
+  </section>
+</div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

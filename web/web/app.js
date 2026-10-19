@@ -51,6 +51,7 @@ const ui = {
   swallow: [],                        // 已被 pointerup 处理、等待吞掉其合成 click 的 press token 队列
   lastDims: null,
   keyhelpOpen: false,                 // 矮屏 B：顶栏「?」键位浮层
+  sheetOpen: false,                   // 「看全文」模态浮层
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
 
@@ -244,6 +245,110 @@ function hideToast() {                          // D1：切卡/换阶段时立�
 }
 function clearToast() {
   hideToast();
+}
+// ---------- 「看全文」浮层（v6.2.6，FIX_SPEC §I-04 / §Z9；复审 v6.2.5 P2-3） ----------
+function fitTrace() {
+  const tr = $("card-trace"), f = $("full"); if (!tr || !f) return;
+  const cut = tr.scrollHeight > tr.clientHeight + 1;
+  f.hidden = !cut;
+}
+let sheetOpener = null, sheetRatio = 0, sheetKey = "";
+const sheetGeomKey = () => (document.documentElement.clientWidth || innerWidth) + "x" + (document.documentElement.clientHeight || innerHeight);
+function sheetScrolled() {
+  const sb = $("sheetbody");
+  if (!sb) return;
+  if (sheetGeomKey() === sheetKey) {
+    const rng = sb.scrollHeight - sb.clientHeight;
+    sheetRatio = rng > 0 ? sb.scrollTop / rng : 0;
+  }
+  sheetMore();
+}
+function sheetMaxLines() {
+  const view = document.body.dataset.view, H = document.documentElement.clientHeight || innerHeight;
+  const tb = $("topbar") ? $("topbar").getBoundingClientRect().height : 52;
+  const sab = $("sheetpanel") ? Math.max(0, (parseFloat(getComputedStyle($("sheetpanel")).bottom) || 16) - 16) : 0;
+  const maxH = (view === "desktop" || view === "tablet-landscape") ? H - 2 * tb : H - ($("topbar") ? $("topbar").getBoundingClientRect().bottom : 52) - 8 - 16 - sab;
+  const chrome = 12 + 28 + 8 + 8 + 1 + 8 + 44 + 8;
+  return Math.max(3, Math.floor((maxH - chrome) / 24));
+}
+function relayoutSheet() {
+  if (!ui.sheetOpen) return;
+  const rh = $("rotate-hint");
+  if (rh && !rh.hidden && rh.getClientRects().length) { closeSheet(); return; }
+  const sb = $("sheetbody");
+  if (!sb) return;
+  if (sheetGeomKey() === sheetKey) sheetScrolled();
+  const ratio = sheetRatio;
+  sb.style.height = "auto";
+  const cs = getComputedStyle(sb), pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0), bd = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+  const lines = Math.round((sb.scrollHeight - pad) / 24), shown = Math.min(lines, sheetMaxLines());
+  sb.style.height = shown * 24 + pad + bd + "px";
+  sb.scrollTop = Math.round(ratio * Math.max(0, sb.scrollHeight - sb.clientHeight));
+  sheetKey = sheetGeomKey(); sheetRatio = ratio;
+  sheetMore();
+}
+function sheetMore() {
+  const sb = $("sheetbody"), sm = $("sheetmore");
+  if (sb && sm) sm.hidden = !(sb.scrollTop + sb.clientHeight < sb.scrollHeight - 1);
+}
+function openSheet(opener) {
+  if (ui.sheetOpen || st.phase !== "engrave") return;
+  ui.sheetOpen = true; sheetOpener = opener || $("full");
+  const c = curCard();
+  const sub = $("sheet-sub") || $("sheet-meta");
+  if (sub && c) setText(sub, SEASON[c.season] + " · " + c.speaker);
+  setText($("sheetbody"), "卡上出现一道迹：" + st.pendingTrace.tally_text);
+  setText($("sheetmore"), keyboardMode() ? "下面还有，滚动看" : "下面还有，往上滑");
+  const sh = $("sheet"), app = $("app");
+  if (sh) sh.hidden = false;
+  if (app) app.inert = true;
+  clearToast();
+  $("full")?.setAttribute("aria-expanded", "true");
+  const sb = $("sheetbody");
+  if (sb) sb.scrollTop = 0;
+  sheetRatio = 0; sheetKey = "";
+  relayoutSheet();
+  $("sheetpanel")?.focus({ preventScroll: true });
+}
+function closeSheet(refocus = true) {
+  if (!ui.sheetOpen) return;
+  ui.sheetOpen = false;
+  const sh = $("sheet"), app = $("app");
+  if (sh) sh.hidden = true;
+  if (app) app.inert = false;
+  $("full")?.setAttribute("aria-expanded", "false");
+  if (refocus) {
+    const f = $("full"), k = $("skip");
+    const to = f && !f.hidden && f.getClientRects().length ? f : k;
+    to?.focus({ preventScroll: true });
+  }
+  sheetOpener = null;
+}
+let sheetRaf = 0;
+const relayoutSheetSoon = () => { if (!ui.sheetOpen || sheetRaf) return; sheetRaf = requestAnimationFrame(() => { sheetRaf = 0; relayoutSheet(); }); };
+addEventListener("resize", relayoutSheetSoon);
+if (window.visualViewport) visualViewport.addEventListener("resize", relayoutSheetSoon);
+let maskDown = null, maskSwallowUntil = 0;
+if ($("sheetmask")) {
+  $("sheetmask").addEventListener("pointerdown", (e) => { maskDown = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+  $("sheetmask").addEventListener("pointerup", (e) => {
+    const d = maskDown; maskDown = null;
+    if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) >= 10) return;
+    maskSwallowUntil = performance.now() + 400; closeSheet();
+  });
+}
+for (const ev of ["click", "mousedown"]) addEventListener(ev, (e) => { if (performance.now() < maskSwallowUntil) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+$("sheetbody")?.addEventListener("scroll", sheetScrolled, { passive: true });
+if ($("sheet")) {
+  on($("sheet"), (e) => {
+    const b = e.target.closest("[data-do]"); if (!b) return;
+    if (b.dataset.do === "trace-close") closeSheet();
+    else if (b.dataset.do === "skip") {
+      closeSheet(false);
+      clearToast();
+      $("skip")?.click();
+    }
+  });
 }
 // N1（R05，PM U1 裁定 + P1）的状态（判定函数 n1RepeatTap 在 bindOpt 上方）。
 // n1Ref 只记「用户直接点选项按钮、当下启动的那次飞卡」的那一下落点；它挂着（这次飞卡还没结束）
@@ -503,7 +608,9 @@ function renderCard() {
   const drops = $("card-drops");
   if (st.phase === "engrave") {
     drops.hidden = false;
-    patchHTML(drops, `卡上出现一道迹：${st.pendingTrace.tally_text} <button class="act" data-do="skip" style="margin-left:8px">先不刻</button>`);
+    patchHTML(drops, `<span class="tr tr-text" id="card-trace">卡上出现一道迹：${st.pendingTrace.tally_text}</span><button class="act skip" id="full" data-do="trace-full" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false" hidden>看全文</button><button class="act skip" id="skip" data-do="skip">先不刻</button>`);
+    fitTrace();
+    requestAnimationFrame(fitTrace);
   } else if (c.drops && c.drops.length) {
     const d = c.drops.filter((x) => st.wordBox.includes(x.char))[0];
     drops.hidden = !d;
@@ -1020,6 +1127,9 @@ function render() {
   renderKeys(); renderShort();
   if (ui.bannerOn) placeBanner();
   if (st.phase !== "ended" && st.phase !== "pick" && st.phase !== "winter") $("endseq").hidden = true;
+  if (ui.sheetOpen && st.phase !== "engrave") closeSheet(false);
+  if (st.phase === "engrave") fitTrace();
+  if (ui.sheetOpen) relayoutSheet();
 }
 
 // ---------- 拖卡 / 键盘 ----------
@@ -1042,6 +1152,7 @@ function beginDrag(x, pointerId) {
 }
 const queuedPress = (id) => ui.keyQueue.find((it) => it.kind === "press" && it.id === id);
 function onDown(e) {
+  if (ui.sheetOpen) return;
   if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
   if (st.phase !== "card" || inputBusy()) return;
   // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
@@ -1252,18 +1363,35 @@ addEventListener("pointermove", onMove);
 addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);
 
-// 模态浮层：存档框 / ☰ 菜单 / 目标面板 / 移动抽屉（键位浮层不是模态）。
-function modalOpen() { return !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden; }
-// 关掉「最上面」的浮层：存档框最后开、最先关；否则关菜单/目标面板/抽屉。只关浮层，不动输入队列。
+// 模态浮层：存档框 / ☰ 菜单 / 目标面板 / 移动抽屉 / 「看全文」（键位浮层不是模态）。
+function modalOpen() { return !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden || ui.sheetOpen; }
+// 关掉「最上面」的浮层：存档框最后开、最先关；否则关菜单/目标面板/抽屉/「看全文」。只关浮层，不动输入队列。
 function closeOverlay() {
+  if (ui.sheetOpen) { closeSheet(); return; }
   if (!$("savedlg").hidden) { closeDlg(); return; }
   ui.menuOpen = false; ui.panelOpen = false; $("drawer").hidden = true;
   renderMenu(); render();                              // render() 内含 renderGoalPanel()，目标面板随之收起
 }
 addEventListener("keydown", (e) => {
   // 浮层打开时键盘属于它：Esc 只关浮层；出卡阶段其它键（方向/落字/Enter…）既不排队也不处理，
-  // 也不拦默认（存档框里打字、菜单按钮上的 Enter 等原生行为照旧）。其它阶段落入下方原有逻辑。
-  if (modalOpen()) { if (e.key === "Escape") { closeOverlay(); return; } if (st.phase === "card") return; }
+  if (modalOpen()) {
+    if (ui.sheetOpen) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "Escape") { e.preventDefault(); closeSheet(); return; }
+      if (e.key === "Tab") {
+        e.preventDefault(); const ring = [$("sheetbody"), $("fold"), $("skip2")].filter(Boolean);
+        const i = ring.indexOf(document.activeElement);
+        ring[(i + (e.shiftKey ? ring.length - 1 : 1) + (i < 0 && e.shiftKey ? 1 : 0)) % ring.length]?.focus({ preventScroll: true });
+        return;
+      }
+      if (e.key === "Enter" || e.key === " ") return;
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) return;
+      e.preventDefault();
+      return;
+    }
+    if (e.key === "Escape") { closeOverlay(); return; }
+    if (st.phase === "card") return;
+  }
   if (e.key === "Escape" && (ui.keyhelpOpen || !$("keyhelp-pop").hidden)) { ui.keyhelpOpen = false; renderShort(); return; }
   // 出卡阶段焦点在牌桌外的按钮/输入控件上（如 ☰）时，Enter 归该控件：不拦默认、不入队、不处理游戏。
   // 牌桌内的卡、字匣格、左右选项不算：点过它们焦点会留在上面，Enter 仍是「提交预览」。
@@ -1529,6 +1657,7 @@ on($("wordbox"), (e) => {
 });
 on($("card"), (e) => {
   const b = e.target.closest("[data-do]"); if (!b) return;
+  if (b.dataset.do === "trace-full") { openSheet(b); return; }
   if (b.dataset.do === "skip") {
     clearToast();
     if (carveBusy()) enqueueInput({ kind: "skip" });

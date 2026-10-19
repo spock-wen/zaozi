@@ -157,7 +157,17 @@ body[data-view="tablet-portrait"] #stage{
 body[data-view="tablet-portrait"] #stage{padding-top:24px;}
 body[data-view="mobile"] #cardcol,body[data-view="tablet-portrait"] #cardcol{grid-area:card;width:100%;gap:6px;min-height:0;height:100%;}
 body[data-view="mobile"] #cardwrap,body[data-view="tablet-portrait"] #cardwrap{flex:1 1 0;min-height:0;width:100%;container-type:size;display:flex;align-items:center;justify-content:center;}
-body[data-view="mobile"] .card,body[data-view="tablet-portrait"] .card{width:min(100cqw,100cqh * 328 / 468);display:flex;flex-direction:column;padding:12px 14px;}
+body[data-view="mobile"] .card,body[data-view="tablet-portrait"] .card{
+  width:min(100cqw,100cqh * 328 / 468);
+  box-sizing:border-box;
+  display:flex;flex-direction:column;padding:12px 14px;
+}
+body[data-view="mobile"] .card.engrave,body[data-view="tablet-portrait"] .card.engrave{
+  --card-w:max(min(100cqw,100cqh * 328 / 468),min(100cqw,300px));
+  width:var(--card-w);
+  height:min(100cqh,calc(var(--card-w) * 468 / 328));
+  aspect-ratio:auto;
+}
 body[data-view="mobile"] #card-title{margin:0 0 4px;}
 body[data-view="mobile"] #card-text{line-height:22px;}
 body[data-view="mobile"] .card > *,body[data-view="tablet-portrait"] .card > *{flex:0 0 auto;}
@@ -165,7 +175,10 @@ body[data-view="mobile"] .card > *,body[data-view="tablet-portrait"] .card > *{f
 body[data-view="mobile"] .card-art,body[data-view="tablet-portrait"] .card-art{flex:1 1 0;min-height:0;container-type:size;background:none;display:flex;justify-content:center;}
 body[data-view="mobile"] .card-art picture,body[data-view="tablet-portrait"] .card-art picture{height:100%;}
 body[data-view="mobile"] .card-art img,body[data-view="tablet-portrait"] .card-art img{height:100%;width:auto;max-width:100%;background:var(--paper-200);border-radius:8px;}
-@container (max-height:63.9px){ body[data-view="mobile"] .card-art img,body[data-view="tablet-portrait"] .card-art img{display:none;} }
+@container (max-height:63.9px){
+  body[data-view="mobile"] .card-art,body[data-view="tablet-portrait"] .card-art{margin-bottom:0;}
+  body[data-view="mobile"] .card-art img,body[data-view="tablet-portrait"] .card-art img{display:none;}
+}
 body[data-view="mobile"] .card-drops,body[data-view="tablet-portrait"] .card-drops{position:static;flex:0 0 auto;height:auto;min-height:56px;margin-top:auto;}
 body[data-view="mobile"] .card.engrave .card-drops{white-space:normal;overflow-wrap:anywhere;padding:4px 8px;line-height:18px;}
 body[data-view="mobile"] .card-drops .act[data-do="skip"],
@@ -716,3 +729,87 @@ body[data-view="tablet-landscape"]:not([data-short]) #pick .cand .mng{line-heigh
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:1ms !important;transition-duration:120ms !important;}
 }
+
+/* §15 对比度 / 字号 (v6.2.7，复审 v6.2.6 P2-3) */
+#drawer-body #log, #drawer-body #log li { color: var(--ink); }
+#pick .pickinfo .pi-h span { color: #6B5A3E; }
+#dlgtext, #keyhelp-btn { border-color: #8A90A6; }
+.zl small { font-size: 13px; line-height: 1.3; }
+body[data-view="desktop"] .zl small, body[data-view="tablet-landscape"] .zl small,
+body[data-view="desktop"] #pick .pickinfo .pi-h span, body[data-view="tablet-landscape"] #pick .pickinfo .pi-h span,
+body[data-view="desktop"] #dlgmsg, body[data-view="tablet-landscape"] #dlgmsg { font-size: 14px; }
+
+/* §11.4 迹框换行排 & 看全文浮层 */
+.card.engrave .card-drops,
+body[data-view] .card.engrave .card-drops {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  align-content: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  height: auto;
+  min-height: 56px;
+}
+.card.engrave .card-drops .tr,
+.card.engrave .card-drops #card-trace,
+body[data-view] .card.engrave .card-drops .tr,
+body[data-view] .card.engrave .card-drops #card-trace {
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--tr-lines, 2);
+  overflow: hidden;
+  min-width: 0;
+}
+body[data-view="desktop"] .card.engrave .card-drops .tr,
+body[data-view="tablet-landscape"] .card.engrave .card-drops .tr,
+body[data-view="desktop"] .card.engrave .card-drops #card-trace,
+body[data-view="tablet-landscape"] .card.engrave .card-drops #card-trace {
+  --tr-lines: 3;
+}
+body[data-short] .card.engrave .card-drops .tr,
+body[data-short] .card.engrave .card-drops #card-trace {
+  --tr-lines: 1;
+}
+.card.engrave .card-drops #full,
+.card.engrave .card-drops #skip,
+body[data-view] .card.engrave .card-drops #full,
+body[data-view] .card.engrave .card-drops #skip {
+  margin-left: 0;
+  flex-shrink: 0;
+  min-height: 44px;
+  min-width: 44px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+#sheet { position: fixed; inset: 0; z-index: 75; }
+#sheet[hidden] { display: none; }
+#sheetmask { position: absolute; inset: 0; background: rgba(21, 23, 31, .6); }
+.sheet-panel {
+  position: absolute; background: var(--paper-50); color: var(--ink); border: 1px solid var(--drag-fill);
+  border-radius: 12px; padding: 12px 16px 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+  left: calc(16px + env(safe-area-inset-left)); right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
+body[data-view="desktop"] .sheet-panel,
+body[data-view="tablet-landscape"] .sheet-panel {
+  left: 50%; right: auto; bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(480px, calc(100vw - 64px));
+}
+.sheet-hd { display: flex; align-items: baseline; gap: 8px; }
+.sheet-hd h2 { font-size: 18px; line-height: 28px; margin: 0; color: var(--carve, #6E2F1F); }
+.sheet-hd span { font-size: 13px; color: var(--ink); }
+.sheet-body {
+  margin-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--night-line);
+  font-size: 15px; line-height: 24px; overflow: auto; touch-action: pan-y; overscroll-behavior: contain;
+}
+.sheet-act { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
+#sheetmore { margin-right: auto; align-self: center; font-size: 13px; line-height: 20px; color: #5C5346; }
