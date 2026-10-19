@@ -194,15 +194,49 @@ function artHTML(card) {
 }
 
 // ---------- 交互助手 ----------
+// toast 位置为工程兜底，待设计师确认（R1 已撤回）
 function toast(m) {
   const t = $("toast");
   const view = document.body.dataset.view;
-  const ol = $("opt-left");
-  t.style.bottom = (view === "mobile" || view === "tablet-portrait") && ol && !ol.hidden
-    ? (innerHeight - ol.getBoundingClientRect().top + 8) + "px"
-    : "";
+  const dims = $("dims");
+  if ((view === "mobile" || view === "tablet-portrait") && dims) {
+    const dr = dims.getBoundingClientRect();
+    t.style.top = (dr.bottom + 8) + "px";
+    t.style.bottom = "auto";
+  } else {
+    t.style.top = "";
+    t.style.bottom = "";
+  }
   t.textContent = m; t.classList.add("on");
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 1800);
+  clearTimeout(toast._t); toast._t = setTimeout(() => {
+    t.classList.remove("on");
+    t.style.top = "";
+    t.style.bottom = "";
+  }, 1800);
+}
+function clearToast() {
+  const t = $("toast");
+  if (t) {
+    t.classList.remove("on");
+    t.textContent = "";
+    t.style.top = "";
+    t.style.bottom = "";
+  }
+  clearTimeout(toast._t);
+}
+function resetInputState() {
+  clearToast();
+  clearTimeout(ui.holdT);
+  ui.dragging = false; ui.dragged = false; ui.hold = false; ui.kbDir = null; ui.animating = false; ui.dx = 0;
+  const c = cardEl();
+  if (c) {
+    c.classList.remove("dragging");
+    c.style.transform = "";
+    c.style.opacity = "";
+  }
+  const dh = $("card-drag-hint");
+  if (dh) dh.hidden = true;
+  paintOpts();
 }
 function deferInteract(el, ms = 350) {         // 防「天亮了」穿透到下一屏的按钮
   el.style.pointerEvents = "none";
@@ -239,13 +273,13 @@ function saveNow() {
   try { saveToStorage(localStorage, seed, actions); } catch { /* 隐私模式 */ }
 }
 function restore() {
+  resetInputState();
   let d = null;
   try { d = loadFromStorage(localStorage); } catch { d = null; }
   if (!d) return false;
   try {
     st = run({ seed: d.seed }, d.actions);
     seed = d.seed; actions = d.actions.slice();
-    toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
     return true;
   } catch (e) {
     try {                                  // 先备份再删（B5）
@@ -258,6 +292,7 @@ function restore() {
   }
 }
 function newGame(s) {
+  resetInputState();
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
   ui.pickFocus = null; ui.pickTapped = null; ui.presses.clear(); ui.swallow = [];
@@ -279,6 +314,7 @@ function exportCode() {
   openDlg("导出存档码", "把下面这串抄走（或点复制）。在新设备里粘贴导入，就从这里接着走。", true);
 }
 function importCode() {
+  resetInputState();
   const code = $("dlgtext").value;
   let d;
   try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
@@ -288,7 +324,6 @@ function importCode() {
     ui.lastDims = null; saveNow(); render();
     whenCardEntryDone().then(() => setCardSettled(true));
     closeDlg();
-    toast(`导入成功：种子 ${seed}，${actions.length} 步`);
   } catch (e) { openDlg("导入存档码", "这串码走不通：" + e.message, false); }
 }
 
@@ -1075,8 +1110,8 @@ addEventListener("keydown", (e) => {
     if (e.key === "Enter" && ui.kbDir) { e.preventDefault(); commitSide(ui.kbDir); return; }
     const a = INPUT.card.keys[e.code]; if (a && !e.repeat) { e.preventDefault(); dispatch(a); }
   } else if (st.phase === "engrave") {
-    if (e.code === INPUT.engrave.key) { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
-    else if (e.code === "KeyS") dispatch(INPUT.engrave.skip);
+    if (e.code === INPUT.engrave.key) { clearToast(); ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); }
+    else if (e.code === "KeyS") { clearToast(); dispatch(INPUT.engrave.skip); }
   } else if (st.phase === "winter" && e.key === "Enter") { e.preventDefault(); winterCarve(); }
 });
 addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
@@ -1142,8 +1177,8 @@ on($("wordbox"), (e) => {
     dispatch({ type: "choose", side: "drop", slot: Number(b.dataset.slot) });
   }
 });
-on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") dispatch({ type: "skip_engrave" }); });
-on($("bonecorner"), () => { if (st.phase === "engrave") { ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
+on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") { clearToast(); dispatch({ type: "skip_engrave" }); } });
+on($("bonecorner"), () => { if (st.phase === "engrave") { clearToast(); ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
 on($("opt-left"), () => commitSide("left"));
 on($("opt-right"), () => commitSide("right"));
 on($("winter"), (e) => {
@@ -1259,7 +1294,7 @@ window.__zz = {
   get short() { return document.body.dataset.short || ""; },
   get animating() { return ui.animating; },
   get debugGoal() { return DEBUG_GOAL; },
-  dispatch, newGame, restore, render, code: () => encodeSaveCode(seed, actions),
+  dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },
   setMuted(v) { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); renderMenu(); },
   isMuted: () => muted(),

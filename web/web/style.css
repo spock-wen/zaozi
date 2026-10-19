@@ -112,7 +112,7 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 
 /* 卡角骨片四态。z-index 让它恒在卡内正文（含 .card-head）之上，命中测试优先。 */
 .bonecorner{
-  position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:10px;z-index:1;
+  position:absolute;top:8px;right:8px;width:44px;height:44px;min-width:44px;min-height:44px;box-sizing:border-box;border-radius:10px;z-index:1;
   display:none;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--ink);
   background:linear-gradient(var(--bone-100),var(--bone-200));border:1px solid var(--bone-crack);
   transition:transform 120ms ease-out,box-shadow 120ms ease-out;
@@ -165,7 +165,8 @@ body[data-view="mobile"] .card-art img,body[data-view="tablet-portrait"] .card-a
 @container (max-height:63.9px){ body[data-view="mobile"] .card-art img,body[data-view="tablet-portrait"] .card-art img{display:none;} }
 body[data-view="mobile"] .card-drops,body[data-view="tablet-portrait"] .card-drops{position:static;flex:0 0 auto;height:auto;min-height:56px;margin-top:auto;}
 body[data-view="mobile"] .card.engrave .card-drops{white-space:normal;overflow-wrap:anywhere;padding:6px 10px;}
-body[data-view="mobile"] .card-drops .act[data-do="skip"]{flex-shrink:0;min-height:36px;padding:0 10px;font-size:12px;}
+body[data-view="mobile"] .card-drops .act[data-do="skip"],
+body[data-view="tablet-portrait"] .card-drops .act[data-do="skip"]{flex-shrink:0;min-height:44px;min-width:44px;box-sizing:border-box;padding:0 12px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;}
 body[data-view="mobile"] .slot img{width:24px;height:24px;}
 body[data-view="mobile"] .slot span{font-size:10px;line-height:1.1;text-align:center;}
 body[data-view="mobile"] .slot.used span{font-size:9px;line-height:10px;max-width:100%;overflow-wrap:anywhere;}
@@ -217,13 +218,13 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
   position:absolute;top:calc(44px + env(safe-area-inset-top) + 4px);right:16px;width:220px;z-index:60;
   background:var(--paper-50);color:var(--ink);border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);
 }
-#menu-pop .grp{font-size:12px;color:#9a8a6a;padding:4px 12px;}
+#menu-pop .grp{font-size:13px;color:#9a8a6a;padding:4px 12px;}
 #menu-pop button,#menu-pop a{
   display:flex;width:100%;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;
   font-size:15px;color:var(--ink);text-decoration:none;text-align:left;
 }
 #menu-pop button:hover,#menu-pop a:hover{background:var(--paper-200);}
-#menu-pop .seed{font-size:12px;color:#9a8a6a;padding:4px 12px;word-break:break-all;}
+#menu-pop .seed{font-size:13px;color:#9a8a6a;padding:4px 12px;word-break:break-all;}
 
 /* ---------- 侧栏 / 抽屉 ---------- */
 #sidebar{width:336px;flex:0 0 auto;background:var(--night-700);position:relative;overflow:auto;padding:12px;}
@@ -237,7 +238,7 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
 .side-sec{margin-bottom:14px;}
 .side-sec h3{margin:0 0 6px;font-size:14px;color:var(--gold-400);}
 .zilu{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;}
-.zl{display:flex;flex-direction:column;align-items:center;font-size:12px;color:var(--paper-200);}
+.zl{display:flex;flex-direction:column;align-items:center;font-size:13px;color:var(--paper-200);}
 .zl img{width:40px;height:40px;background:var(--paper-100);border-radius:6px;}
 .zl.new{color:var(--up);}
 .tally{border:1px solid var(--night-line);border-radius:8px;padding:6px;margin:4px 0;font-size:13px;cursor:pointer;}
@@ -302,7 +303,7 @@ body[data-view="desktop"] #banner{top:calc(56px + 8px);}
 #pick .desc{font-size:13px;color:var(--paper-200);min-height:20px;margin-top:6px;}
 #pick .pickinfo{background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 14px;max-width:420px;}
 #pick .pickinfo .pi-h{font-weight:700;font-size:16px;margin-bottom:4px;}
-#pick .pickinfo .pi-h span{font-weight:400;font-size:12px;color:var(--bone-crack);margin-left:6px;}
+#pick .pickinfo .pi-h span{font-weight:400;font-size:13px;color:var(--bone-crack);margin-left:6px;}
 #pick .pickinfo .pi-row{display:flex;gap:8px;font-size:13px;line-height:22px;}
 #pick .pickinfo .pi-row b{flex:0 0 40px;color:var(--zhu-600);}
 
@@ -352,9 +353,9 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #xcv{background:var(--paper-100);border-radius:8px;display:block;margin:8px 0;cursor:crosshair;touch-action:none;max-width:100%;height:auto;}
 
 /* ---------- 存档弹层 / toast ---------- */
-#savedlg{position:fixed;inset:0;z-index:80;background:rgba(10,11,16,.82);display:flex;align-items:center;justify-content:center;padding:12px;}
+#savedlg{position:fixed;inset:0;z-index:80;background:rgba(10,11,16,.82);display:flex;align-items:center;justify-content:center;padding:12px;font-size:13px;}
 #dlgbox{background:var(--night-700);border:1px solid var(--night-line);border-radius:12px;padding:16px;width:min(560px,100%);max-height:92dvh;overflow:auto;}
-#dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:12px/1.5 ui-monospace,Menlo,monospace;}
+#dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:13px/1.5 ui-monospace,Menlo,monospace;}
 #dlgbtns{text-align:right;margin-top:8px;}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
   background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;
@@ -392,13 +393,13 @@ body[data-view="desktop"] #gesture-hint{color:var(--night-line);}
 body[data-view="desktop"] #gesture-hint:empty{display:none;}
 /* 卡槽宽 = 卡高 × 328/468（同 tablet-landscape 注释）：让 #cardwrap 盒 = 卡盒，
    卡在槽内居中、字匣（居中在网格列）正好在卡下，矮屏 A/B 也沿用此比例。 */
-body[data-view="desktop"] #cardwrap{height:468px;width:auto;aspect-ratio:328/468;max-width:480px;}
+body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;aspect-ratio:328/468;}
 body[data-view="desktop"] .card{
   height:100%;width:auto;aspect-ratio:328/468;
   display:flex;flex-direction:column;
 }
 body[data-view="desktop"] .card > *{flex:0 0 auto;}
-body[data-view="desktop"] .card-art{flex:0 1 auto;min-height:0;display:flex;justify-content:center;}
+body[data-view="desktop"] .card-art{flex:1 1 auto;min-height:0;display:flex;justify-content:center;}
 body[data-view="desktop"] .card-art picture{height:100%;display:flex;justify-content:center;}
 body[data-view="desktop"] .card-art img{height:100%;max-height:100%;width:auto;max-width:100%;object-fit:contain;}
 body[data-view="desktop"] .card-drops{
@@ -409,7 +410,8 @@ body[data-view="desktop"] .card.engrave .card-drops{
   display:flex;align-items:center;justify-content:space-between;gap:8px;
 }
 body[data-view="desktop"] .card-drops .act[data-do="skip"]{
-  flex-shrink:0;min-height:36px;padding:0 10px;font-size:12px;
+  flex-shrink:0;min-height:44px;min-width:44px;box-sizing:border-box;padding:0 12px;font-size:12px;
+  display:inline-flex;align-items:center;justify-content:center;
 }
 body[data-view="desktop"] .slot img{width:24px;height:24px;}
 body[data-view="desktop"] .slot span{font-size:10px;line-height:1.1;text-align:center;}
@@ -440,7 +442,7 @@ body[data-view="mobile"] #drawer-body{max-height:68dvh;}
 body[data-short="A"] #topbar,
 body[data-short="B"] #topbar{min-height:48px;padding:2px 8px;}
 body[data-short="A"] #gen-line,
-body[data-short="B"] #gen-line{font-size:12px;}
+body[data-short="B"] #gen-line{font-size:13px;}
 /* 矮屏「目标」点击区抬到 ≥44×44（BREAKPOINTS 硬规则），视觉不变：
    按钮自身 44 高、透明无边框；可见胶囊改由 ::before 居中画出（高 = 44 − 6 − 6 = 32），
    与原来 81×32 的胶囊逐像素一致。isolation 建层，让 z-index:-1 的胶囊落在文字之后、
@@ -542,7 +544,7 @@ body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;
 #keyhelp-pop{
   position:absolute;top:calc(48px + 4px);right:8px;width:344px;z-index:61;
   background:var(--paper-50);color:var(--ink);border-radius:12px;padding:8px 12px;
-  font-size:12px;line-height:16px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+  font-size:13px;line-height:18px;box-shadow:0 10px 30px rgba(0,0,0,.4);
   display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
 }
 #keyhelp-pop .kh-row{display:flex;gap:8px;}
@@ -553,7 +555,8 @@ body[data-short] #wordbox-bar{border-top:0;border-radius:16px;width:fit-content;
    提示右缘 ≤ 285，故与卡（含卡头）不交叠；居中摆放会压住卡头。 */
 #too-short{
   position:fixed;left:12px;top:calc(48px + 4px);z-index:58;max-width:90vw;
-  background:var(--paper-100);color:var(--ink);border-radius:10px;padding:6px 14px;font-size:13px;
+  background:var(--paper-100);color:var(--ink);border-radius:10px;padding:6px 14px;
+  font-size:15px;line-height:22px;
   box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;
 }
 
