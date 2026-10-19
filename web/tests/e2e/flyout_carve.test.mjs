@@ -605,9 +605,12 @@ for (const [engine] of Object.entries(ENGINES)) {
         // 第一次点：入场中
         await page.mouse.click(geom.bc.cx, geom.bc.cy);
 
-        // 轮询直到 __settles[T03] 出现（卡刚落定，正处于 250ms dwell 停留内）
+        // 轮询直到 __settles[T03] 出现（卡刚落定）
         await page.waitForFunction(() => !!window.__settles?.T03, null, { polling: "raf" });
-        // 第二次点：停留内现场点
+        // 等到落定后 100ms（处于 250ms dwell 停留中段，此时 2 帧 rAF 已过，drainArmed 已置 false，排队首项处于 dwell 计时）
+        // 注：window.__zz 未暴露内部 ui 对象，故此处通过时间窗口确立并在日志记录
+        await page.waitForFunction(() => performance.now() >= window.__settles.T03 + 100, null, { polling: "raf" });
+        // 第二次点：停留中段点击
         await page.mouse.click(geom.bc.cx, geom.bc.cy);
 
         await page.waitForFunction(() => window.__zz.actions.some((a) => a.type === "engrave"), null, { timeout: 4000 });
