@@ -247,8 +247,26 @@ function saveNow() {
   ui.lastDims = { ...st.dims };
   try { saveToStorage(localStorage, seed, actions); } catch { /* 隐私模式 */ }
 }
+const capturedPointers = new Set();
+// 重置卡片运动与拖拽残留态（仅用于 newGame / importCode / restore 三个重置入口）：
+// 换局/导入时若正逢飞出或拖拽，epoch++ 会使动画/提交中止，此处将位移归零、动画态与实拖标志清空、
+// 取消长按定时器、释放卡片捕获的指针，并重置卡片 DOM 的 transform/opacity 与 .dragging 类。
+function resetCardMotion() {
+  ui.dx = 0;
+  ui.animating = false;
+  ui.dragging = false; ui.dragged = false; ui.hold = false;
+  clearTimeout(ui.holdT); ui.holdT = 0;
+  const c = $("card");
+  if (c) {
+    for (const id of capturedPointers) { try { c.releasePointerCapture?.(id); } catch {} }
+    c.classList.remove("dragging");
+    c.style.transform = "";
+    c.style.opacity = "";
+  }
+  capturedPointers.clear();
+}
 function restore() {
-  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0;
+  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
   let d = null;
   try { d = loadFromStorage(localStorage); } catch { d = null; }
   if (!d) return false;
@@ -269,7 +287,7 @@ function restore() {
   }
 }
 function newGame(s) {
-  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0;
+  clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
   hideToast();   // 先清队列（含挂起的重放/提交、epoch++），再收 toast：之后不会再有排队项把提示弹回来
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
   ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
@@ -296,7 +314,7 @@ function importCode() {
   try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
-    clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0;
+    clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; resetCardMotion();
     hideToast();   // 顺序同 newGame/restore：先清队列，再收 toast
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
     ui.lastDims = null; saveNow(); render(); closeDlg();
@@ -884,7 +902,12 @@ const cardEl = () => $("card");
 function threshold() { return DRAG_RATIO * (cardEl().offsetWidth || cardEl().getBoundingClientRect().width); }
 
 // 试着在 #card 上捕获指针：真实指针成功，合成指针（e2e 触屏 PointerEvent）会抛，吞掉即可。
-const captureCard = (id) => { try { cardEl().setPointerCapture?.(id); } catch { /* 合成指针会抛 */ } };
+const captureCard = (id) => {
+  try {
+    cardEl().setPointerCapture?.(id);
+    capturedPointers.add(id);
+  } catch { /* 合成指针会抛 */ }
+};
 // 起拖：onDown 与「排队 press 的重放」共用同一段（round 4 A5）。置拖拽态、加 .dragging、挂长按计时。
 function beginDrag(x, pointerId) {
   ui.dragging = true; ui.dragged = false; ui.startX = x;
@@ -922,6 +945,7 @@ function applyTilt() {
 }
 function renderDimsOnly() { const d = dimsHTML(); patchHTML($("dims"), d); patchHTML($("dims-desktop"), d); const s = previewSide(); $("opt-left").classList.toggle("on", s === "left"); $("opt-right").classList.toggle("on", s === "right"); }
 function onUp(e) {
+  capturedPointers.delete(e.pointerId);
   if (!ui.dragging) {
     // 排队中的 press 松手：按抬起时的位移决定「在队列原位变成一次 side 提交」还是整项丢弃。
     const it = queuedPress(e.pointerId);
@@ -973,10 +997,11 @@ function onUp(e) {
   }
 }
 function rebound() {
-  const from = ui.dx;
+  const ep = ui.epoch, from = ui.dx;
   if (reducedPref()) { ui.dx = 0; cardEl().style.transform = ""; render(); return; }
   ui.animating = true; renderShort(); const t0 = performance.now(), dur = 320;
   const tick = (t) => {
+    if (ui.epoch !== ep) { ui.animating = false; return; }
     const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
     ui.dx = from * (1 - e); cardEl().style.transform = `translateX(${ui.dx}px)`; renderDimsOnly();
     if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; ui.dx = 0; cardEl().style.transform = ""; render(); }
@@ -988,10 +1013,11 @@ function flyOut(targetX, done) {
   if (reducedPref()) { ui.animating = true; cardEl().style.opacity = "0"; setTimeout(() => { cardEl().style.opacity = ""; ui.animating = false; if (ui.epoch === ep) done(); }, 120); return; }
   ui.animating = true; renderShort(); const from = ui.dx, t0 = performance.now(), dur = 240, deg = Math.sign(targetX) * 18;
   const tick = (t) => {
+    if (ui.epoch !== ep) { ui.animating = false; return; }
     const k = Math.min(1, (t - t0) / dur), e = k * k;
     ui.dx = from + (targetX - from) * e;
     cardEl().style.transform = `translateX(${ui.dx}px) rotate(${deg * e}deg)`; cardEl().style.opacity = String(1 - e);
-    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; cardEl().style.transform = ""; cardEl().style.opacity = ""; if (ui.epoch === ep) done(); }
+    if (k < 1) requestAnimationFrame(tick); else { ui.animating = false; ui.dx = 0; cardEl().style.transform = ""; cardEl().style.opacity = ""; if (ui.epoch === ep) done(); }
   };
   requestAnimationFrame(tick);
 }
@@ -1360,7 +1386,7 @@ addEventListener("pointerup", (e) => {
   ui.swallow.push({ token: press.token, at: performance.now() });
   pickAction(press.do, press.char);                        // 用按下时记下的字/动作，不用抬起时的节点内容
 });
-addEventListener("pointercancel", (e) => { ui.presses.delete(e.pointerId); });
+addEventListener("pointercancel", (e) => { ui.presses.delete(e.pointerId); capturedPointers.delete(e.pointerId); });
 on($("pick"), (e) => {
   const c = e.target.closest(PICK_HIT); if (!c) return;
   if (consumePickSwallow()) return;                        // 这次 click 由 pointerup 已处理的同一次按下合成
