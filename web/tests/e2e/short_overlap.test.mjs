@@ -117,8 +117,8 @@ for (const engine of Object.keys(ENGINES)) {
           assert.equal(g.pop.hidden, false, `${label}：键位浮层应打开`);
           assert.ok(inViewport(g.pop, g.vw, g.vh), `${label}：浮层应在视口内：${box(g.pop)}`);
 
-          // 6 行全可见、不滚动：scrollHeight 不得超过 clientHeight（无裁切/无滚动条）
-          assert.equal(g.rows.length, 6, `${label}：浮层应列全部 6 条键位，实际 ${g.rows.length} 行`);
+          // 4 行（无骨片不显 K 刻字/刻）全可见、不滚动：scrollHeight 不得超过 clientHeight（无裁切/无滚动条）
+          assert.equal(g.rows.length, 4, `${label}：浮层无骨片时应列 4 条键位，实际 ${g.rows.length} 行`);
           assert.ok(
             g.popScrollH <= g.popClientH,
             `${label}：浮层不应滚动，scrollH=${g.popScrollH} clientH=${g.popClientH}`,

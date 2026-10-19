@@ -720,7 +720,6 @@ function renderKeys() {
 function keyhelpHTML() {
   const rows = [
     ["← →", "选字；再按同向或 Enter 提交"],
-    ["Enter", "确认选择"],
     ["1–3", "落字"],
     ["Space", "按住看分量"],
   ];
