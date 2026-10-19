@@ -32,21 +32,26 @@ const VIEWPORTS = [
 
 async function getVisibleLiveElement(page) {
   return await page.evaluate(() => {
-    const els = Array.from(document.querySelectorAll("[aria-live], [role='status']"));
-    for (const el of els) {
-      let cur = el;
-      let visible = true;
-      while (cur && cur !== document.documentElement) {
-        const cs = getComputedStyle(cur);
-        if (cs.display === "none" || cs.visibility === "hidden") {
-          visible = false;
-          break;
-        }
-        cur = cur.parentElement;
+    const el = document.getElementById("toast-live");
+    if (!el) return null;
+    let cur = el;
+    let visible = true;
+    while (cur && cur !== document.documentElement) {
+      const cs = getComputedStyle(cur);
+      if (cs.display === "none" || cs.visibility === "hidden") {
+        visible = false;
+        break;
       }
-      if (visible) return { id: el.id, tag: el.tagName, text: el.textContent, role: el.getAttribute("role"), live: el.getAttribute("aria-live") };
+      cur = cur.parentElement;
     }
-    return null;
+    return {
+      id: el.id,
+      tag: el.tagName,
+      text: el.textContent,
+      role: el.getAttribute("role"),
+      live: el.getAttribute("aria-live"),
+      visible,
+    };
   });
 }
 
@@ -79,19 +84,31 @@ for (const engine of Object.keys(ENGINES)) {
         // 闲置状态：等待 2.5s 确保读档 toast 消失
         await page.waitForTimeout(2500);
 
-        // 1) 闲置时应存在未被隐藏的 live element (display != none && visibility != hidden)
-        const idleLive = await getVisibleLiveElement(page);
-        assert.ok(idleLive, "闲置状态下应存在可见的 [aria-live] 或 [role=status] 元素");
+        // 断言 #toast 自身不再携带 aria-live 属性（避免读屏双重播报）
+        const toastAriaLive = await page.locator("#toast").getAttribute("aria-live");
+        assert.equal(toastAriaLive, null, "#toast 本身不应携带 aria-live 属性");
 
-        // 在 chromium 下使用 CDP Accessibility.getFullAXTree 检查
+        // 1) 闲置时应存在未被隐藏的 #toast-live 元素 (role=status, aria-live=polite, 祖先及自身可见)
+        const idleLive = await getVisibleLiveElement(page);
+        assert.ok(idleLive, "闲置状态下 #toast-live 元素应存在");
+        assert.equal(idleLive.id, "toast-live", "元素 ID 必须为 toast-live");
+        assert.equal(idleLive.role, "status", "#toast-live role 应为 status");
+        assert.equal(idleLive.live, "polite", "#toast-live aria-live 应为 polite");
+        assert.equal(idleLive.visible, true, "#toast-live 自身及祖先均不能为 display:none 或 visibility:hidden");
+
+        // 在 chromium 下使用 CDP 定位 #toast-live 节点并检查其 AX live 属性
         if (engine === "chromium") {
           const client = await ctx.newCDPSession(page);
-          const ax = await client.send("Accessibility.getFullAXTree");
-          const hasLiveNode = ax.nodes.some((n) =>
-            n.live?.value === "polite" ||
-            n.properties?.some((p) => p.name === "live" && (p.value?.value === "polite" || p.value === "polite"))
-          );
-          assert.ok(hasLiveNode, "Chromium AX 树在闲置时应包含 live=polite 节点");
+          const doc = await client.send("DOM.getDocument");
+          const { nodeId } = await client.send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#toast-live" });
+          const desc = await client.send("DOM.describeNode", { nodeId });
+          const backendNodeId = desc.node.backendNodeId;
+          const ax = await client.send("Accessibility.getPartialAXTree", { backendNodeId });
+          const targetNode = ax.nodes.find((n) => n.backendDOMNodeId === backendNodeId);
+          assert.ok(targetNode, "Chromium AX 树中应能定位到 #toast-live 节点");
+          const liveProp = targetNode.properties?.find((p) => p.name === "live");
+          const liveValue = liveProp?.value?.value ?? liveProp?.value ?? targetNode.live?.value;
+          assert.equal(liveValue, "polite", "#toast-live 节点的 AX live 属性应为 polite");
         }
 
         // 进入 T03
@@ -109,20 +126,22 @@ for (const engine of Object.keys(ENGINES)) {
         const toastText = (await page.locator("#toast").textContent()) || "";
         assert.ok(toastText.length > 0, "toast 文本应非空");
 
-        // 2) 弹 toast 时：live element textContent 等于 toast 文本
+        // 2) 弹 toast 时：#toast-live 元素 textContent 等于 toast 文本
         const activeLive = await getVisibleLiveElement(page);
-        assert.ok(activeLive, "toast 显示时 live element 应存在且可见");
-        assert.equal(activeLive.text, toastText, "live element textContent 应等于 toast 文本");
+        assert.ok(activeLive, "toast 显示时 #toast-live 应存在");
+        assert.equal(activeLive.visible, true, "toast 显示时 #toast-live 祖先及自身应可见");
+        assert.equal(activeLive.text, toastText, "#toast-live textContent 应等于 toast 文本");
 
         // 3) 等待 toast 收起（2.5s）
         await page.waitForTimeout(2500);
         const toastOn = await page.locator("#toast").evaluate((e) => e.classList.contains("on"));
         assert.equal(toastOn, false, "#toast 应已收起");
 
-        // live element 依然可见，且其文本已清空
+        // #toast-live 依然可见，且其文本已清空
         const afterLive = await getVisibleLiveElement(page);
-        assert.ok(afterLive, "toast 收起后 live element 应依然可见存在");
-        assert.equal(afterLive.text, "", "toast 收起后 live element 文本应清空");
+        assert.ok(afterLive, "toast 收起后 #toast-live 应依然存在");
+        assert.equal(afterLive.visible, true, "toast 收起后 #toast-live 祖先及自身应依然可见");
+        assert.equal(afterLive.text, "", "toast 收起后 #toast-live 文本应清空");
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {

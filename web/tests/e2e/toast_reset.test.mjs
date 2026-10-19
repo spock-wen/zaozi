@@ -109,15 +109,123 @@ for (const engine of Object.keys(ENGINES)) {
         const lockText = await page.locator("#toast").textContent();
         assert.ok(lockText.includes("先点卡角骨片刻下这件事"), "锁拖提示应出现");
 
-        // 导入有效存档码
-        await page.evaluate(() => {
+        // 导入有效存档码，并通过 MutationObserver 捕获 hideToast() 与 toast() 的序列变化
+        const result = await page.evaluate(() => {
+          const t = document.getElementById("toast");
+          const tl = document.getElementById("toast-live");
+          const obs = new MutationObserver(() => {});
+          if (tl) obs.observe(tl, { childList: true });
+          if (t) obs.observe(t, { attributes: true, attributeFilter: ["class", "style"], attributeOldValue: true });
+
           const code = window.__zz.code();
           window.__zz.importCode(code);
+
+          const records = obs.takeRecords().map((r) => ({
+            target: r.target.id,
+            type: r.type,
+            attr: r.attributeName,
+            old: r.oldValue,
+            added: r.addedNodes ? Array.from(r.addedNodes).map((n) => n.textContent) : [],
+            removed: r.removedNodes ? Array.from(r.removedNodes).map((n) => n.textContent) : [],
+          }));
+          obs.disconnect();
+          return { records, newText: t ? t.textContent : "" };
         });
 
-        const newText = await page.locator("#toast").textContent();
-        assert.ok(newText.startsWith("导入成功"), `toast 文案应为导入成功，得到：${newText}`);
-        assert.notEqual(newText, lockText, "toast 文案不能仍是锁拖提示");
+        assert.ok(result.newText.startsWith("导入成功"), `toast 文案应为导入成功，得到：${result.newText}`);
+        assert.notEqual(result.newText, lockText, "toast 文案不能仍是锁拖提示");
+
+        // 必须观测到 hideToast() 在新消息前先清空旧 toast
+        const clearIndex = result.records.findIndex(
+          (r) => r.target === "toast-live" && r.type === "childList" && r.added.length === 0 && r.removed.length > 0
+        );
+        assert.ok(
+          clearIndex !== -1,
+          "importCode() 必须调用 hideToast() 清空旧 toast (#toast-live 应产生 childList 清空记录)",
+        );
+        const newMsgIndex = result.records.findIndex(
+          (r) => r.target === "toast-live" && r.type === "childList" && r.added.some((s) => s.startsWith("导入成功"))
+        );
+        assert.ok(
+          newMsgIndex !== -1,
+          "#toast-live 应记录到新消息「导入成功」的写入",
+        );
+        assert.ok(
+          clearIndex < newMsgIndex,
+          `hideToast() 的清空动作（记录 #${clearIndex}）必须在新消息写入（记录 #${newMsgIndex}）之前发生`,
+        );
+
+        assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
+      } finally {
+        await ctx.close();
+      }
+    });
+
+    test(`${engine} ${vp.name} [guard]: 锁拖提示下读回存档替换为读回进度 toast`, async () => {
+      const ctx = await browsers[engine].newContext({
+        viewport: { width: vp.width, height: vp.height },
+        hasTouch: vp.view === "mobile",
+      });
+      const page = await ctx.newPage();
+      const errs = [];
+      collectErrors(page, errs);
+      try {
+        await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
+        await page.waitForFunction(() => !!window.__zz);
+
+        await commit(page, "left");               // T01 → T02
+        await commit(page, "right");              // T02 → T03（锁拖，进刻）
+        assert.equal(await current(page), "T03");
+
+        await pressCard(page, vp.view === "mobile");
+        const lockText = await page.locator("#toast").textContent();
+        assert.ok(lockText.includes("先点卡角骨片刻下这件事"), "锁拖提示应出现");
+
+        // 读回上次进度，并通过 MutationObserver 捕获 hideToast() 与 toast() 的序列变化
+        const result = await page.evaluate(() => {
+          const t = document.getElementById("toast");
+          const tl = document.getElementById("toast-live");
+          const obs = new MutationObserver(() => {});
+          if (tl) obs.observe(tl, { childList: true });
+          if (t) obs.observe(t, { attributes: true, attributeFilter: ["class", "style"], attributeOldValue: true });
+
+          const ok = window.__zz.restore();
+
+          const records = obs.takeRecords().map((r) => ({
+            target: r.target.id,
+            type: r.type,
+            attr: r.attributeName,
+            old: r.oldValue,
+            added: r.addedNodes ? Array.from(r.addedNodes).map((n) => n.textContent) : [],
+            removed: r.removedNodes ? Array.from(r.removedNodes).map((n) => n.textContent) : [],
+          }));
+          obs.disconnect();
+          return { ok, records, newText: t ? t.textContent : "" };
+        });
+
+        assert.equal(result.ok, true, "restore() 应成功读回存档");
+        assert.ok(result.newText.startsWith("读回上次的进度"), `toast 文案应为读回上次的进度，得到：${result.newText}`);
+        assert.notEqual(result.newText, lockText, "toast 文案不能仍是锁拖提示");
+
+        // 必须观测到 hideToast() 在新消息前先清空旧 toast
+        const clearIndex = result.records.findIndex(
+          (r) => r.target === "toast-live" && r.type === "childList" && r.added.length === 0 && r.removed.length > 0
+        );
+        assert.ok(
+          clearIndex !== -1,
+          "restore() 必须调用 hideToast() 清空旧 toast (#toast-live 应产生 childList 清空记录)",
+        );
+        const newMsgIndex = result.records.findIndex(
+          (r) => r.target === "toast-live" && r.type === "childList" && r.added.some((s) => s.startsWith("读回上次的进度"))
+        );
+        assert.ok(
+          newMsgIndex !== -1,
+          "#toast-live 应记录到新消息「读回上次的进度」的写入",
+        );
+        assert.ok(
+          clearIndex < newMsgIndex,
+          `hideToast() 的清空动作（记录 #${clearIndex}）必须在新消息写入（记录 #${newMsgIndex}）之前发生`,
+        );
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {
