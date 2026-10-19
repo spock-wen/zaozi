@@ -1205,6 +1205,7 @@ on($("wordbox"), (e) => {
   }
 });
 on($("card"), (e) => { const b = e.target.closest("[data-do]"); if (!b) return; if (b.dataset.do === "skip") { clearToast(); dispatch({ type: "skip_engrave" }); } });
+on($("bonecorner"), () => { if (st.phase === "engrave") { clearToast(); ui.engraved = true; dispatch({ type: "engrave", trace: st.pendingTrace.target }); } });
 // 左右选项：支持 pointerup 提交并与 click 去重（S-1）。
 // WebKit 在切卡/重绘（setText 换 text 节点）跨越按下与抬起时，不会为按钮合成 click。
 // 在 pointerup 上若未起拖且仍在按钮内，即提交；随后的 click 借时间窗口去重，确保仅触发一次。
