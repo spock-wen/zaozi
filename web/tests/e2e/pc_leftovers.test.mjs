@@ -477,9 +477,8 @@ for (const [engine] of Object.entries(ENGINES)) {
         await commitCard(page, "right");
         assert.equal(await page.evaluate(() => window.__zz.st?.phase), "engrave");
 
-        const segsT03 = vp.h <= 760
-          ? ["1–3落字", "Space分量", "K刻"]
-          : ["1–3 落字", "按住 Space 看分量", "K 刻字"];
+        // R12 / D1: In engrave phase, keys bar drops decision keys (1-3, Space) and shows only K 刻字 · S 先不刻 · 卡已定住
+        const segsT03 = ["K 刻字"];
         const resT03 = await checkHintUniqueness("T03", segsT03);
         for (const seg of segsT03) {
           const list = resT03[seg];

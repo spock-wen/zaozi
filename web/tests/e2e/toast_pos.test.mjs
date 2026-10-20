@@ -205,7 +205,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
     await page.waitForFunction(() => !!window.__zz && document.body.dataset.cardReady === "1");
 
-    const negRes = await page.evaluate(() => {
+    const negRes = await page.evaluate((checkerCode) => {
       const t = document.getElementById("toast");
       const optL = document.getElementById("opt-left");
       if (!t || !optL) return { ok: true, reason: "Missing elements" };
@@ -221,12 +221,12 @@ for (const [engine] of Object.entries(ENGINES)) {
       t.style.opacity = "1";
       t.style.visibility = "visible";
 
-      // Execute checker function
+      // Execute checker function passed from Node context
       return new Function(`
-        ${CHECKER_FN_STRING}
+        ${checkerCode}
         return checkToastAndObstacles();
       `)();
-    });
+    }, CHECKER_FN_STRING);
 
     assert.equal(negRes.ok, false, "Checker must flag forced overlap as failure");
     assert.ok(

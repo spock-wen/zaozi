@@ -155,14 +155,14 @@ for (const engine of Object.keys(ENGINES)) {
         await btn.click();
         await assertClear("点「?」", 4);
 
-        // 推进到 T03（刻字阶段）：浮层展示全部 6 行键位，几何依然全可见、不滚动、不压左右选项
+        // 推进到 T03（刻字阶段）：浮层展示刻字键位（R12/D1：刻字阶段去除选卡键位，浮层收为 K/S/Esc 3 行），几何依然全可见、不滚动、不压左右选项
         await commit(page, "left");   // T01 → T02
         await commit(page, "right");  // T02 → T03
         if (await pop.isHidden()) {
           await btn.click();
         }
         await pop.waitFor({ state: "visible" });
-        await assertClear("刻字阶段点「?」", 6);
+        await assertClear("刻字阶段点「?」", 3); // R12/D1: 刻字浮层只含 K/S/Esc 3 条
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {

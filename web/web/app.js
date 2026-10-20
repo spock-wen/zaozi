@@ -215,29 +215,36 @@ function placeToast(t) {
   const gh = $("gesture-hint"), gestOnly = !layer && toastVis(gh) && gh.dataset.kind === "gesture";
   const els = [...(layer || document).querySelectorAll(TOAST_AVOID)];
   if (layer) els.push($("too-short"));
-  else if (toastVis(gh) && !gestOnly) els.push(gh);
+  else if (toastVis(gh)) els.push(gh);
   const av = els.filter((e) => e && e !== t && !t.contains(e) && toastVis(e))
     .map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
   t.style.top = ""; t.style.bottom = "";
   const r0 = t.getBoundingClientRect(), w = r0.width, h = r0.height, x = (vw - w) / 2;
   const sat = (parseFloat(getComputedStyle($("topbar")).paddingTop) || 4) - 4;
   const minY = layer ? sat : 0;
-  const bad = (y) => x < 0 || x + w > vw || y < minY || y + h > vh || av.some((a) => x < a.right + M && x + w > a.left - M && y < a.bottom + M && y + h > a.top - M);
+  const ghBox = (gestOnly && toastVis(gh)) ? gh.getBoundingClientRect() : null;
+  const bad = (y, allowGest = false) => x < 0 || x + w > vw || y < minY || y + h > vh || av.some((a) => {
+    if (allowGest && ghBox && a.left === ghBox.left && a.top === ghBox.top) return false;
+    return x < a.right + M && x + w > a.left - M && y < a.bottom + M && y + h > a.top - M;
+  });
   const view = document.body.dataset.view, ol = $("opt-left");
   const c = [!layer && (view === "mobile" || view === "tablet-portrait") && toastVis(ol) ? ol.getBoundingClientRect().top - 8 - h : r0.top];
-  if (gestOnly) { const q = gh.getBoundingClientRect(); c.push(q.top + (q.height - h) / 2); }
   const startY = Math.ceil(layer ? sat + 8 : ($("topbar")?.getBoundingClientRect().bottom || 0) + 8);
   for (let y = startY; y + h <= vh; y += 4) c.push(y);
   for (const rawY of c) {
     const y = Math.round(rawY);
-    if (!bad(y)) { t.style.bottom = "auto"; t.style.top = y + "px"; return true; }
+    if (!bad(y, false)) { t.style.bottom = "auto"; t.style.top = y + "px"; return true; }
+  }
+  if (gestOnly && ghBox) {
+    const y = Math.round(ghBox.top + (ghBox.height - h) / 2);
+    if (!bad(y, true)) { t.style.bottom = "auto"; t.style.top = y + "px"; return true; }
   }
   return false;
 }
 
 function srSay(m) {
   const s = $("toast-live") || $("sr-live"); if (!s) return;
-  s.textContent = ""; requestAnimationFrame(() => { s.textContent = m; });
+  s.textContent = m;
 }
 
 function toast(m) {
@@ -262,7 +269,10 @@ function toast(m) {
   t.classList.add("on");
   t.classList.toggle("hold", cardEntryBusy());
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { t.classList.remove("on"); }, toastMs(m));
+  toast._t = setTimeout(() => {
+    t.classList.remove("on");
+    const tl = $("toast-live") || $("sr-live"); if (tl) tl.textContent = "";
+  }, toastMs(m));
 }
 
 function reflowToast() {
@@ -281,6 +291,7 @@ function hideToast() {
     t.style.top = "";
     t.style.bottom = "";
   }
+  const tl = $("toast-live") || $("sr-live"); if (tl) tl.textContent = "";
 }
 function clearToast() { hideToast(); }
 

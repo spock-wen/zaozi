@@ -86,13 +86,14 @@ for (const engine of Object.keys(ENGINES)) {
         assert.equal(g.hintDisplay, "none", "矮屏不显旧手势行（设计稿卡下只有卡→字匣→键位）");
         assert.ok(g.scroll <= 1, `矮屏不应滚动，溢出 ${g.scroll}`);
 
-        // 刻字阶段（T03）：键位行追加「K刻」，几何依然满足一行 28、在屏内、卡/字匣/键位互不交叠
+        // 刻字阶段（T03）：键位行展示刻字文案（R12/D1：刻字阶段去除选卡键，文案为「K 刻字 · S 先不刻 · 卡已定住」），几何依然满足一行 28、在屏内、卡/字匣/键位互不交叠
         await commit(page, "left");   // T01 → T02
         await commit(page, "right");  // T02 → T03
         const gEngrave = await box(page);
         assert.notEqual(gEngrave.keysDisplay, "none", "刻字阶段 A 档应显示键位行");
         assert.equal(Math.round(gEngrave.keys.h), 28, "刻字阶段 A 档键位行应为一行 28");
-        assert.equal(gEngrave.keysText, "←→选 1–3落字 Space分量 K刻", "刻字阶段 A 档键位行文案");
+        // R12/D1: 刻字阶段无左右选字与落字键，显示定住与 K/S
+        assert.equal(gEngrave.keysText, "K 刻字 · S 先不刻 · 卡已定住", "刻字阶段 A 档键位行文案");
         assert.ok(gEngrave.keys.bottom <= gEngrave.vh + 1, "刻字阶段键位行应在视口内");
         assert.ok(
           !intersect(gEngrave.card, gEngrave.wb) &&
@@ -166,7 +167,8 @@ for (const engine of Object.keys(ENGINES)) {
         const pbEngrave = await pop.boundingBox();
         assert.ok(pbEngrave.y >= 0 && pbEngrave.y + pbEngrave.height <= g.vh + 1, "刻字阶段键位浮层应在视口内");
         const rowsEngrave = await pop.locator(".kh-row").count();
-        assert.equal(rowsEngrave, 6, `刻字阶段浮层应列出全部 6 条键位，实际 ${rowsEngrave} 行`);
+        // R12/D1: 刻字阶段浮层去除选卡键位，只含 K/S/Esc 3 行
+        assert.equal(rowsEngrave, 3, `刻字阶段浮层应列出全部 3 条键位，实际 ${rowsEngrave} 行`);
         const gEngrave = await box(page);
         assert.ok(!intersect(gEngrave.card, gEngrave.wb), "刻字阶段卡与字匣不交叠");
         assert.equal(gEngrave.keysDisplay, "none", "B 档刻字阶段不显示键位行");

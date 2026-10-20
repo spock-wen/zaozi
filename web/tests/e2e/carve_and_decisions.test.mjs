@@ -313,6 +313,11 @@ for (const [engine] of Object.entries(ENGINES)) {
               window.__zz.st.pendingTrace = { target: "休", tally_text: "晌午正热，赶路的背抵着一截老干" };
               window.__zz.render();
 
+              // D1: engrave card geometry (min width 300px) differs from decision card; update card rect
+              const engraveCard = document.querySelector("#card");
+              const crEngrave = engraveCard ? engraveCard.getBoundingClientRect() : cr;
+              const vboxEngrave = engraveCard ? visibleBoxOf(engraveCard) : vbox;
+
               const engraveContent = [];
               for (const sel of [".card-head", "#card-title", "#card-text", ".card-art", "#card-drops"]) {
                 const el = document.querySelector(sel);
@@ -322,10 +327,10 @@ for (const [engine] of Object.entries(ENGINES)) {
                 if (sel !== ".card-art" && el.scrollHeight > el.clientHeight + 1) {
                   return { ok: false, msg: `${id} (engrave): ${sel} scrollHeight ${el.scrollHeight} > clientHeight ${el.clientHeight}` };
                 }
-                if (!contains(cr, r)) {
+                if (!contains(crEngrave, r)) {
                   return { ok: false, msg: `${id} (engrave): ${sel} overflows #card` };
                 }
-                if (!contains(vbox, r)) {
+                if (!contains(vboxEngrave, r)) {
                   return { ok: false, msg: `${id} (engrave): ${sel} clipped by ancestor` };
                 }
                 engraveContent.push({ sel, el, r });
