@@ -69,6 +69,7 @@
     // scrollWidth/scrollHeight 溢出（overflow:auto/scroll 的除外）
     for (const e of new Set([...boxes, ...contSet])) {
       if (scrollable(e) || e.clientWidth === 0) continue;
+      if (e.classList.contains("sr-only") && e.getBoundingClientRect().width <= 1.5 && e.getBoundingClientRect().height <= 1.5) continue;   // 读屏专用区（.sr-only 1px+clip，如 #toast-live）设计上不可见，溢出不算；只跳过真被缩成 ≤1.5px 的
       const lc = getComputedStyle(e).webkitLineClamp; if (lc && lc !== "none") continue;   // 设计上的行数截断（-webkit-line-clamp，FIX_SPEC I-04 迹文 2 行）不算溢出；438124f/e75a390 没用到
       const dx = e.scrollWidth - e.clientWidth, dy = e.scrollHeight - e.clientHeight;
       if (dx > TOL || dy > TOL) v.push({ kind: "内容溢出", el: name(e), text: snip(e), sw: e.scrollWidth, cw: e.clientWidth, sh: e.scrollHeight, ch: e.clientHeight, box: R(e.getBoundingClientRect()) });
