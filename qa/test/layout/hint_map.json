@@ -21,6 +21,29 @@
    "source": "app.js:720 (8b58f03) 触屏刻字提示；指骨片「刻」与 #skip「先不刻」；键位版「K 刻字 · S 先不刻 · 卡已定住」由键位条目覆盖；BEHAVIOR_RULES_mobile_next R12"
   },
   {
+   "id": "弹层-下面还有",
+   "match": "下面还有，(往上滑|滚动看)",
+   "kind": "pointer",
+   "targets": [
+    "#sheet"
+   ],
+   "source": "index.html:106 #sheetmore；app.js:360（3cc3f77 及更早）；指弹层 #sheet 可滚内容"
+  },
+  {
+   "id": "按钮自身-先不刻",
+   "match": "^先不刻$",
+   "kind": "info",
+   "targets": [],
+   "source": "app.js:1050 键位浮层标签；index.html:108 #skip2 按钮本身文字（不指向别处）"
+  },
+  {
+   "id": "字匣-已落读屏",
+   "match": "，已落\"?$",
+   "kind": "info",
+   "targets": [],
+   "source": "app.js:810 字匣格 aria-label 状态（3cc3f77 及更早，读屏叙述）"
+  },
+  {
    "id": "目标与造法说明",
    "match": "用骨片刻下一件事|^达成|落一个字$|别的造法",
    "kind": "info",
