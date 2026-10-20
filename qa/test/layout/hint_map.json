@@ -11,6 +11,16 @@
  },
  "entries": [
   {
+   "id": "刻字-卡已定住",
+   "match": "卡已定住 · 点「刻」或「先不刻」",
+   "kind": "pointer",
+   "targets": [
+    "#bonecorner",
+    "#skip"
+   ],
+   "source": "app.js:720 (8b58f03) 触屏刻字提示；指骨片「刻」与 #skip「先不刻」；键位版「K 刻字 · S 先不刻 · 卡已定住」由键位条目覆盖；BEHAVIOR_RULES_mobile_next R12"
+  },
+  {
    "id": "目标与造法说明",
    "match": "用骨片刻下一件事|^达成|落一个字$|别的造法",
    "kind": "info",
