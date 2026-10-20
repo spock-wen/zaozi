@@ -630,6 +630,24 @@ function placeBanner() {
     baseBottom = Math.max(baseBottom, dims.getBoundingClientRect().bottom);
   }
   b.style.top = (baseBottom + 8) + "px";
+  // 桌面：横幅顶 = 资源条底 + 8 = 卡顶（资源条与卡同在 #cardcol、列距 8），CSS 居中位必压卡右上角
+  // （layout check B「coach 所指 #card 被遮挡」）。实测卡槽与舞台，把横幅水平挪进卡侧空档：
+  // 取更宽的一侧、离卡 12px；自然宽塞不下就收窄（maxWidth）让文字换行。手机/平板维持居中不动。
+  b.style.left = ""; b.style.transform = ""; b.style.maxWidth = "";
+  if (view !== "desktop") return;
+  const stage = $("stage"), card = $("cardwrap");
+  const sr = stage && stage.getBoundingClientRect();
+  const cr = card && card.getBoundingClientRect();
+  if (!sr || sr.width <= 0 || !cr || cr.width <= 0) return;
+  const GAP = 12, PAD = 16;
+  const gapR = sr.right - PAD - cr.right, gapL = cr.left - sr.left - PAD;
+  const right = gapR >= gapL;                          // 空档更宽的一侧
+  const avail = (right ? gapR : gapL) - GAP;
+  if (avail < b.getBoundingClientRect().width)
+    b.style.maxWidth = Math.max(96, avail) + "px";     // 塞不下自然宽：收窄换行，不压卡
+  const w = b.getBoundingClientRect().width;
+  b.style.left = (right ? cr.right + GAP : cr.left - GAP - w) + "px";
+  b.style.transform = "none";
 }
 function pumpBanner() {
   if (ui.bannerOn || ui.bannerQueue.length === 0) return;

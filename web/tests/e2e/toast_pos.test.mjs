@@ -205,6 +205,19 @@ for (const [engine] of Object.entries(ENGINES)) {
     await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
     await page.waitForFunction(() => !!window.__zz && document.body.dataset.cardReady === "1");
 
+    // Precondition: at boot the state is phase="card", so #opt-left must be shown —
+    // otherwise the negative check below would pass vacuously
+    const optPre = await page.evaluate(() => {
+      const optL = document.getElementById("opt-left");
+      if (!optL) return "missing";
+      const r = optL.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return "zero rect";
+      const cs = getComputedStyle(optL);
+      if (cs.display === "none" || cs.visibility === "hidden") return `hidden (visibility:${cs.visibility})`;
+      return "";
+    });
+    assert.equal(optPre, "", "precondition: #opt-left must be visible at boot state");
+
     const negRes = await page.evaluate((checkerCode) => {
       const t = document.getElementById("toast");
       const optL = document.getElementById("opt-left");
@@ -214,6 +227,10 @@ for (const [engine] of Object.entries(ENGINES)) {
       t.textContent = "强制覆盖左选项测试";
       t.classList.add("on");
       t.classList.remove("hold");
+      // #toast carries `transition: opacity .3s`; with only opacity:1 inline, getComputedStyle
+      // in this same tick still yields the transition start value (~0) and the checker's
+      // hidden-guard passes vacuously — kill the transition so the toast is opaque right now
+      t.style.transition = "none";
       t.style.top = Math.round(r.top) + "px";
       t.style.bottom = "auto";
       t.style.left = Math.round(r.left + r.width / 2) + "px";
