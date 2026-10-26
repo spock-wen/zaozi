@@ -8,7 +8,9 @@
 // 清选区发生在 pointerdown（鼠标按下），按钮点击与别处（如致谢页）的文字选择不受影响。
 //
 // 本用例：三引擎 × 1280×800 / 390×844 鼠标，每个场景用新页面（导入同一存档：过教学后的第一张带图卡）：
-//   (a) 从卡下提示行 #gesture-hint 按下，斜划进卡里松手，再从卡面图片向左拖卡；
+//   (a) 从卡外那行键位提示按下，斜划进卡里松手，再从卡面图片向左拖卡
+//       （桌面键鼠下这行按 L15 只留一处：#gesture-hint 置空隐藏，整句改由底部 #keys 承担，
+//        故起点按可见性在 #gesture-hint / #keys 之间选）；
 //   (b) 从顶栏 #gen-line 按下，拖选进卡里松手，再从卡中心向左拖卡；
 //   (c) Ctrl+A 全选（Linux/Windows 的全选键；webkit 在 Linux 上 Meta+A 不是全选），再从卡面图片向左拖卡。
 // 每个场景断言（拖卡这一下）：无原生 dragstart、无 pointercancel、拖到一半卡跟手、松手恰好提交一次且为「选左」、无 .dragging 残留、无选区残留，
@@ -115,11 +117,19 @@ const VPS = [{ width: 1280, height: 800 }, { width: 390, height: 844 }];
 
 for (const [engine] of Object.entries(ENGINES)) {
   for (const vp of VPS) {
-    test(`${engine} ${vp.width} (a) select from #gesture-hint into the card, then drag from the image`, async () => {
+    test(`${engine} ${vp.width} (a) select from the key hint row into the card, then drag from the image`, async () => {
       const { ctx, page, errs } = await openAtCard(engine, vp);
       try {
-        const c = await rectOf(page, "#card"), h = await rectOf(page, "#gesture-hint");
-        assert.ok(h.w > 0 && h.h > 0, "提示行应可见");
+        // 卡外那行「提示」在桌面键鼠下已按 L15 只留一处：#gesture-hint 置空并 :empty{display:none}，
+        // 整句键位提示改由底部 #keys 承担（LEFTOVERS L15「按键提示只出现一处，不被气泡遮挡」）。
+        // 所以桌面取 #keys、手机/平板仍取 #gesture-hint 作为选起点；两处都要求真的可见。
+        const hintSel = await page.evaluate(() => {
+          const g = document.querySelector("#gesture-hint");
+          const vis = (e) => !!e && !e.hidden && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().height > 0;
+          return vis(g) ? "#gesture-hint" : "#keys";
+        });
+        const c = await rectOf(page, "#card"), h = await rectOf(page, hintSel);
+        assert.ok(h.w > 0 && h.h > 0, `提示行应可见（${hintSel}）`);
         await slide(page, c.x + c.w * 0.2, h.y + h.h / 2, c.x + c.w * 0.8, c.y + c.h * 0.45);
         await page.waitForTimeout(500);
         await dragLeftAndCheck(page, "(a) 提示行划进卡后从图片拖", "image");

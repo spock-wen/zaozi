@@ -1,5 +1,5 @@
 // e2e 矮屏交叠回归（QA FINAL_REPORT 92cf10a 缺陷 D2 / D3）。
-// D2：视口高 <492 时「窗口太矮」提示（#too-short）不得压住卡（含卡头 #card .card-head）。
+// D2：视口高 <600 时「窗口太小」提示（#too-short）不得压住卡（含卡头 #card .card-head）。
 // D3：B 档键位浮层（#keyhelp-pop，首进自动弹 / 点「?」手动开）不得压住左右选项（#opt-right/#opt-left），
 //     且键位在 492–600 全程全部可见、浮层不滚动（普通卡 4 行 / 刻字 6 行）。
 // BREAKPOINTS §矮屏「硬规则」：所有点击目标 ≥44×44 且没被别的元素盖住。
@@ -38,7 +38,7 @@ const snap = (page) =>
       const cs = getComputedStyle(e);
       const r = e.getBoundingClientRect();
       const hidden = e.hidden || cs.display === "none" || cs.visibility === "hidden";
-      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, hidden };
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, hidden, text: e.textContent.trim() };
     };
     const R = (s) => {
       const e = document.querySelector(s);
@@ -79,15 +79,16 @@ function inside(a, b) {
   return a.x >= b.x - 1 && a.y >= b.y - 1 && a.right <= b.right + 1 && a.bottom <= b.bottom + 1;
 }
 
-// ---------- D2：视口高 <492「窗口太矮」提示不压卡/卡头 ----------
+// ---------- D2：视口高 <600「窗口太小」提示不压卡/卡头 ----------
 for (const engine of Object.keys(ENGINES)) {
   for (const vp of [{ w: 1024, h: 491 }, { w: 1280, h: 491 }]) {
-    test(`${engine} D2 ${vp.w}×${vp.h}: 「窗口太矮」提示不压卡头`, async () => {
+    test(`${engine} D2 ${vp.w}×${vp.h}: 「窗口太小」提示不压卡头`, async () => {
       const { ctx, page, errs } = await open(engine, { width: vp.w, height: vp.h });
       try {
         const g = await snap(page);
         assert.equal(g.short, "B", "491 应落 B 档");
-        assert.equal(g.tooShort.hidden, false, "视口高 <492 应显示「窗口太矮」提示");
+        assert.equal(g.tooShort.hidden, false, "视口高 <600 应显示「窗口太小」提示");
+        assert.equal(g.tooShort.text, "窗口太小，放大窗口更好玩", `提示文案应精确为「窗口太小，放大窗口更好玩」，实际：${g.tooShort.text}`);
         assert.ok(inViewport(g.tooShort, g.vw, g.vh), `提示应在视口内：${box(g.tooShort)}`);
         assert.ok(
           !intersects(g.tooShort, g.cardHead),
@@ -154,14 +155,14 @@ for (const engine of Object.keys(ENGINES)) {
         await btn.click();
         await assertClear("点「?」", 4);
 
-        // 推进到 T03（刻字阶段）：浮层展示全部 6 行键位，几何依然全可见、不滚动、不压左右选项
+        // 推进到 T03（刻字阶段）：浮层展示刻字键位（R12/D1：刻字阶段去除选卡键位，浮层收为 K/S/Esc 3 行），几何依然全可见、不滚动、不压左右选项
         await commit(page, "left");   // T01 → T02
         await commit(page, "right");  // T02 → T03
         if (await pop.isHidden()) {
           await btn.click();
         }
         await pop.waitFor({ state: "visible" });
-        await assertClear("刻字阶段点「?」", 6);
+        await assertClear("刻字阶段点「?」", 3); // R12/D1: 刻字浮层只含 K/S/Esc 3 条
 
         assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));
       } finally {

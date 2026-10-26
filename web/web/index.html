@@ -39,6 +39,10 @@
           <div class="card-head"><span id="card-season"></span><span class="dot-sep">·</span><span id="card-speaker"></span></div>
           <h2 id="card-title"></h2>
           <p id="card-text"></p>
+          <div id="card-drag-hint" class="card-drag-hint" hidden>
+            <div id="card-drag-label" class="card-drag-label"></div>
+            <div id="card-drag-bar" class="card-drag-bar"><div id="card-drag-fill" class="card-drag-fill"></div></div>
+          </div>
           <div id="card-drops" class="card-drops" hidden></div>
         </article>
       </div>
@@ -68,7 +72,7 @@
 
   <div id="menu-pop" hidden></div>
   <div id="keyhelp-pop" hidden></div>
-  <div id="too-short" hidden>窗口太矮，放大窗口或全屏（F11）更好玩</div>
+  <div id="too-short" hidden>窗口太小，放大窗口更好玩</div>
 
   <section id="pick" hidden></section>
   <section id="elder" hidden></section>
@@ -91,6 +95,19 @@
   <div id="rotate-hint" hidden>把手机横过来不如转回竖屏——这一版先只做竖屏。</div>
   <div id="toast"></div>
   <div id="toast-live" class="sr-only" role="status" aria-live="polite"></div>
+</div>
+
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div id="sheetmask"></div>
+  <section class="sheet-panel" id="sheetpanel" tabindex="-1">
+    <div class="sheet-hd"><h2 id="sheet-title">迹</h2><span id="sheet-sub"></span></div>
+    <div class="sheet-body" id="sheetbody" tabindex="0" aria-label="迹文全文"></div>
+    <div class="sheet-act">
+      <span id="sheetmore" hidden>下面还有，往上滑</span>
+      <button class="act skip" id="fold" data-do="trace-close">收起</button>
+      <button class="act skip" id="skip2" data-do="skip">先不刻</button>
+    </div>
+  </section>
 </div>
 <script type="module" src="app.js"></script>
 </body>

@@ -11,7 +11,7 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(path.resolve(import.meta.url.replace("file://", ""))));
 const argv = process.argv.slice(2);
 const PORT = Number(argv[argv.indexOf("--port") + 1]) || 5179;
-const DIST = path.join(ROOT, "dist");
+const DIST = argv.includes("--dir") ? path.resolve(argv[argv.indexOf("--dir") + 1]) : path.join(ROOT, "dist");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
