@@ -37,6 +37,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 #gen-line{font-size:13px;color:var(--paper-200);white-space:nowrap;}
 #topright{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;}
 #season-chip,#bones-chip{color:var(--gold-400);white-space:nowrap;font-size:13px;}
+#bones-chip{position:relative;}
+#bones-chip .float{left:auto;right:0;}
 #bonesnum,#gennum{font-size:13px;}
 #menubtn{
   width:44px;height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;
@@ -56,6 +58,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 .dim .dots.on{opacity:1;}
 .dot{width:5px;height:5px;border-radius:50%;background:var(--gold-400);}
 .dot.s2{width:8px;height:8px;} .dot.s3{width:12px;height:12px;}
+/* 预览骨 pip：常态骨片 16×20 的 70%（≈11×14）。矮屏圆点排只有 8px，收到排内，避免顶栏溢出。 */
+.bone-pip{
+  width:11px;height:14px;flex:0 0 auto;align-self:flex-end;border-radius:2px;box-sizing:border-box;
+  background:linear-gradient(var(--bone-100),var(--bone-200));
+  border:1px solid var(--night-line);
+}
+body[data-short] .bone-pip{width:8px;height:8px;}
 #dims-desktop{display:none;}
 .float{position:absolute;left:0;top:-6px;font-size:13px;font-weight:700;animation:float 600ms ease-out forwards;pointer-events:none;}
 .float.up{color:var(--up);} .float.down{color:var(--down);}
@@ -123,6 +132,13 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 .bonecorner:active{transform:scale(.92);box-shadow:0 0 0 3px rgba(181,67,46,.45);}
 .bonecorner.done{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);pointer-events:none;}
 .card.engrave .bonecorner:not(.done):hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.3);border-color:var(--night-line);}
+/* 刻前定住：卡角刻按钮右上骨 −1。命中仍归 44×44 的 mark；确认弹层本仓没有，不新做。 */
+.bone-badge{
+  display:none;position:absolute;top:0;right:0;height:22px;min-width:22px;padding:0 5px;box-sizing:border-box;
+  border-radius:11px;background:var(--zhu-600);color:#fff;font-size:13px;font-weight:700;font-style:normal;
+  line-height:22px;text-align:center;pointer-events:none;
+}
+.card.engrave[data-ready] .bonecorner:not(.done) .bone-badge{display:block;}
 .bone-hint{position:absolute;top:14px;right:58px;font-size:13px;color:var(--zhu-600);background:var(--paper-100);padding:2px 6px;border-radius:6px;display:none;}
 .card.engrave .bone-hint{display:block;}
 
@@ -390,6 +406,12 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #dlgtext{width:100%;background:var(--night-800);color:var(--paper-50);border:1px solid var(--night-line);border-radius:8px;padding:8px;font:13px/1.5 ui-monospace,Menlo,monospace;}
 #dlgbtns{text-align:right;margin-top:8px;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
+#outcome{
+  position:fixed;z-index:45;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);
+  max-width:min(360px, calc(100% - 32px));padding:6px 12px;border-radius:8px;box-sizing:border-box;
+  background:var(--night-700);color:var(--paper-50);border:1px solid var(--night-line);
+  font-size:13px;font-weight:700;line-height:1.4;text-align:center;pointer-events:none;
+}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;
   background:var(--zhu-600);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s;pointer-events:none;
   width:max-content;max-width:min(calc(100vw - 32px),320px);white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:22px;}

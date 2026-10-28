@@ -14,6 +14,17 @@ const BUILD_DIST = false;                 // 构建 dist 时置 true：注册 Se
 const GLYPH_BASE = "../";                 // 字形包位置；构建 dist 时改成 "./"
 
 const DIMS = RULES.dims.keys, DIMNAME = RULES.dims.names, SEASON = RULES.year.season_names;
+// 环1 文案（COPY_TABLE · 2026-10-28）。只挂载，不改 B1 规则句、不改数值表。
+const DIM_GLOSS = {
+  food: "部落的存粮。见底会「饥年」，囤满了又可能「仓满招寇」。",
+  faith: "族人还信不信祭祀和巫。掉太低会「失祀」。",
+  memory: "部落还记不记得住事。记不住会「旧水重来」。",
+  outsider: "和外族处得和不和气。闹翻了会「兵祸」。",
+};
+const BONE_GLOSS = "空骨片用来把这件事刻成事签，也可以交给巫。";
+const SKIP_EMPTY = "这件事没刻下来。";
+const CARVE_OK = "刻成事签";
+const signedN = (n) => `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
 const METHOD = Object.fromEntries(Object.entries(RULES.winter_night.methods).map(([k, v]) => [k, v.name]));
 const POSNAME = { top: "上", middle: "中", bottom: "下" };
 const DRAG_RATIO = INPUT.card.drag.commit_threshold_ratio;   // 0.35
@@ -38,7 +49,8 @@ let lastHover = { x: NaN, y: NaN };   // 上一次鼠标位置：区分「真的
 let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
-  preview: false, kbDir: null, animating: false, floats: {}, keyQueue: [], drainArmed: false,
+  preview: false, kbDir: null, animating: false, floats: {}, floatPin: null, boneFloat: 0, boneFloatT: 0,
+  keyQueue: [], drainArmed: false,
   settleKey: null, settledAt: 0, dwellT: 0, commitNotBefore: 0, heldCommitT: 0,   // round 5：最短停留 / 提交不早于
   resumeHeldCommit: null, epoch: 0,
   winter: freshWinter(),
@@ -443,30 +455,145 @@ function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closes
 function dispatch(a) {
   try {
     const prevCurrent = st.current, prevPhase = st.phase;   // D1
+    const prevBones = st.bones;
+    const prevDims = { ...st.dims };
     st = step(st, a);
     actions.push(a);
-    afterAction(a);
+    afterAction(a, prevBones);
     saveNow();
     if (st.current !== prevCurrent || st.phase !== prevPhase) {
-      hideToast();  // D1：换卡/换阶段即收起 toast
+      hideToast();  // D1：换卡/换阶段即收起 toast（#toast 必须保持收起，锁拖提示不能留到下一张）
       ui.engraveHinted = false;  // REREVIEW P3 D5 / RULES §10.3b：换卡/换阶段复位刻字提示标志
+      clearOutcomeFloats();      // 四维飘字钉在触发卡上：下一张进场前清掉，避免错归因
+      if (a.type === "engrave") showOutcome(carveOutcome(prevDims, prevBones));
+      else if (a.type === "skip_engrave") showOutcome(SKIP_EMPTY);
+      else hideOutcome();
     }
-  } catch (e) { toast(e.message); }
+  } catch (e) { clearOutcomeFloats(); toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();
 }
-function afterAction(a) {
-  // 音效 + 数值飘字（对比前后四维）
+function afterAction(a, prevBones) {
+  // 音效按真实涨跌。四维飘字不在这里挂到下一张：选卡飞出前由 primeFloats 钉在触发卡，换卡时 clearOutcomeFloats。
   const before = ui.lastDims || {};
-  const after = st.dims, floats = {};
-  for (const k of DIMS) if (before[k] != null && before[k] !== after[k]) floats[k] = after[k] - before[k];
-  ui.floats = floats;
-  if (Object.keys(floats).length) { (Object.values(floats).some((v) => v < 0) ? sfx.down : sfx.up)(); }
+  const after = st.dims;
+  let down = false, any = false;
+  for (const k of DIMS) if (before[k] != null && before[k] !== after[k]) { any = true; if (after[k] < before[k]) down = true; }
+  if (any) (down ? sfx.down : sfx.up)();
   if (a.type === "choose" && a.side === "drop") sfx.drop();
   if (a.type === "engrave") sfx.engrave();
   if (a.type === "winter_carve") { /* 结果音在 winterCarve 里按对错播 */ }
   for (const k of DIMS) if (after[k] <= 15 || after[k] >= 85) sfx.danger();
-  setTimeout(() => { ui.floats = {}; render(); }, 650);
+  const boneDiff = st.bones - prevBones;
+  if (boneDiff) armBoneFloat(boneDiff);
+  else if ((a.type === "choose" || a.type === "engrave") && ui.boneFloat) clearBoneFloat();
+}
+// 选项上的骨片增减（与引擎 applyBones 同一套上限/空骨/事签骨），供飞出前的飘字。
+function boneDeltaOf(n) {
+  if (typeof n !== "number" || !n) return 0;
+  if (n > 0) {
+    const room = RULES.bones.max_per_generation - (st.bones + st.tallies.length);
+    return Math.max(0, Math.min(n, room));
+  }
+  let bones = st.bones, tallies = st.tallies.length, delta = 0;
+  for (let i = 0; i < -n; i++) {
+    if (bones > 0) { bones -= 1; delta -= 1; }
+    else if (tallies > 0) { tallies -= 1; delta -= 1; }
+    else break;
+  }
+  return delta;
+}
+// 飞出开始前：按将要提交的一侧算出四维/骨片飘字，钉在当前这张卡上（此时状态还没 step）。
+function primeFloats(dir) {
+  if (st.phase !== "card") return;
+  const card = curCard();
+  if (!card) return;
+  const opt = dir === "left" ? card.left : card.right;
+  if (!opt) return;
+  const dims = {};
+  for (const k of DIMS) {
+    const d = opt.delta ? opt.delta[k] : undefined;
+    if (typeof d !== "number") continue;
+    const next = Math.max(RULES.dims.min, Math.min(RULES.dims.max, st.dims[k] + d));
+    const diff = next - st.dims[k];
+    if (diff) dims[k] = diff;
+  }
+  ui.floats = dims;
+  ui.floatPin = st.current;
+  const bone = boneDeltaOf(opt.bones);
+  if (bone) armBoneFloat(bone);
+  renderDimsOnly();
+}
+function clearOutcomeFloats() {
+  ui.floats = {};
+  ui.floatPin = null;
+}
+function armBoneFloat(n) {
+  if (!n) return;
+  ui.boneFloat = n;
+  clearTimeout(ui.boneFloatT);
+  ui.boneFloatT = setTimeout(() => { ui.boneFloat = 0; syncBoneFloat(); }, 650);
+  syncBoneFloat();
+}
+function clearBoneFloat() {
+  ui.boneFloat = 0;
+  clearTimeout(ui.boneFloatT);
+  syncBoneFloat();
+}
+function syncBoneFloat() {
+  const chip = $("bones-chip");
+  if (!chip) return;
+  const n = ui.boneFloat;
+  let fl = [...chip.children].find((el) => el.classList.contains("float"));
+  if (!n) { if (fl) fl.remove(); return; }
+  const text = signedN(n);
+  const cls = `float bone ${n > 0 ? "up" : "down"}`;
+  if (!fl) {
+    fl = document.createElement("span");
+    chip.appendChild(fl);
+  }
+  if (fl.textContent !== text) fl.textContent = text;
+  if (fl.className !== cls) fl.className = cls;
+}
+function carveOutcome(prevDims, prevBones) {
+  const parts = [];
+  for (const k of DIMS) {
+    const d = st.dims[k] - prevDims[k];
+    if (d) parts.push(`${DIMNAME[k]}${signedN(d)}`);
+  }
+  const b = st.bones - prevBones;
+  if (b) parts.push(`骨${signedN(b)}`);
+  return parts.length ? `${CARVE_OK} · ${parts}` : CARVE_OK;
+}
+function showOutcome(msg) {
+  const el = $("outcome");
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = msg;
+  const live = $("toast-live");
+  if (live && !$("toast")?.classList.contains("on")) live.textContent = msg;
+  clearTimeout(showOutcome._t);
+  showOutcome._t = setTimeout(() => {
+    if (el.textContent !== msg) return;
+    el.hidden = true;
+    el.textContent = "";
+    if (live && live.textContent === msg) live.textContent = "";
+  }, 1800);
+}
+function hideOutcome() {
+  clearTimeout(showOutcome._t);
+  const el = $("outcome");
+  if (!el || el.hidden) return;
+  const msg = el.textContent;
+  el.hidden = true;
+  el.textContent = "";
+  const live = $("toast-live");
+  if (live && msg && live.textContent === msg) live.textContent = "";
+}
+function resetOutcome() {
+  clearOutcomeFloats();
+  clearBoneFloat();
+  hideOutcome();
 }
 function saveNow() {
   ui.lastDims = { ...st.dims };
@@ -496,6 +623,7 @@ function resetCardMotion() {
 }
 function restore() {
   clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
+  resetOutcome();
   resetInputState();
   let d = null;
   try { d = loadFromStorage(localStorage); } catch { d = null; }
@@ -529,6 +657,7 @@ function restore() {
 }
 function newGame(s) {
   clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
+  resetOutcome();
   resetInputState();
   hideToast();   // 先清队列（含挂起的重放/提交、epoch++），再收 toast：之后不会再有排队项把提示弹回来
   seed = s >>> 0; actions = []; st = createGame({ seed, debugGoal: DEBUG_GOAL }); ui.winter = freshWinter();
@@ -559,6 +688,7 @@ function importCode() {
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
     clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
+    resetOutcome();
     hideToast();   // 顺序同 newGame/restore：先清队列，再收 toast
     toast(`导入成功：种子 ${seed}，${actions.length} 步`);
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
@@ -581,18 +711,32 @@ function previewSide() {
 function dimsHTML() {
   const side = previewSide();
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
-  const opt = side && card ? (side === "left" ? card.left : card.right) : null;
-  return DIMS.map((k) => {
+  const opt = side && card && st.phase === "card" ? (side === "left" ? card.left : card.right) : null;
+  // 按住预览：该侧副作用 boneΔ≠0 时，在圆点排末尾追加骨 pip（与留迹同形，70%）。涨跌不写在点上。
+  const rawBone = opt && typeof opt.bones === "number" ? opt.bones : 0;
+  let pipAt = -1;
+  if (rawBone) {
+    for (let i = DIMS.length - 1; i >= 0; i--) {
+      const d = opt.delta ? opt.delta[DIMS[i]] : undefined;
+      if (typeof d === "number") { pipAt = i; break; }
+    }
+    if (pipAt < 0) pipAt = DIMS.length - 1;
+  }
+  const pinned = ui.floatPin && ui.floatPin === st.current;
+  return DIMS.map((k, i) => {
     const v = st.dims[k];
     const danger = v <= 15 || v >= 85;
+    const gloss = DIM_GLOSS[k] || "";
     let dots = "";
-    if (opt && typeof opt.delta[k] === "number") {
+    const pip = i === pipAt ? `<i class="bone-pip" aria-hidden="true"></i>` : "";
+    if (opt && opt.delta && typeof opt.delta[k] === "number") {
       const a = Math.abs(opt.delta[k]);
-      dots = `<div class="dots on">${a > 8 ? '<i class="dot s3"></i>' : a > 4 ? '<i class="dot s2"></i>' : '<i class="dot"></i>'}</div>`;
-    } else dots = `<div class="dots"></div>`;
-    const fl = ui.floats[k];
-    const float = fl ? `<span class="float ${fl > 0 ? "up" : "down"}">${fl > 0 ? "+" : "−"}${Math.abs(fl)}</span>` : "";
-    return `<div class="dim${danger ? " danger" : ""}">${dots}${float}<div class="lbl"><span>${DIMNAME[k]}</span><span>${v}</span></div><div class="bar"><div class="fill" style="transform:scaleX(${(v / 100).toFixed(3)})"></div></div></div>`;
+      dots = `<div class="dots on">${a > 8 ? '<i class="dot s3"></i>' : a > 4 ? '<i class="dot s2"></i>' : '<i class="dot"></i>'}${pip}</div>`;
+    } else if (pip) dots = `<div class="dots on">${pip}</div>`;
+    else dots = `<div class="dots"></div>`;
+    const fl = pinned ? ui.floats[k] : 0;
+    const float = fl ? `<span class="float ${fl > 0 ? "up" : "down"}">${signedN(fl)}</span>` : "";
+    return `<div class="dim${danger ? " danger" : ""}" data-dim="${k}" title="${gloss}">${dots}${float}<div class="lbl"><span>${DIMNAME[k]}</span><span>${v}</span></div><div class="bar"><div class="fill" style="transform:scaleX(${(v / 100).toFixed(3)})"></div></div><span class="sr-only">${gloss}</span></div>`;
   }).join("");
 }
 function floatHTML() { return ""; }
@@ -663,9 +807,11 @@ function renderSprout() { /* 开春展开：每代第一张卡显示三件事，
 function renderTopbar() {
   setText($("gennum"), st.generation ?? 1);
   setText($("bonesnum"), st.bones);
+  const chip = $("bones-chip");
+  if (chip) { chip.hidden = false; if (chip.title !== BONE_GLOSS) chip.title = BONE_GLOSS; }
+  syncBoneFloat();
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
   setText($("season-chip"), card ? SEASON[card.season] : (st.phase === "pick" ? "春" : "—"));
-  $("bones-chip").hidden = false;
 }
 function renderCard() {
   const ol = $("opt-left"), or = $("opt-right");
@@ -1415,6 +1561,7 @@ function rebound() {
   requestAnimationFrame(tick);
 }
 function flyOut(targetX, done) {
+  primeFloats(targetX < 0 ? "left" : "right");   // 飞出前把这一下的飘字钉在触发卡上
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   n1Ref = null;                   // 新一次飞出：上一次飞卡的 N1 参照点作废（键盘/拖拽启动的也没有参照点）
   cardSettling = true;
@@ -1974,6 +2121,15 @@ on($("elder"), (e) => {
 on($("dlgcopy"), async () => { const t = $("dlgtext"); try { await navigator.clipboard.writeText(t.value); toast("已复制"); } catch { t.focus(); t.select(); toast("复制不了，请手动选中复制"); } });
 on($("dlgapply"), importCode);
 on($("dlgclose"), closeDlg);
+function onDimGloss(e) {
+  const dim = e.target.closest?.("[data-dim]");
+  if (!dim || !e.currentTarget.contains(dim)) return;
+  const g = DIM_GLOSS[dim.dataset.dim];
+  if (g) toast(g);
+}
+$("dims").addEventListener("click", onDimGloss);
+$("dims-desktop").addEventListener("click", onDimGloss);
+$("bones-chip").addEventListener("click", () => toast(BONE_GLOSS));
 $("savedlg").addEventListener("click", (e) => { if (e.target === $("savedlg")) closeDlg(); });
 const closeMenuOutside = (e) => {                 // 点外面关菜单
   if (ui.menuOpen && !e.target.closest("#menu-pop") && !e.target.closest("#menubtn")) { ui.menuOpen = false; renderMenu(); }

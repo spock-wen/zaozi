@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`820f4a6d1d64`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`57103e0cccdc`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -293,4 +293,12 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
   - P2-2：和 fix/web-mobile-next（29933da）的冲突点更新在 PR 描述里，本 PR 不处理。P3-6（toast 位置）归 PR10。
   - VERSION 597aa0d3a640（干净树构建两次一致）。
   - 验证：单测 35/35；全量 3 引擎串行 e2e 650/650、0 跳过（07cac3d，10/19 21:04:41–21:51:13 UTC+8）；之后只改本报告。coder 在独立 worktree（6d0eb61）复核了全部变异，见 pstack_trail/r8/verify/summary.txt。
+
+## 意义反馈（环3，接到 main ec89b2e；dist VERSION 57103e0cccdc）
+- 源：zaozi-web 已审 tip `22d6f7f50f6c388939555f0748c4b926a587a39f`（父提交 `eec1d76`，合入 `feat/web-redesign-v2` 的 merge `67ef26d`）。本仓云端凭据读不到私有仓 `spock-wen/zaozi-web`，不是把该 tip 重置到 main，而是按环1文案表、环2 SPEC 和已审行为接到当前飞出队列上。
+- 文案（COPY_TABLE，2026-10-28）：四维 `title` + 读屏句 + 点按 toast；骨片 chip 挂「空骨片用来把这件事刻成事签，也可以交给巫。」。不改 B1 规则句、不改 `data/*.json` 数值、不重开已停的落字/部件 UX。F4（目标过线仍 ◇）不做。
+- 飘字：`primeFloats` 在 `flyOut` 开头、状态尚未 `step` 时钉在当前卡；换卡/换阶段时 `dispatch` 先 `clearOutcomeFloats` 再 `render`，四维 ±N 不留到下一张。骨片 ±N 挂在骨片 chip 上（换骨/交骨/刻，与引擎实际增减一致），约 650ms。不再用 650ms 后整页 `render()` 清飘字。
+- 按住预览：选项 `bones` 非 0 时，该侧圆点排末尾加骨 pip（16×20 的 70%，矮屏收到 8px）。刻字卡落定（`#card[data-ready]`）且未刻时，卡角「刻」右上显示「−1」；本仓没有刻前确认弹层，不新做。
+- 不刻：换卡后 `#outcome` 显示「这件事没刻下来。」。刻成功：`#outcome` 显示「刻成事签」并带上这一下的四维/骨片实际增减。这两句不走 `#toast`，换卡时 `hideToast()` 仍把锁拖提示收起（D1）。
+- 飞出队列、`commitSide` / `dwell` / `epoch`、`newGame` / `importCode` / `restore` 的清队列顺序保持 main。`sw.js` 未手改；VERSION 来自 `node tools/build_dist.mjs`。
 
