@@ -17,7 +17,7 @@
     <div id="gen-line">第 <span id="gennum">1</span> 代 · 记事人</div>
     <button id="goals-slip" hidden aria-label="目标"></button>
     <div id="topright">
-      <span id="bones-chip" title="空骨片">骨片 <b id="bonesnum">3</b></span>
+      <span id="bones-chip" title="空骨片用来把这件事刻成事签，也可以交给巫。">骨片 <b id="bonesnum">3</b><span class="sr-only">空骨片用来把这件事刻成事签，也可以交给巫。</span></span>
       <span id="season-chip">春</span>
       <button id="keyhelp-btn" aria-label="键位说明" aria-haspopup="true" aria-expanded="false">?</button>
       <button id="menubtn" aria-label="菜单" aria-haspopup="true" aria-expanded="false">☰</button>
@@ -34,7 +34,7 @@
       <div id="dims-desktop" class="dims"></div>
       <div id="cardwrap">
         <article id="card" class="card" tabindex="0">
-          <button id="bonecorner" class="bonecorner" aria-label="刻字">刻</button>
+          <button id="bonecorner" class="bonecorner" aria-label="刻字">刻<i class="bone-badge" aria-hidden="true">−1</i></button>
           <div id="card-art" class="card-art" hidden></div>
           <div class="card-head"><span id="card-season"></span><span class="dot-sep">·</span><span id="card-speaker"></span></div>
           <h2 id="card-title"></h2>
@@ -93,6 +93,7 @@
   </div>
 
   <div id="rotate-hint" hidden>把手机横过来不如转回竖屏——这一版先只做竖屏。</div>
+  <div id="outcome" hidden></div>
   <div id="toast"></div>
   <div id="toast-live" class="sr-only" role="status" aria-live="polite"></div>
 </div>
