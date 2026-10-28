@@ -301,4 +301,5 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - 按住预览：选项 `bones` 非 0 时，该侧圆点排末尾加骨 pip（16×20 的 70%，矮屏收到 8px）。刻字卡落定（`#card[data-ready]`）且未刻时，卡角「刻」右上显示「−1」；本仓没有刻前确认弹层，不新做。
 - 不刻：换卡后 `#outcome` 显示「这件事没刻下来。」。刻成功：`#outcome` 显示「刻成事签」并带上这一下的四维/骨片实际增减。这两句不走 `#toast`，换卡时 `hideToast()` 仍把锁拖提示收起（D1）。
 - 飞出队列、`commitSide` / `dwell` / `epoch`、`newGame` / `importCode` / `restore` 的清队列顺序保持 main。`sw.js` 未手改；VERSION 来自 `node tools/build_dist.mjs`。
+- 自测：在 `web/` 跑一次 `npm test`，35/35 通过（2026-10-28）。未跑 e2e。
 
