@@ -110,7 +110,8 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.waitForTimeout(80);
       assert.deepEqual(await picks(), [], "tap1 不应填格");
       assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "tap1 应出说明卡");
-      assert.equal(await page.locator("#pick-desc .pi-row").count(), 0, "水 没有部件数据，说明卡不应有说明行");
+      assert.equal(await page.locator("#pick-desc .pi-row").count(), 1, "水 应只出「落」一行（年卡有落字文案，没有部件）");
+      assert.ok((await page.locator("#pick-desc").innerText()).includes("以河为界"), "水 的落字文案应来自年卡 label");
       assert.ok(!(await page.locator("#pick-desc").innerText()).includes("？"), "说明卡不应出现「？」占位");
       assert.equal(await page.locator("#pick .pickslot[data-char]").count(), 0, "tap1 不应填格");
       assert.equal(await page.locator("#pick .cand.sel").count(), 0, "tap1 不应选中");

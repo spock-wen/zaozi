@@ -72,10 +72,11 @@ for (const [engine] of Object.entries(ENGINES)) {
         assert.equal(await current(page), "T05");
         // P1：落字达成 G_DROP1，屏幕上的横幅必须是 goals.json 的 banner（「达成　落一个字」），不是目标正文。
         await page.locator("#banner").waitFor({ state: "visible", timeout: 3000 });
+        const DROP_COST_LINE = `${BANNER_DROP1} · 这一代冬夜不能再当部件`;
         assert.equal(
           (await page.locator("#banner").textContent()).trim(),
-          BANNER_DROP1,
-          `达成横幅应显示 banner：「${BANNER_DROP1}」`,
+          DROP_COST_LINE,
+          `落字横幅应为锁文整句：「${DROP_COST_LINE}」`,
         );
         await commit(page, "left");               // → 第一张普通卡
 
@@ -144,8 +145,10 @@ for (const [engine] of Object.entries(ENGINES)) {
         await infoIs(page, "水");
         assert.deepEqual(await page.evaluate(() => window.__zz.st.picks), [], "第一次点不应选中");
         assert.ok(await page.locator("#pick-desc .pickinfo").isVisible(), "第一次点应出说明卡");
-        // P1-1：说明卡只画有数据的行。「水」在字池里没有部件/底字数据 → 不出任何说明行，也不出「？」。
-        assert.equal(await page.locator("#pick-desc .pi-row").count(), 0, "水 没有部件数据，说明卡不应有说明行");
+        // 说明卡只画有数据的行。「水」没有部件，但年卡有落字文案（以河为界）→ 只出「落」一行，不出「？」。
+        assert.equal(await page.locator("#pick-desc .pi-row").count(), 1, "水 应只出「落」一行");
+        assert.ok((await page.locator("#pick-desc .pi-row").innerText()).includes("能落"), "水 的说明行应是「落」");
+        assert.ok((await page.locator("#pick-desc").innerText()).includes("以河为界"), "水 的落字文案应来自年卡 label");
         assert.ok(!(await page.locator("#pick-desc").innerText()).includes("？"), "说明卡不应出现「？」占位");
         assert.equal(await page.locator("#pick .cand.sel").count(), 0, "第一次点不应有已选字");
         // gf5 ②：同一字再点一次才入格、变朱、带序号角标。

@@ -140,10 +140,10 @@
   },
   {
    "id": "叙述-结果",
-   "match": "骨片裂|^刻成「|^刻$|^刻字$|^落字$|· 已落|已落$|^刻（Enter）$|^出发挑字|挑三个字带上路|用骨片刻下一件事|落一个字|^达成",
+   "match": "骨片裂|^刻成「|^刻$|^刻字$|^落字$|· 已落|已落$|上代已落|本代已落|带去落掉|能落|^刻（Enter）$|^出发挑字|挑三个字带上路|用骨片刻下一件事|落一个字|^达成|部落的存粮|记不记得住事|空骨片用来|没刻下来|^刻成事签$",
    "kind": "info",
    "targets": [],
-   "source": "app.js:549 结果 toast；index.html:37 骨片按钮自身文字；app.js:466/594/699/702；data/tutorial.json elder.body；data/goals.json 目标文案"
+   "source": "app.js 结果 toast / 挑字导语 / 说明卡「落」行 / 冬夜已落；index.html:37 骨片按钮自身文字；data/tutorial.json elder.body；data/goals.json 目标文案"
   },
   {
    "id": "叙述-迹与结算",
