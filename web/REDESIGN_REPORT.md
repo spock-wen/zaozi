@@ -3,7 +3,7 @@
 分支 `feat/web-redesign-v2`。基线 = 重建源码树（`src/*.ts` 引擎、`web/` 壳、`tools/build_dist.mjs`）。
 玩法数值/规则不改，只做任务书（`REDESIGN_TASK.md`）列出的改动。
 
-- **dist VERSION**：`57103e0cccdc`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
+- **dist VERSION**：`e73227a7391f`（内容哈希，干净树构建；本分支已解钉 `tools/baseline_version.txt`）
 - **构建 commit**：本分支 tip `feat/web-redesign-v2`（推送后即 `git rev-parse HEAD`，本报告随该 tip 一同提交）；不写死 SHA，避免与 tip 不符
 - **dist 文件数**：184（含 `sw.js`、`_headers`）
 - **不部署**（brief E7）。
@@ -302,4 +302,12 @@ chromium 另有 2 个专属：1440 教学气泡距侧栏 ≥16 且不压四维�
 - 不刻：换卡后 `#outcome` 显示「这件事没刻下来。」。刻成功：`#outcome` 显示「刻成事签」并带上这一下的四维/骨片实际增减。这两句不走 `#toast`，换卡时 `hideToast()` 仍把锁拖提示收起（D1）。
 - 飞出队列、`commitSide` / `dwell` / `epoch`、`newGame` / `importCode` / `restore` 的清队列顺序保持 main。`sw.js` 未手改；VERSION 来自 `node tools/build_dist.mjs`。
 - 自测：在 `web/` 跑一次 `npm test`，35/35 通过（2026-10-28）。未跑 e2e。
+
+## 挑字引导 + F4（环2，接到 tip 830135e；dist VERSION e73227a7391f）
+- 挑字屏（第 2 代起）：页首导语「带去落掉，冬夜就少一个部件。」；顶栏「传下字录：」点名本代新造字；候选格「新」/「上代已落」。说明卡有数据才画行：部件仍从字池结构推，落字行用年卡 `drops[].label`（水 → 以河为界，火 → 围着一堆柴同吃同睡），空行不画。
+- 落字成功横幅改为锁文「达成　落一个字 · 这一代冬夜不能再当部件」。`data/goals.json` 的短 banner 与代末结算不改。已落后，其它卡不再留「可落字：X」。
+- 冬夜部件盘仍列出本代已落的字，标「已落」；点它只出「{字}：本代已落，不能当部件。」
+- F4 只改展示：四维目标中途已过该项门槛时，侧栏和目标清单的 ◇ 显示成 ◆。不写回 `achieved`，不提前发达成事件。
+- 徽标底用现有 zhu-100 / jade-100 与 paper-50 混合（约 60% / 70%），对比约 4.59 / 4.63，不新增色。电脑端挑字坐标仍按 gf5 §11。
+- 不部署。VERSION 来自 `node tools/build_dist.mjs`。
 
