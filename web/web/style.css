@@ -355,7 +355,7 @@ body:not([data-view="desktop"]) #pick .pool{flex:1 1 auto;min-height:0;overflow:
 #pick .cand.focus{box-shadow:0 0 0 2px var(--gold-400);}
 #pick .cand .badge{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:9px;background:var(--zhu-600);color:#fff;font-size:13px;font-weight:700;line-height:18px;text-align:center;z-index:2;}
 #pick .badge-new{position:absolute;left:4px;top:4px;height:18px;padding:0 6px;border-radius:9px;background:var(--zhu-600);color:#fff;font:700 13px/18px inherit;z-index:2;}
-#pick .badge-dropped{position:absolute;right:4px;bottom:4px;height:18px;padding:0 5px;border-radius:6px;background:var(--night-900);box-shadow:0 0 0 1px var(--night-line);color:var(--on-night-2);font:700 13px/18px inherit;z-index:2;white-space:nowrap;}
+#pick .badge-dropped{position:absolute;right:4px;bottom:4px;height:auto;min-height:18px;padding:0 5px;border-radius:6px;background:var(--night-900);box-shadow:0 0 0 1px var(--night-line);color:var(--on-night-2);font-size:13px;font-weight:700;line-height:18px;z-index:2;white-space:nowrap;}
 .gocenter{align-items:center;}
 #pick .pickfoot{margin-top:auto;display:flex;padding-top:8px;}
 #pick .go{width:100%;min-height:44px;border-radius:22px;background:var(--night-700);border:1px solid var(--bone-crack);font-weight:700;font-size:15px;color:var(--paper-200);}
