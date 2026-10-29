@@ -1,12 +1,14 @@
 /* 造字人 · 一年里程碑重做样式（v3_mobile BREAKPOINTS + v4_gamefeel 手感）。
    色板取自任务书；间距 4/8 节奏；点击区 ≥44。判断输入方式用 (hover:hover) and (pointer:fine)。 */
 :root{
-  --night-800:#1E2230; --night-700:#2B3042; --night-line:#3A4057;
+  --night-900:#15171F; --night-800:#1E2230; --night-700:#2B3042; --night-line:#3A4057;
   --paper-50:#FAF6EC; --paper-100:#F3ECDD; --paper-200:#E6DCC6; --paper-line:#D8CCB2;
-  --zhu-600:#B5432E; --gold-400:#D8B46A;
+  --zhu-600:#B5432E; --zhu-100:#F3DED6; --gold-400:#D8B46A;
+  --jade-600:#4E6E66; --jade-100:#DDE6E1;
   --bone-100:#F1E8D4; --bone-200:#E4D6B8; --bone-crack:#B9A57C;
   --down:#E08A74; --up:#8FB8A8;
-  --ink:#3b2f20; --muted:#9a93a6;
+  --ink:#3b2f20; --ink-900:#2A241D; --ink-600:#5C5346; --muted:#9a93a6;
+  --on-night:#EEE7D8; --on-night-2:#A8A193; --carve:#6E2F1F;
   --card-h: 468px;
   /* 10/13 版 7dc14fa 拖卡阈值色，待设计师替换 */
   --drag-label:#6b5a3e;
@@ -321,27 +323,40 @@ body[data-view="desktop"] #goals-panel{top:calc(56px + 8px + 52px);}
   box-shadow:0 8px 24px rgba(0,0,0,.35);
 }
 #sprout{top:calc(44px + env(safe-area-inset-top) + 60px);}
-#banner{top:calc(44px + env(safe-area-inset-top) + 56px + 8px);font-size:15px;font-weight:700;color:var(--zhu-600);}
+#banner{top:calc(44px + env(safe-area-inset-top) + 56px + 8px);font-size:15px;font-weight:700;color:var(--zhu-600);max-width:min(520px, calc(100vw - 32px));white-space:normal;text-align:center;line-height:1.45;}
 body[data-view="desktop"] #sprout{top:calc(56px + 8px);}
 body[data-view="desktop"] #banner{top:calc(56px + 8px + 52px + 8px);}
 #banner .bdots{margin-left:6px;}
 
 /* ---------- 挑字 ---------- */
 #pick{position:fixed;inset:0;z-index:70;background:var(--night-800);padding:10px 16px;overflow:auto;display:flex;flex-direction:column;}
-#pick h2{font-size:18px;color:var(--gold-400);margin:4px 0;}
-#pick .season-note{font-size:13px;color:var(--paper-200);margin:2px 0;}
+#pick .pick-legacy{display:flex;align-items:baseline;gap:6px;flex:none;min-height:32px;margin:-10px -16px 8px;padding:8px 16px;border-bottom:1px solid var(--night-line);font-size:13px;line-height:20px;color:var(--on-night-2);}
+#pick .pick-legacy b{color:var(--gold-400);font-weight:700;flex:none;}
+#pick .pick-legacy .chars{color:var(--on-night);font-weight:700;letter-spacing:.08em;}
+#pick h2{font-size:18px;color:var(--gold-400);margin:4px 0;flex:none;}
+#pick .pick-lead{margin:4px 0 0;font-size:14px;line-height:22px;color:var(--on-night);flex:none;}
+#pick .season-note{font-size:13px;color:var(--paper-200);margin:2px 0;flex:none;}
+/* 手机/平板竖：字池自己滚；导语、传下字录、说明卡、出发键留在屏内（360×640）。 */
+body:not([data-view="desktop"]) #pick{overflow:hidden;}
+body:not([data-view="desktop"]) #pick .pickslots,
+body:not([data-view="desktop"]) #pick .desc,
+body:not([data-view="desktop"]) #pick .pickfoot{flex:none;}
+body:not([data-view="desktop"]) #pick .pool{flex:1 1 auto;min-height:0;overflow:auto;align-content:start;}
 #pick .pickslots{display:flex;gap:8px;margin:8px 0;min-height:0;}
 #pick .pickslot{width:72px;height:76px;padding:0;box-sizing:border-box;border-radius:12px;border:1px dashed var(--bone-crack);display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;font-size:13px;color:var(--paper-200);}
 #pick .pickslot img{width:32px;height:32px;background:var(--paper-100);border-radius:6px;}
 #pick .pickslot span{font-size:13px;line-height:18px;white-space:nowrap;}
 #pick .pool{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
-#pick .cand{width:72px;height:76px;padding:0;box-sizing:border-box;border-radius:12px;background:var(--night-700);border:1px solid var(--bone-crack);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;color:var(--paper-200);}
+#pick .cand{position:relative;width:72px;height:76px;padding:0;box-sizing:border-box;border-radius:12px;background:var(--night-700);border:1px solid var(--bone-crack);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;color:var(--paper-200);}
 #pick .cand img{width:32px;height:32px;background:var(--paper-100);border-radius:6px;}
 #pick .cand .mng{font-size:13px;color:var(--paper-200);line-height:18px;white-space:nowrap;}
 #pick .cand.sel{background:var(--zhu-600);color:#fff;border-color:var(--zhu-600);}
 #pick .cand.dim{opacity:.4;}
 #pick .cand.focus{box-shadow:0 0 0 2px var(--gold-400);}
-#pick .cand .badge{position:absolute;font-size:13px;}.gocenter{align-items:center;}
+#pick .cand .badge{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:9px;background:var(--zhu-600);color:#fff;font-size:13px;font-weight:700;line-height:18px;text-align:center;z-index:2;}
+#pick .badge-new{position:absolute;left:4px;top:4px;height:18px;padding:0 6px;border-radius:9px;background:var(--zhu-600);color:#fff;font:700 13px/18px inherit;z-index:2;}
+#pick .badge-dropped{position:absolute;right:4px;bottom:4px;height:18px;padding:0 5px;border-radius:6px;background:var(--night-900);box-shadow:0 0 0 1px var(--night-line);color:var(--on-night-2);font:700 13px/18px inherit;z-index:2;white-space:nowrap;}
+.gocenter{align-items:center;}
 #pick .pickfoot{margin-top:auto;display:flex;padding-top:8px;}
 #pick .go{width:100%;min-height:44px;border-radius:22px;background:var(--night-700);border:1px solid var(--bone-crack);font-weight:700;font-size:15px;color:var(--paper-200);}
 #pick .go.ready{background:var(--zhu-600);border-color:var(--zhu-600);color:#fff;}
@@ -349,8 +364,10 @@ body[data-view="desktop"] #banner{top:calc(56px + 8px + 52px + 8px);}
 #pick .pickinfo{background:var(--paper-50);color:var(--ink);border-radius:12px;padding:10px 14px;max-width:420px;}
 #pick .pickinfo .pi-h{font-weight:700;font-size:16px;margin-bottom:4px;}
 #pick .pickinfo .pi-h span{font-weight:400;font-size:13px;color:var(--bone-crack);margin-left:6px;}
-#pick .pickinfo .pi-row{display:flex;gap:8px;font-size:13px;line-height:22px;}
-#pick .pickinfo .pi-row b{flex:0 0 40px;color:var(--zhu-600);}
+#pick .pickinfo .pi-row{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:22px;margin-top:8px;}
+/* zhu-600/zhu-100 实底约 4.26，jade 约 4.40。徽标底改成浅色与 paper-50 混合，对比拉到 ≥4.5，不新增色。 */
+#pick .pickinfo .pi-row b{flex:none;min-width:36px;height:22px;padding:0 8px;border-radius:6px;background:color-mix(in srgb, var(--zhu-100) 60%, var(--paper-50));color:var(--zhu-600);font-size:13px;line-height:22px;text-align:center;}
+#pick .pickinfo .pi-row.part b{background:color-mix(in srgb, var(--jade-100) 70%, var(--paper-50));color:var(--jade-600);}
 
 /* 挑字 · 电脑端（design/v4_gamefeel/gf5_pick.html §11）：按 1280 设计稿绝对定位，
    左挑右看——说明卡在字池网格右侧（不是下方）。
@@ -372,6 +389,8 @@ body[data-view="desktop"] #pick{
   --pick-w:min(100vw, 1280px);
   --pick-x:max(0px, calc((100vw - 1280px) / 2));
 }
+body[data-view="desktop"]:not([data-short]) #pick .pick-legacy{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);right:auto;top:24px;margin:0;padding:0;border:none;min-height:0;font-size:14px;}
+body[data-view="desktop"]:not([data-short]) #pick .pick-lead{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:128px;margin:0;max-width:calc(var(--pick-w) * 0.5);}
 body[data-view="desktop"] #pick h2{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:96px;margin:0;}
 body[data-view="desktop"] #pick .pickslots{position:absolute;left:calc(var(--pick-x) + var(--pick-w) * 0.075);top:160px;margin:0;}
 body[data-view="desktop"] #pick .pickslot{height:94px;}
@@ -395,9 +414,12 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
 #winter{position:fixed;inset:0;z-index:60;background:var(--night-800);padding:16px;overflow:auto;}
 #winter h2{font-size:18px;color:var(--gold-400);}
 #winter .tally{background:var(--night-700);color:var(--paper-50);border-color:var(--bone-crack);}
-#winter .comp{width:60px;height:60px;margin:4px;border-radius:8px;border:1px solid var(--bone-crack);background:var(--night-700);color:var(--paper-200);}
+#winter .comp{position:relative;width:60px;height:60px;margin:4px;border-radius:8px;border:1px solid var(--bone-crack);background:var(--night-700);color:var(--paper-200);}
 #winter .comp img{width:34px;height:34px;background:var(--paper-100);border-radius:4px;display:block;margin:0 auto;}
 #winter .comp.sel{border-color:var(--gold-400);}
+#winter .comp.used{background:var(--night-700);color:rgba(238,231,216,.55);box-shadow:inset 0 0 0 1px var(--night-line);}
+#winter .comp.used img{opacity:.45;}
+#winter .comp .dropped-tag{position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);height:16px;padding:0 4px;border-radius:4px;background:var(--night-900);box-shadow:0 0 0 1px var(--night-line);font:700 13px/16px inherit;color:var(--on-night-2);white-space:nowrap;font-style:normal;}
 #xcv{background:var(--paper-100);border-radius:8px;display:block;margin:8px 0;cursor:crosshair;touch-action:none;max-width:100%;height:auto;}
 
 /* ---------- 存档弹层 / toast ---------- */
@@ -659,11 +681,15 @@ body.no-anim, body.no-anim *, body.no-anim *::before, body.no-anim *::after{tran
 body[data-view="desktop"][data-short="A"] #pick,
 body[data-view="desktop"][data-short="B"] #pick{
   display:grid;padding:24px 16px;overflow:hidden;
-  grid-template-areas:"h2 desc" "note desc" "slots desc" "pool desc" "foot desc";
+  grid-template-areas:"legacy legacy" "h2 desc" "lead desc" "note desc" "slots desc" "pool desc" "foot desc";
   align-content:start;justify-content:center;gap:8px 24px;
 }
 body[data-view="desktop"][data-short="A"] #pick{grid-template-columns:496px 280px;}
 body[data-view="desktop"][data-short="B"] #pick{grid-template-columns:440px 260px;padding:16px;}
+body[data-short="A"] #pick .pick-legacy,
+body[data-short="B"] #pick .pick-legacy{grid-area:legacy;position:static;left:auto;top:auto;right:auto;margin:0;padding:0 0 4px;border:none;min-height:0;font-size:14px;}
+body[data-short="A"] #pick .pick-lead,
+body[data-short="B"] #pick .pick-lead{grid-area:lead;position:static;left:auto;top:auto;margin:0;max-width:none;font-size:14px;line-height:22px;}
 body[data-short="A"] #pick h2,
 body[data-short="B"] #pick h2{grid-area:h2;position:static;left:auto;top:auto;margin:0;font-size:16px;}
 body[data-short="A"] #pick .season-note,
@@ -708,7 +734,11 @@ body[data-view="desktop"] .slot.used span,
 body[data-view="desktop"] .tally,
 body[data-view="desktop"] .zl,
 body[data-view="desktop"] #pick .season-note,
+body[data-view="desktop"] #pick .pick-lead,
+body[data-view="desktop"] #pick .pick-legacy,
 body[data-view="desktop"] #pick .desc,
+body[data-view="desktop"] #pick .pickinfo .pi-row,
+body[data-view="desktop"] #pick .pickinfo .pi-row b,
 body[data-view="desktop"] #pick .cand .mng,
 body[data-view="desktop"] #menu-pop .grp,
 body[data-view="desktop"] #menu-pop .seed,
@@ -731,7 +761,11 @@ body[data-view="tablet-landscape"] .slot.used span,
 body[data-view="tablet-landscape"] .tally,
 body[data-view="tablet-landscape"] .zl,
 body[data-view="tablet-landscape"] #pick .season-note,
+body[data-view="tablet-landscape"] #pick .pick-lead,
+body[data-view="tablet-landscape"] #pick .pick-legacy,
 body[data-view="tablet-landscape"] #pick .desc,
+body[data-view="tablet-landscape"] #pick .pickinfo .pi-row,
+body[data-view="tablet-landscape"] #pick .pickinfo .pi-row b,
 body[data-view="tablet-landscape"] #pick .cand .mng,
 body[data-view="desktop"] #goals-slip,
 body[data-view="tablet-landscape"] #goals-slip,
