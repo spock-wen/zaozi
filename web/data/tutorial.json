@@ -2,8 +2,8 @@
   "schema_version": "1",
   "_说明": "教学开局（PM 决定 4/5，GAMEFEEL_SPEC §3，画板 gf3）。T01–T05 只在第 1 代按序出现、不洗牌，也不进普通牌堆；每张只教一件事。coach 是提示条文案（手机 / 电脑两版，电脑版带键位）；先人卡在每代结束时出现，第 1 代版讲清「传给下一代」。文案为版式示意。",
   "steps": [
-    { "n": 1, "card": "T01", "teach": "drag", "coach": "左右拖卡做选择。拖过一小段再松手。", "coach_desktop": "左右拖卡做选择，或按 ← → 再按 Enter。", "lock_drag": false, "lock_hint": "" },
-    { "n": 2, "card": "T02", "teach": "preview", "coach": "按住卡不放，看这一下会动哪几项。", "coach_desktop": "按住卡，或按 ← → 看这一下会动哪几项。", "lock_drag": false, "lock_hint": "" },
+    { "n": 1, "card": "T01", "teach": "drag", "coach": "左右拖卡做选择。拖过一小段再松手，松手后进下一张。", "coach_desktop": "左右拖卡做选择，或按 ← → 再按 Enter。确认后进下一张。", "lock_drag": false, "lock_hint": "" },
+    { "n": 2, "card": "T02", "teach": "preview", "coach": "按住卡不放，看这一下会动哪几项。", "coach_desktop": "按住卡，或按 ← →，看这一下会动哪几项。", "lock_drag": false, "lock_hint": "" },
     { "n": 3, "card": "T03", "teach": "engrave", "coach": "点卡角的骨片，把这件事刻下来。", "coach_desktop": "点卡角的骨片，或按 K，把这件事刻下来。", "lock_drag": true, "lock_hint": "先点卡角骨片刻下这件事" },
     { "n": 4, "card": "T04", "teach": "drop", "coach": "族长借你一个「水」。点它，落在卡上。", "coach_desktop": "点字匣里的「水」，或按 1，落在卡上。", "lock_drag": false, "lock_hint": "" },
     { "n": 5, "card": "T05", "teach": "tradeoff", "coach": "这次两边都有代价。想好再松手。", "coach_desktop": "这次两边都有代价。想好再松手。", "lock_drag": false, "lock_hint": "" }
