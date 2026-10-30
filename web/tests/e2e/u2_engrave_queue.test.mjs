@@ -209,13 +209,14 @@ for (const [engine] of Object.entries(ENGINES)) {
       // Wait for T03 settle + dwell
       await page.waitForFunction(() => window.__settles?.T03 != null, null, { timeout: 8000 });
       await page.waitForFunction(
-        () => (window.__toastOns?.length || 0) >= 1,
+        () => (window.__toastOns || []).filter((t) => /骨片/.test(t.text)).length >= 1,
         null,
         { timeout: 8000 }
       );
 
-      // Exactly one lock hint shown for all queued arrows
-      const toastCount1 = await page.evaluate(() => window.__toastOns.length);
+      // Exactly one lock hint shown for all queued arrows.
+      // T01 的左右答句也会记进 __toastOns，不计入刻字锁提示。
+      const toastCount1 = await page.evaluate(() => window.__toastOns.filter((t) => /骨片/.test(t.text)).length);
       assert.equal(toastCount1, 1, "Exactly one lock hint must be shown for queued arrows");
       const hintedAfter = await page.evaluate(() => window.__zz.engraveHinted);
       assert.equal(hintedAfter, true, "ui.engraveHinted must be true after lock hint was shown");
