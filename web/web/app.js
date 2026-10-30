@@ -284,16 +284,19 @@ function toast(m) {
     return;
   }
   t.classList.add("on");
-  t.classList.toggle("hold", cardEntryBusy());
+  // 选项答句在飞出途中就要看得见：这段时间 cardEntryBusy 为真，加上 .hold 会把它藏到换卡收起之后。
+  t.classList.toggle("hold", cardEntryBusy() && !toast._choice);
   clearTimeout(toast._t);
   toast._t = setTimeout(() => {
     t.classList.remove("on");
+    toast._choice = false;
     const tl = $("toast-live") || $("sr-live"); if (tl) tl.textContent = "";
   }, toastMs(m));
 }
 
 function reflowToast() {
   const t = $("toast"); if (!t || !t.classList.contains("on")) return;
+  if (toast._choice) { t.classList.remove("hold"); return; }
   if (cardEntryBusy()) { t.classList.add("hold"); return; }
   if (!placeToast(t)) { t.classList.remove("on"); t.classList.add("hold"); clearTimeout(toast._t); return; }
   t.classList.remove("hold");
@@ -301,6 +304,16 @@ function reflowToast() {
 
 function hideToast() {
   const t = $("toast"); clearTimeout(toast._t);
+  if (toast._choice) {
+    toast._choice = false;
+    // 放不下 #toast 时答句会落到 #gesture-hint，1800ms 后才清。换卡必须一起收，不能留到下一张。
+    if (toast._g) {
+      clearTimeout(toast._g);
+      toast._g = 0;
+      const gh = $("gesture-hint");
+      if (gh) gh.textContent = "";
+    }
+  }
   if (t) {
     t.classList.remove("on");
     t.classList.remove("hold");
@@ -1604,8 +1617,28 @@ function rebound() {
   };
   requestAnimationFrame(tick);
 }
+// 选项答句（year1_cards.json 的 left/right.toast）。飞出开始时亮一句；
+// 换卡由 dispatch 里的 hideToast 收起（D1），不留到下一张。没有 toast 的选项不响。
+function choiceToast(dir) {
+  if (st.phase !== "card") return "";
+  const card = curCard();
+  const opt = card && (dir === "left" ? card.left : card.right);
+  const msg = opt && typeof opt.toast === "string" ? opt.toast.trim() : "";
+  return msg;
+}
+function showChoiceToast(dir) {
+  const msg = choiceToast(dir);
+  if (!msg) return;
+  toast._choice = true;
+  const t = $("toast");
+  if (t) t.style.transition = "none";
+  toast(msg);
+  if (t) t.classList.remove("hold");
+}
 function flyOut(targetX, done) {
-  primeFloats(targetX < 0 ? "left" : "right");   // 飞出前把这一下的飘字钉在触发卡上
+  const dir = targetX < 0 ? "left" : "right";
+  primeFloats(dir);   // 飞出前把这一下的飘字钉在触发卡上
+  showChoiceToast(dir);
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   n1Ref = null;                   // 新一次飞出：上一次飞卡的 N1 参照点作废（键盘/拖拽启动的也没有参照点）
   cardSettling = true;

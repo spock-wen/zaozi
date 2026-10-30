@@ -289,11 +289,12 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.waitForFunction(() => !!window.__zz.animating, null, { timeout: 1000 });
       await press(page, ["ArrowRight", "ArrowLeft"]);
 
-      await page.waitForFunction(() => (window.__toastOns?.length ?? 0) > 0, null, { timeout: 5000 });
+      // T01 左右答句也会让 #toast.on。这里只等刻字锁提示。
+      await page.waitForFunction(() => (window.__toastOns || []).some((t) => /骨片/.test(t.text)), null, { timeout: 5000 });
 
       const res = await page.evaluate(() => ({
         settleT: window.__settles?.T03,
-        toastOns: window.__toastOns || [],
+        toastOns: (window.__toastOns || []).filter((t) => /骨片/.test(t.text)),
         n: window.__zz.actions.length,
         phase: window.__zz.st.phase,
       }));
@@ -386,7 +387,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         settleT: window.__settles?.T03,
         actLog: window.__actLog || [],
         engraves: window.__zz.actions.filter((a) => a.type === "engrave"),
-        toastOns: window.__toastOns || [],
+        toastOns: (window.__toastOns || []).filter((t) => /骨片/.test(t.text)),
       }));
 
       assert.ok(res.settleT != null, "应记录到 T03 落定时间");

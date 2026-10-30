@@ -217,7 +217,8 @@ body[data-view="mobile"] .optbtn,body[data-view="tablet-portrait"] .optbtn{
 body:not([data-phase="card"]) #opt-left,body:not([data-phase="card"]) #opt-right{visibility:hidden;}
 body[data-view="mobile"] #opt-left,body[data-view="tablet-portrait"] #opt-left{grid-area:l;}
 body[data-view="mobile"] #opt-right,body[data-view="tablet-portrait"] #opt-right{grid-area:r;}
-body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;height:40px;min-height:40px;}
+/* 行高随气泡：T01 教练两行时不能锁 40px，否则气泡伸出 #stage、压住字匣把手。 */
+body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;height:auto;min-height:40px;}
 body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-width:none;}
 #coach{
   max-width:320px;background:var(--paper-100);color:var(--ink);border-radius:12px;padding:10px 12px;
