@@ -471,11 +471,15 @@ function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closes
 
 // ---------- 派发 / 存档 ----------
 function dispatch(a) {
+  let pendingDropNote = "";
   try {
     const prevCurrent = st.current, prevPhase = st.phase;   // D1
     const prevBones = st.bones;
     const prevDims = { ...st.dims };
+    const noteCard = a.type === "choose" && a.side === "drop" ? curCard() : null;
+    const noteChar = noteCard ? st.wordBox[a.slot] : "";
     st = step(st, a);
+    if (noteCard) pendingDropNote = dropNote(noteCard, noteChar);
     actions.push(a);
     afterAction(a, prevBones);
     saveNow();
@@ -487,9 +491,10 @@ function dispatch(a) {
       else if (a.type === "skip_engrave") showOutcome(SKIP_EMPTY);
       else hideOutcome();
     }
-  } catch (e) { clearOutcomeFloats(); toast(e.message); }
+  } catch (e) { pendingDropNote = ""; clearOutcomeFloats(); toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();
+  showToastLine(pendingDropNote);
 }
 function afterAction(a, prevBones) {
   // 音效按真实涨跌。四维飘字不在这里挂到下一张：选卡飞出前由 primeFloats 钉在触发卡，换卡时 clearOutcomeFloats。
@@ -1626,14 +1631,20 @@ function choiceToast(dir) {
   const msg = opt && typeof opt.toast === "string" ? opt.toast.trim() : "";
   return msg;
 }
-function showChoiceToast(dir) {
-  const msg = choiceToast(dir);
+function dropNote(card, ch) {
+  const row = card && (card.drops || []).find((d) => d.char === ch);
+  return row && typeof row.note === "string" ? row.note.trim() : "";
+}
+function showToastLine(msg) {
   if (!msg) return;
   toast._choice = true;
   const t = $("toast");
   if (t) t.style.transition = "none";
   toast(msg);
   if (t) t.classList.remove("hold");
+}
+function showChoiceToast(dir) {
+  showToastLine(choiceToast(dir));
 }
 function flyOut(targetX, done) {
   const dir = targetX < 0 ? "left" : "right";
