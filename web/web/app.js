@@ -1495,7 +1495,7 @@ function beginDrag(x, pointerId) {
 const queuedPress = (id) => ui.keyQueue.find((it) => it.kind === "press" && it.id === id);
 function onDown(e) {
   if (ui.sheetOpen) return;
-  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事"); return; }  // B11
+  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角那道迹，才能刻"); return; }  // B11
   if (st.phase !== "card" || inputBusy()) return;
   // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
   // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
@@ -1945,7 +1945,7 @@ function handleKey(e) {
     const a = INPUT.card.keys[e.code]; if (a && !e.repeat) { e.preventDefault(); dispatch(a); }
   } else if (st.phase === "engrave") {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
-      toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+      toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角那道迹，才能刻");
     } else if (e.code === INPUT.engrave.key) {
       clearToast();
       ui.engraved = true;
@@ -2000,7 +2000,7 @@ const drainStep = () => {
         ui.drainArmed = false;
         if (dropped && !ui.engraveHinted) {
           ui.engraveHinted = true;
-          toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角骨片刻下这件事");
+          toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角那道迹，才能刻");
         }
         return;
       }

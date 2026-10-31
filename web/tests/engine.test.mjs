@@ -119,27 +119,27 @@ test("teach bridge flags stack with lock-table keys and frozen deltas", () => {
   assert.deepEqual(delta("T05", "left"), { food: 4, outsider: -8 });
   assert.deepEqual(delta("T05", "right"), { food: -6, outsider: 6 });
 
-  assert.equal(card("T01").cutscene.bone.body, "刀刚到手，寨口就有脚步。妇人背回一筐野果，等你拿主意。");
+  assert.equal(card("T01").cutscene.bone.body, "寨口有脚步。妇人背回一筐野果，等你拿主意。");
   assert.equal(card("T01").cutscene.hardship.body, "难处先记着。寨口妇人背回野果——今冬紧不紧，就看这一筐。");
-  assert.equal(card("T02").faces.bone.text, "族人看着你手里的刀。「分给他们，还是先存着？」");
+  assert.equal(card("T02").faces.bone.text, "族人等你拿主意。「分给他们，还是先存着？」");
   assert.equal(card("T02").faces.bone.left, "先存着");
   assert.equal(card("T02").faces.bone.right, "分给他们");
   assert.equal(card("T02").faces.hardship.text, "「粮会紧。这筐果先囤过冬，还是分掉？」");
   assert.equal(card("T02").faces.hardship.left, "先囤过冬");
   assert.equal(card("T02").faces.hardship.right, "分给大家");
-  assert.equal(card("T02").cutscene.store.body, "果先囤下了。夜里擦刀，你才看见骨上那道裂。");
+  assert.equal(card("T02").cutscene.store.body, "果先囤下了。夜里摸骨片，你才看见那道裂。");
   assert.equal(card("T02").cutscene.share.body, "果分完了。有人拿骨片来记，才摸到一道裂。");
   assert.equal(card("T03").faces.store.right, "先搁着");
   assert.equal(card("T03").faces.share.right, "先不管它");
-  assert.equal(card("T03").cutscene.carve.body, "这道迹刻下了。没等干，两家又为河界吵起来。");
+  assert.equal(card("T03").cutscene.carve.body, "这道迹刻下了。没等干，两家又为河滩吵起来。");
   assert.equal(card("T03").cutscene.skip.body, "裂先搁着。寨外传来喊声——河水漫过了界石。");
   assert.equal(card("T04").faces.carve.text, "迹刚刻完，两家为一条河争了三天。");
   assert.equal(card("T04").faces.skip.text, "裂还搁着，两家已为一条河争了三天。");
-  assert.equal(card("T04").cutscene.yield.body, "各让一步，河界暂定。对方却得寸进尺，来要一半的粮。");
+  assert.equal(card("T04").cutscene.yield.body, "各让一步，两边暂定。对方又来，要一半的粮。");
   assert.equal(card("T04").cutscene.hold.body, "这边守住了。对方改口，只要你们一半的粮。");
-  assert.equal(card("T04").cutscene.river.body, "以河为界落了字。对方又派人来，要一半的粮。");
-  assert.equal(card("T05").faces.open.text, "河界松了口。给了，今冬难熬；不给，怕要动刀。");
-  assert.equal(card("T05").faces.hold.text, "这边没让。给了，今冬难熬；不给，怕要动刀。");
+  assert.equal(card("T04").cutscene.river.body, "河滩分开的形落下了。对方又派人来，要一半的粮。");
+  assert.equal(card("T05").faces.open.text, "河滩松了口。给了，今冬难熬；不给，怕要抡棍棒。");
+  assert.equal(card("T05").faces.hold.text, "这边没让。给了，今冬难熬；不给，怕要抡棍棒。");
   assert.equal(card("T05").cutscene.refuse.body, "粮留下了。这一季的事，先记到这儿。");
   assert.equal(card("T05").cutscene.half.body, "一半交出去了。这一季的事，先记到这儿。");
   for (const row of ["ignore", "guard", "water"]) {

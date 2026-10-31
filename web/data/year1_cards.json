@@ -2,23 +2,23 @@
   "schema_version": "1",
   "_说明": "一年里程碑卡池：10 张卡（春 3、夏 3、秋 2、冬 2）+ 1 次冬夜，外加 5 张教学卡 T01–T05（只进第 1 代、按序；only_tutorial 为 true，不进普通牌堆）。卡上数值是内容样例，按 GAMEPLAY §3 的幅度写；落字「水」的数值照 §2.4 的例子。新增字段：title=卡头标题（版式），tutorial=教学顺序号，only_tutorial=只用于教学，lock_choice=开局即进「刻」阶段且锁左右拖（教学第 3 张），trace=卡级迹（配合 lock_choice）。trace 表示选这一边后卡上出现的迹，target 是这条迹能刻成的字，tally_text 是事签文案。",
   "cards": [
-    { "id": "T01", "season": "spring", "speaker": "族长", "tutorial": 1, "only_tutorial": true,
-      "title": "开春了",
-      "text": "族长把骨刀交到你手里：「往后记事，就靠你了。」",
-      "left":  { "label": "接过骨刀", "delta": { "faith": 6 } },
-      "right": { "label": "先问问往后的难处", "delta": { "memory": 6 } },
+    { "id": "T01", "season": "spring", "speaker": "管事的老人", "tutorial": 1, "only_tutorial": true,
+      "title": "火边这一夜",
+      "text": "管事的老人把刻骨用的骨刀推到你面前。火边的人都看着你。",
+      "left":  { "label": "今晚这事我来记", "delta": { "faith": 6 } },
+      "right": { "label": "先问清往后的难处", "delta": { "memory": 6 } },
       "cutscene": {
-        "bone": { "speaker": "族长", "body": "刀刚到手，寨口就有脚步。妇人背回一筐野果，等你拿主意。", "continue": "继续", "alias": "path_blade" },
-        "hardship": { "speaker": "族长", "body": "难处先记着。寨口妇人背回野果——今冬紧不紧，就看这一筐。", "continue": "继续", "alias": "path_ask" }
+        "bone": { "speaker": "管事的老人", "body": "寨口有脚步。妇人背回一筐野果，等你拿主意。", "continue": "继续", "alias": "path_blade" },
+        "hardship": { "speaker": "管事的老人", "body": "难处先记着。寨口妇人背回野果——今冬紧不紧，就看这一筐。", "continue": "继续", "alias": "path_ask" }
       },
       "drops": [] },
     { "id": "T02", "season": "spring", "speaker": "采集的妇人", "tutorial": 2, "only_tutorial": true,
       "title": "她背回一筐野果",
-      "text": "族人看着你手里的刀。「分给他们，还是先存着？」",
+      "text": "族人等你拿主意。「分给他们，还是先存着？」",
       "faces": {
         "bone": {
           "title": "她背回一筐野果",
-          "text": "族人看着你手里的刀。「分给他们，还是先存着？」",
+          "text": "族人等你拿主意。「分给他们，还是先存着？」",
           "left": "先存着",
           "right": "分给他们"
         },
@@ -32,8 +32,8 @@
       "left":  { "label": "先存着", "delta": { "food": 8, "faith": -4 } },
       "right": { "label": "分给他们", "delta": { "faith": 6, "food": -4 } },
       "cutscene": {
-        "store": { "speaker": "族长", "body": "果先囤下了。夜里擦刀，你才看见骨上那道裂。", "continue": "继续" },
-        "share": { "speaker": "族长", "body": "果分完了。有人拿骨片来记，才摸到一道裂。", "continue": "继续" }
+        "store": { "speaker": "管事的老人", "body": "果先囤下了。夜里摸骨片，你才看见那道裂。", "continue": "继续" },
+        "share": { "speaker": "管事的老人", "body": "果分完了。有人拿骨片来记，才摸到一道裂。", "continue": "继续" }
       },
       "drops": [] },
     { "id": "T03", "season": "spring", "speaker": "巫", "tutorial": 3, "only_tutorial": true,
@@ -44,7 +44,7 @@
       "faces": {
         "store": {
           "title": "骨上有一道裂",
-          "text": "囤果时擦到刀身。「这道迹，刻下来，过冬也有底。」",
+          "text": "囤果时摸到骨上那道裂。「这道迹，刻下来，过冬也有底。」",
           "left": "刻下这道迹",
           "right": "先搁着"
         },
@@ -58,11 +58,11 @@
       "left":  { "label": "刻下这道迹", "delta": { "memory": 4 } },
       "right": { "label": "先不管它", "delta": { "faith": 4 } },
       "cutscene": {
-        "carve": { "speaker": "族长", "body": "这道迹刻下了。没等干，两家又为河界吵起来。", "continue": "继续" },
-        "skip": { "speaker": "族长", "body": "裂先搁着。寨外传来喊声——河水漫过了界石。", "continue": "继续" }
+        "carve": { "speaker": "管事的老人", "body": "这道迹刻下了。没等干，两家又为河滩吵起来。", "continue": "继续" },
+        "skip": { "speaker": "管事的老人", "body": "裂先搁着。寨外传来喊声——河水漫过了界石。", "continue": "继续" }
       },
       "drops": [] },
-    { "id": "T04", "season": "summer", "speaker": "族长", "tutorial": 4, "only_tutorial": true,
+    { "id": "T04", "season": "summer", "speaker": "管事的老人", "tutorial": 4, "only_tutorial": true,
       "title": "河水漫过了界石",
       "text": "两家为一条河争了三天。",
       "faces": {
@@ -71,37 +71,37 @@
           "text": "迹刚刻完，两家为一条河争了三天。",
           "left": "各让一步",
           "right": "守住这边",
-          "drop": { "水": { "label": "以河为界", "note": "借来一个「水」，落在这张卡上。" } }
+          "drop": { "水": { "label": "河滩分开", "note": "拿来一个像水的形，落到这张卡上。" } }
         },
         "skip": {
           "title": "河水漫过了界石",
           "text": "裂还搁着，两家已为一条河争了三天。",
           "left": "各让一步",
           "right": "守住这边",
-          "drop": { "水": { "label": "以河为界", "note": "借来一个「水」，落在这张卡上。" } }
+          "drop": { "水": { "label": "河滩分开", "note": "拿来一个像水的形，落到这张卡上。" } }
         }
       },
       "left":  { "label": "各让一步", "delta": { "outsider": 4, "food": -4 } },
       "right": { "label": "守住这边", "delta": { "outsider": -4, "food": 4 } },
       "cutscene": {
-        "yield": { "speaker": "族长", "body": "各让一步，河界暂定。对方却得寸进尺，来要一半的粮。", "continue": "继续" },
-        "hold": { "speaker": "族长", "body": "这边守住了。对方改口，只要你们一半的粮。", "continue": "继续" },
-        "river": { "speaker": "族长", "body": "以河为界落了字。对方又派人来，要一半的粮。", "continue": "继续" }
+        "yield": { "speaker": "管事的老人", "body": "各让一步，两边暂定。对方又来，要一半的粮。", "continue": "继续" },
+        "hold": { "speaker": "管事的老人", "body": "这边守住了。对方改口，只要你们一半的粮。", "continue": "继续" },
+        "river": { "speaker": "管事的老人", "body": "河滩分开的形落下了。对方又派人来，要一半的粮。", "continue": "继续" }
       },
-      "drops": [ { "char": "水", "label": "以河为界", "delta": { "outsider": 4, "food": -4 }, "note": "借来一个「水」，落在这张卡上。" } ] },
+      "drops": [ { "char": "水", "label": "河滩分开", "delta": { "outsider": 4, "food": -4 }, "note": "拿来一个像水的形，落到这张卡上。" } ] },
     { "id": "T05", "season": "summer", "speaker": "外族来使", "tutorial": 5, "only_tutorial": true,
       "title": "他们要一半的粮",
-      "text": "给了，今冬难熬；不给，怕要动刀。",
+      "text": "给了，今冬难熬；不给，怕要抡棍棒。",
       "faces": {
         "open": {
           "title": "他们要一半的粮",
-          "text": "河界松了口。给了，今冬难熬；不给，怕要动刀。",
+          "text": "河滩松了口。给了，今冬难熬；不给，怕要抡棍棒。",
           "left": "不给",
           "right": "给一半"
         },
         "hold": {
           "title": "他们要一半的粮",
-          "text": "这边没让。给了，今冬难熬；不给，怕要动刀。",
+          "text": "这边没让。给了，今冬难熬；不给，怕要抡棍棒。",
           "left": "不给",
           "right": "给一半"
         }
@@ -109,8 +109,8 @@
       "left":  { "label": "不给", "delta": { "food": 4, "outsider": -8 } },
       "right": { "label": "给一半", "delta": { "food": -6, "outsider": 6 } },
       "cutscene": {
-        "refuse": { "speaker": "族长", "body": "粮留下了。这一季的事，先记到这儿。", "continue": "继续" },
-        "half": { "speaker": "族长", "body": "一半交出去了。这一季的事，先记到这儿。", "continue": "继续" }
+        "refuse": { "speaker": "管事的老人", "body": "粮留下了。这一季的事，先记到这儿。", "continue": "继续" },
+        "half": { "speaker": "管事的老人", "body": "一半交出去了。这一季的事，先记到这儿。", "continue": "继续" }
       },
       "drops": [] },
     { "id": "C01", "season": "spring", "speaker": "族长",
