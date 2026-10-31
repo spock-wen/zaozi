@@ -107,7 +107,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         await pressCard(page, vp.view === "mobile");
         const lockText = await page.locator("#toast").textContent();
-        assert.ok(lockText.includes("先点卡角骨片刻下这件事"), "锁拖提示应出现");
+        assert.ok(lockText.includes("先点卡角那道迹，才能刻"), "锁拖提示应出现");
 
         // 导入有效存档码，并通过 MutationObserver 捕获 hideToast() 与 toast() 的序列变化
         const result = await page.evaluate(() => {
@@ -179,7 +179,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         await pressCard(page, vp.view === "mobile");
         const lockText = await page.locator("#toast").textContent();
-        assert.ok(lockText.includes("先点卡角骨片刻下这件事"), "锁拖提示应出现");
+        assert.ok(lockText.includes("先点卡角那道迹，才能刻"), "锁拖提示应出现");
 
         // 读回上次进度，并通过 MutationObserver 捕获 hideToast() 与 toast() 的序列变化
         const result = await page.evaluate(() => {

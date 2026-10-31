@@ -2,7 +2,7 @@
 // 覆盖 QA D1/D2/D4：
 //   D1 tap「天亮了」不能穿透点到新翻出的「先人 / 交给第 2 代」，代末总结必须先出；
 //   D2 目标弹层一次点击不秒关；静音每次点击只切一次（390 与 1024）；导出弹层在 1024 能开；
-//   D4 拖锁定的第 3 张卡出专属提示「先点卡角骨片刻下这件事」，且 toast 不遮字匣；
+//   D4 拖锁定的第 3 张卡出专属提示「先点卡角那道迹，才能刻」，且 toast 不遮字匣；
 //   挑字界面只出 14 字切片、以现代字呈现、季节标签非空；全 UI 可见文本不含「占位」。
 // 三引擎各跑一遍。
 import { test, before, after } from "node:test";
@@ -158,7 +158,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       // D4：拖动锁定的卡出专属提示
       await dragCard(page);
       const toastTxt = await page.locator("#toast").textContent();
-      assert.ok(toastTxt.includes("先点卡角骨片刻下这件事"), `锁卡提示应含专属文案，得到：${toastTxt}`);
+      assert.ok(toastTxt.includes("先点卡角那道迹，才能刻"), `锁卡提示应含专属文案，得到：${toastTxt}`);
       const toast = await page.locator("#toast").boundingBox();
       const wb = await page.locator("#wordbox-bar").boundingBox();
       assert.ok(toast.y + toast.height <= wb.y + 2, "toast 不能盖住字匣");

@@ -440,8 +440,8 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         // 1. T01 with coach
         const segsT01 = vp.h <= 760
-          ? ["1–3落字", "Space分量", "左右拖卡做选择"]
-          : ["1–3 落字", "按住 Space 看分量", "左右拖卡做选择"];
+          ? ["1–3落字", "Space分量", "拖到一边再松手"]
+          : ["1–3 落字", "按住 Space 看分量", "拖到一边再松手"];
         const resT01 = await checkHintUniqueness("T01", segsT01);
         for (const seg of segsT01) {
           const list = resT01[seg];
