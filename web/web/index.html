@@ -1,8 +1,19 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+/* 首屏设 html lang，跟 zaozi_locale_v1（缺省 zh）。 */
+(function () {
+  var loc = "zh";
+  try {
+    var stored = localStorage.getItem("zaozi_locale_v1");
+    if (stored === "en" || stored === "zh") loc = stored;
+  } catch (e) {}
+  document.documentElement.lang = loc === "en" ? "en" : "zh-CN";
+})();
+</script>
 <title>造字人 · 一年里程碑</title>
 <link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.webmanifest">
