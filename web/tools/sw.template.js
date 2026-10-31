@@ -30,7 +30,8 @@ self.addEventListener("install", (e) => {
     const c = await caches.open(CACHE);
     // 逐个 fetch（不用 addAll：addAll 里一条 308 就把整批带成 redirected，且失败信息不好定位）
     for (const f of FILES) {
-      const r = await fetch(U(f));                              // 清单里 "./" 这种键本身就可能是跳转目标
+      // cache:"reload"：绕过 HTTP/CDN 缓存，避免同 VERSION 下把旧 app.js 毒进新 CACHE（locale=en 普通刷新丢英文壳）
+      const r = await fetch(U(f), { cache: "reload" });            // 清单里 "./" 这种键本身就可能是跳转目标
       if (!r.ok) throw new Error(`预缓存失败 ${f}：HTTP ${r.status}`);
       const cc = await putClean(c, U(f), r);                    // 按清单键原样存（键即缓存匹配的 URL）
       // credits 只 fetch 一次：Pages 上 /credits.html 会 308 到 /credits，两个地址都得能命中，同一份响应存两个键
