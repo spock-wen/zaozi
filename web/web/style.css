@@ -440,6 +440,26 @@ body[data-view="desktop"] #pick .season-note{position:absolute;left:calc(var(--p
   width:max-content;max-width:min(calc(100vw - 32px),320px);white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:22px;}
 #toast.on{opacity:1;visibility:visible;transition:opacity .3s,visibility 0s;}  /* D1：收起后连命中/绘制一起退出，不在 #coach 上留透明盒 */
 #toast.hold{visibility:hidden !important;transition:none !important;}
+/* T01→T02 对话卡过场。色用现成纸/朱，不是 toast。T03–T05 本环不出这一层。 */
+#cutscene{position:fixed;inset:0;z-index:92;display:flex;align-items:center;justify-content:center;padding:16px;}
+#cutscene[hidden]{display:none !important;}
+#cut-scrim{position:absolute;inset:0;background:rgba(21,23,31,.5);}
+#cut-card{
+  position:relative;z-index:1;display:flex;flex-direction:column;
+  width:min(328px,100%);max-height:calc(100dvh - 32px);box-sizing:border-box;
+  background:var(--paper-50);color:var(--ink-900);border-radius:16px;padding:20px;
+  box-shadow:0 0 0 1px var(--paper-line),0 16px 40px rgba(0,0,0,.5);
+}
+body[data-view="desktop"] #cut-card{width:min(360px,100%);}
+#cut-speaker{flex:0 0 auto;font-size:12px;font-weight:700;line-height:1;color:var(--zhu-600);letter-spacing:.08em;}
+#cut-body{margin:12px 0 0;overflow:auto;font-size:16px;line-height:28px;font-weight:400;color:var(--ink-900);}
+body[data-short] #cut-body{line-height:24px;}
+#cut-act{flex:0 0 auto;margin-top:20px;display:flex;justify-content:flex-end;}
+#cut-continue{
+  min-width:96px;height:44px;min-height:44px;padding:0 18px;border-radius:12px;
+  background:var(--zhu-600);color:#fff;font-size:15px;font-weight:700;line-height:44px;
+}
+#cut-continue:active{transform:scale(.98);}
 #rotate-hint{position:fixed;inset:0;z-index:95;background:var(--night-800);display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-size:16px;}
 
 /* ---------- 平板竖屏（600–1023 竖） ---------- */

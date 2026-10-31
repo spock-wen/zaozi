@@ -13,7 +13,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { clearTutorial, gen2Codes } from "./helpers/flow.mjs";
+import { clearTutorial, gen2Codes, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -109,6 +109,7 @@ async function settle(page) {
     if (!window.__settleFrom) window.__settleFrom = now;
     return now - window.__settleFrom >= 400;
   }, null, { timeout: 10000, polling: 60 });
+  await passCutscene(page);
 }
 
 // 卡中心与卡宽：在飞出之前（已稳）量一次。

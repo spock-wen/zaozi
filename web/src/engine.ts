@@ -116,6 +116,7 @@ export function createGame(cfg: GameConfig): GameState {
     goalEvents: [],
     engravedThisGen: 0,
     tutorialDone: generation > 1,
+    t01: null,
     log: [`开局：种子 ${cfg.seed}，第 ${generation} 代，第一张 ${deck[0]}`],
   };
   enterCard(st);
@@ -281,6 +282,9 @@ export function step(prev: GameState, action: Action): GameState {
       if (opt.bones) applyBones(st, opt.bones);
       if (opt.hidden_marker) st.hiddenMarkers[opt.hidden_marker] = (st.hiddenMarkers[opt.hidden_marker] ?? 0) + 1;
       st.log.push(`${card.id} ${action.side === "left" ? "左" : "右"}`);
+      // 路径旗只记 T01：左 bone（别名 path_blade）/ 右 hardship（别名 path_ask）。
+      // T03–T05 同模式（选后对话卡 → 下一张按旗改语气）本环不记旗、不出帧。
+      if (card.id === "T01") st.t01 = action.side === "left" ? "bone" : "hardship";
       if (opt.trace) {
         st.pendingTrace = opt.trace;
         st.phase = "engrave";

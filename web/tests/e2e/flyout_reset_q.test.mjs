@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { clearTutorial } from "./helpers/flow.mjs";
+import { clearTutorial, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -171,6 +171,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     try {
       await press(page, ["ArrowLeft", "ArrowLeft"]);                          // T01 → T02
       await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+      await passCutscene(page);
       await settle(page);
 
       const box = await cardBox(page);
@@ -213,6 +214,7 @@ for (const [engine] of Object.entries(ENGINES)) {
     try {
       await press(page, ["ArrowLeft", "ArrowLeft"]);                          // T01 → T02
       await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+      await passCutscene(page);
       await settle(page);
 
       const box = await cardBox(page);

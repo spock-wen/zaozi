@@ -2,6 +2,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -43,6 +44,7 @@ async function commitCard(page, dir) {
   await page.keyboard.press(k);
   await page.waitForFunction(() => !window.__zz?.animating, null, { timeout: 5000 });
   await page.waitForTimeout(400);
+  await passCutscene(page);
 }
 
 for (const [engine] of Object.entries(ENGINES)) {

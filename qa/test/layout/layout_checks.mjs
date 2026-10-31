@@ -44,7 +44,9 @@ const idle = () => p.waitForFunction(() => !window.__zz.animating, null, { timeo
 const vis = (s) => p.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden && e.getClientRects().length > 0; }, s);
 const tapSel = async (s) => { const L = p.locator(s).first(); if (touch) await L.tap(); else await L.click(); };
 const tapXY = async (x, y) => { if (touch) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
-const commit = async (d) => { await idle(); const k = d === "l" ? "ArrowLeft" : "ArrowRight"; await p.keyboard.press(k); await p.keyboard.press(k); await p.waitForTimeout(650); };
+const commit = async (d) => { await idle(); const k = d === "l" ? "ArrowLeft" : "ArrowRight"; await p.keyboard.press(k); await p.keyboard.press(k); await p.waitForTimeout(650);
+  const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; });
+  if (cut) { await p.locator("#cut-continue").click(); await p.waitForTimeout(200); } };
 const cell = (s) => String(s).replace(/[\n\r]/g, " ").replace(/,/g, "，");
 let n = 0; const cardSizes = [];
 async function scene(name, settle = 300) {

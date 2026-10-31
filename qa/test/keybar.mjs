@@ -15,7 +15,9 @@ const B = await { chromium, firefox, webkit }[engine].launch(); const ctx = awai
 let seq = 0; const shot = async (n) => { const f = `shots/${cfg}/${String(++seq).padStart(2, "0")}_${n}.png`; await p.screenshot({ path: `${OUT}/${f}`, fullPage: true }).catch(() => {}); return f; };
 const clk = async (x, y) => { if (touch) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
 const ctr = (s) => p.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return r.width ? [r.left + r.width / 2, r.top + r.height / 2] : null; }, s);
-const still = async () => { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {}); await p.waitForTimeout(500); };
+const still = async () => { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {}); await p.waitForTimeout(500);
+  const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+  if (cut) { await p.locator("#cut-continue").click(); await p.waitForFunction(() => document.getElementById("cutscene").hidden, null, { timeout: 2000 }).catch(() => {}); } };
 const geo = (sel) => p.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; const cs = getComputedStyle(e); const r = e.getBoundingClientRect();
   const vis = !e.hidden && cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0 && r.height > 0;
   return { vis, text: e.innerText.trim(), l: +r.left.toFixed(1), r: +r.right.toFixed(1), t: +r.top.toFixed(1), b: +r.bottom.toFixed(1), sw: e.scrollWidth, cw: e.clientWidth, sh: e.scrollHeight, ch: e.clientHeight, ws: cs.whiteSpace, ov: cs.overflow }; }, sel);

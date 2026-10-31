@@ -7,6 +7,7 @@ import os from "node:os";
 import net from "node:net";
 import { spawn } from "node:child_process";
 import { ENGINES, SEED, DIST, ROOT, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -559,6 +560,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           await page.locator("#opt-left").click();
         }
         await page.waitForFunction(() => window.__zz.st?.current === "T02" && document.body.dataset.cardReady === "1", null, { timeout: 5000 });
+        await passCutscene(page);
 
         // T02 -> T03
         if (vp.isTouch) {
