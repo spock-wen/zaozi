@@ -144,20 +144,24 @@ for (const [engine] of Object.entries(ENGINES)) {
       // ① T01 左选项键 #opt-left
       await pressBetween(page, "#opt-left");
       await expectCurrent(page, "T02", "「接过骨刀」(#opt-left) 应推进到 T02");
+      await passCutscene(page);
 
       // ② T02 右选项键 #opt-right → T03（锁拖，一进来就是「刻」）
       await pressBetween(page, "#opt-right");
+      await passCutscene(page);
       await expectPhase(page, "engrave", "#opt-right 应推进到 T03 的「刻」");
 
       // ③ 卡角「刻」#bonecorner
       const bones0 = await page.evaluate(() => window.__zz.st.bones);
       await pressBetween(page, "#bonecorner");
+      await passCutscene(page);
       await expectCurrent(page, "T04", "点卡角「刻」应推进到 T04");
       assert.equal(await page.evaluate(() => window.__zz.st.bones), bones0 - 1, "刻应扣一片骨片");
       assert.ok((await page.evaluate(() => window.__zz.st.tallies.map((t) => t.target))).includes("休"), "刻应记下一张事签");
 
       // ④ 字匣落字 #wordbox .slot.ok（T04 的「水」）
       await pressBetween(page, "#wordbox .slot.ok");
+      await passCutscene(page);
       await expectCurrent(page, "T05", "字匣落字应推进到 T05");
       assert.ok(await page.evaluate(() => window.__zz.st.dropped.includes("水")), "应落下「水」");
 
@@ -348,10 +352,12 @@ test("chromium 390 touch(CDP): down/up 间 render() 不丢点击（字匣落字/
     assert.equal(await phase(page), "engrave");
     await page.locator("#bonecorner").click();  // 刻 → T04
     await page.waitForTimeout(300);
+    await passCutscene(page);
     await expectCurrent(page, "T04", "刻后应到 T04");
 
     // 字匣落字（触屏）
     await touchBetween("#wordbox .slot.ok");
+    await passCutscene(page);
     try { await page.waitForFunction(() => window.__zz.st.current === "T05", null, { timeout: 3000 }); } catch {}
     assert.ok(await page.evaluate(() => window.__zz.st.dropped.includes("水")), "触屏落字不应被 render 吞掉");
 

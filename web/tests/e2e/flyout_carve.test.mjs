@@ -16,7 +16,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { passCutscene } from "./helpers/flow.mjs";
+import { passCutscene, releaseBridge } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -231,6 +231,8 @@ async function finalGeom(engine, touch) {
 // T03 入场滑行中等待目标中心落点就位且卡仍在入场
 async function waitEnteringHit(page, x, y, sel) {
   await page.waitForFunction(([px, py, s]) => {
+    const cut = document.getElementById("cutscene");
+    if (cut && !cut.hidden) { document.getElementById("cut-continue")?.click(); return false; }
     const el = document.elementFromPoint(px, py);
     const card = document.getElementById("card");
     const inside = !!el && !!el.closest(s);
@@ -249,6 +251,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.waitForFunction(() => window.__zz.st.current === "T03" && window.__zz.st.phase === "engrave", null, { timeout: 5000 });
       await settle(page);
       await page.waitForTimeout(300);
+      await passCutscene(page);
 
       const nBefore = await page.evaluate(() => window.__zz.actions.length);
       await press(page, ["ArrowRight", "ArrowRight"]);
@@ -290,6 +293,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       await press(page, ["ArrowRight", "ArrowRight"]);
       await page.waitForFunction(() => !!window.__zz.animating, null, { timeout: 1000 });
       await press(page, ["ArrowRight", "ArrowLeft"]);
+      await releaseBridge(page);
 
       // T01 左右答句也会让 #toast.on。这里只等刻字锁提示。
       await page.waitForFunction(() => (window.__toastOns || []).some((t) => /骨片/.test(t.text)), null, { timeout: 5000 });
@@ -338,6 +342,8 @@ for (const [engine] of Object.entries(ENGINES)) {
         if (!z || z.st?.phase !== "engrave") return false;
         const card = document.getElementById("card");
         const running = card ? card.getAnimations().some((a) => a.playState === "running") : false;
+        const cut = document.getElementById("cutscene");
+        if (cut && !cut.hidden) document.getElementById("cut-continue")?.click();
         return running || !!z.animating;
       }, null, { timeout: 4000, polling: "raf" });
 
@@ -376,6 +382,8 @@ for (const [engine] of Object.entries(ENGINES)) {
         if (!z || z.st?.phase !== "engrave") return false;
         const card = document.getElementById("card");
         const running = card ? card.getAnimations().some((a) => a.playState === "running") : false;
+        const cut = document.getElementById("cutscene");
+        if (cut && !cut.hidden) document.getElementById("cut-continue")?.click();
         return running || !!z.animating;
       }, null, { timeout: 4000, polling: "raf" });
 

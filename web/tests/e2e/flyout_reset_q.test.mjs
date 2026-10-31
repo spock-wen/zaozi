@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { clearTutorial, passCutscene } from "./helpers/flow.mjs";
+import { clearTutorial, passCutscene, releaseBridge } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -182,6 +182,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.mouse.down();
       await page.mouse.move(box.cx + box.w * 0.6, box.cy);                    // 超过阈值，松手入队
       await page.mouse.up();
+      await releaseBridge(page);
 
       await page.waitForFunction(() => {
         const el = document.getElementById("toast");
@@ -225,6 +226,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.mouse.down();
       await page.mouse.move(box.cx + box.w * 0.6, box.cy);                    // 超过阈值，松手入队
       await page.mouse.up();
+      await releaseBridge(page);
 
       await page.waitForFunction(() => {
         const el = document.getElementById("toast");

@@ -14,12 +14,15 @@ await p.waitForTimeout(300);
 log("start current=", await cur(), "phase=", await st());
 
 // T01: ← preview then ← commit
+const cont = async () => { const open = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }); if (open) await p.locator("#cut-continue").click(); };
 await p.keyboard.press("ArrowLeft"); await p.keyboard.press("ArrowLeft");
 await p.waitForTimeout(300);
+await cont();
 log("after T01:", await cur(), await st());
 // T02
 await p.keyboard.press("ArrowRight"); await p.keyboard.press("ArrowRight");
 await p.waitForTimeout(300);
+await cont();
 log("after T02:", await cur(), await st());
 if ((await st()) !== "engrave") errs.push("T03 did not enter engrave");
 
@@ -35,14 +38,17 @@ if (!toastTxt.includes("骨片")) errs.push("no locked-card hint, got: " + toast
 // engrave
 await p.locator("#bonecorner").click();
 await p.waitForTimeout(300);
+await cont();
 log("after engrave:", await cur(), await st());
 // T04 drop
 await p.locator("#wordbox .slot").first().click();
 await p.waitForTimeout(300);
+await cont();
 log("after T04 drop:", await cur(), await st());
 // T05 right
 await p.keyboard.press("ArrowRight"); await p.keyboard.press("ArrowRight");
 await p.waitForTimeout(300);
+await cont();
 log("after T05:", await cur(), await st());
 
 // play normal cards until winter/ended

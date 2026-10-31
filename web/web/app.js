@@ -69,7 +69,7 @@ const ui = {
   engraveHinted: false,               // 刻字阶段锁定提示是否已弹出：每进一次刻字阶段最多一次。在进入刻字阶段（换卡或换阶段）及 newGame/restore/importCode 时复位为 false（REREVIEW P3 D5 / RULES §10.3b）
   keyhelpOpen: false,                 // 矮屏 B：顶栏「?」键位浮层
   sheetOpen: false,                   // 「看全文」模态浮层
-  cutscene: null,                     // T01 飞出落定后的对话卡。非空时下一张还不可选
+  cutscene: null,                     // 教学选后的对话卡。非空时下一张还不可选，只点「继续」才收
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
 
@@ -471,8 +471,12 @@ function deferInteract(el, ms = 350) {         // 防「天亮了」穿透到下
 function on(el, fn) { el.addEventListener("click", (e) => { if (!e.target.closest?.("a[href]")) e.preventDefault?.(); fn(e); }); }
 
 // ---------- 派发 / 存档 ----------
+let pendingBridgeNote = "";
 function dispatch(a) {
   let pendingDropNote = "";
+  const fromId = st.current;
+  const bridgeFlag = flagForAction(fromId, a);
+  const bridgeRow = bridgeFlag && cutsceneRow(fromId, bridgeFlag);
   try {
     const prevCurrent = st.current, prevPhase = st.phase;   // D1
     const prevBones = st.bones;
@@ -492,9 +496,15 @@ function dispatch(a) {
       else if (a.type === "skip_engrave") showOutcome(SKIP_EMPTY);
       else hideOutcome();
     }
-  } catch (e) { pendingDropNote = ""; clearOutcomeFloats(); toast(e.message); }
+    if (bridgeRow && stateFlag(fromId) === bridgeFlag) {
+      ui.cutscene = { ep: ui.epoch, from: fromId, flag: bridgeFlag, alias: bridgeRow.alias || "" };
+      pendingBridgeNote = pendingDropNote;
+      pendingDropNote = "";
+    }
+  } catch (e) { pendingDropNote = ""; pendingBridgeNote = ""; abortCutscene(); clearOutcomeFloats(); toast(e.message); }
   ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
   render();
+  if (ui.cutscene && ui.cutscene.from === fromId && ui.cutscene.flag === bridgeFlag) showCutsceneLayer();
   showToastLine(pendingDropNote);
 }
 function afterAction(a, prevBones) {
@@ -872,7 +882,7 @@ function renderCard() {
   $("card-art").hidden = !art;
   setText($("card-season"), SEASON[c.season]);
   setText($("card-speaker"), c.speaker);
-  const face = t02Face(c);
+  const face = teachFace(c);
   setText($("card-title"), (face && face.title) || c.title || "");
   setText($("card-text"), (face && face.text) || c.text);
   const engrave = st.phase === "engrave";
@@ -1520,13 +1530,15 @@ function renderDragHintOnly() {
   }
   const c = curCard();
   if (!c) { el.hidden = true; return; }
+  const face = teachFace(c);
   const opt = ui.dx < 0 ? c.left : c.right;
+  const faceLabel = face && (ui.dx < 0 ? face.left : face.right);
   const thr = threshold();
   const ratio = Math.min(1, Math.abs(ui.dx) / thr);
   const hot = Math.abs(ui.dx) >= thr;
   const lbl = $("card-drag-label");
   if (lbl) {
-    lbl.textContent = opt.label;
+    lbl.textContent = faceLabel || opt.label;
     lbl.classList.toggle("hot", hot);
   }
   const fill = $("card-drag-fill");
@@ -1634,6 +1646,9 @@ function choiceToast(dir) {
   return msg;
 }
 function dropNote(card, ch) {
+  const face = teachFace(card);
+  const faced = face && face.drop && face.drop[ch];
+  if (faced && typeof faced.note === "string" && faced.note.trim()) return faced.note.trim();
   const row = card && (card.drops || []).find((d) => d.char === ch);
   return row && typeof row.note === "string" ? row.note.trim() : "";
 }
@@ -1648,19 +1663,50 @@ function showToastLine(msg) {
 function showChoiceToast(dir) {
   showToastLine(choiceToast(dir));
 }
-// T01 选后：飞出落定立刻记旗并上对话卡。只点「继续」才收。T03–T05 本环不挂。
+// 教学桥：选后飞出落定（或刻/落字提交）立刻上同一张对话卡。只点「继续」才收。不是 toast，不自动跳。
+const BRIDGE_FLAG = {
+  T01: { left: "bone", right: "hardship" },
+  T02: { left: "store", right: "share" },
+  T03: { engrave: "carve", skip_engrave: "skip" },
+  T04: { left: "yield", right: "hold", drop: "river" },
+  T05: { left: "refuse", right: "half" },
+};
 function cutsceneOn() { return !!ui.cutscene; }
-function cutsceneRow(flag) {
-  const card = CARDS.find((c) => c.id === "T01");
-  return (card && card.cutscene && card.cutscene[flag]) || null;
+function flagForAction(cardId, action) {
+  const map = BRIDGE_FLAG[cardId];
+  if (!map || !action) return null;
+  if (action.type === "choose") return map[action.side] || null;
+  if (action.type === "engrave" || action.type === "skip_engrave") return map[action.type] || null;
+  return null;
 }
-function t02Face(c) {
-  if (!c || c.id !== "T02" || !c.faces || (st.t01 !== "bone" && st.t01 !== "hardship")) return null;
-  return c.faces[st.t01] || null;
+function stateFlag(cardId) {
+  if (cardId === "T01") return st.t01;
+  if (cardId === "T02") return st.t02;
+  if (cardId === "T03") return st.t03;
+  if (cardId === "T04") return st.t04;
+  if (cardId === "T05") return st.t05;
+  return null;
 }
-function t01FlyCut(dir) {
-  if (st.phase !== "card" || st.current !== "T01") return false;
-  return !!cutsceneRow(dir === "left" ? "bone" : "hardship");
+function cutsceneRow(cardId, flag) {
+  const card = CARDS.find((c) => c.id === cardId);
+  const row = card && card.cutscene && flag ? card.cutscene[flag] : null;
+  return row && row.body ? row : null;
+}
+function teachFace(c) {
+  if (!c || !c.faces) return null;
+  if (c.id === "T02") return (st.t01 === "bone" || st.t01 === "hardship") ? (c.faces[st.t01] || null) : null;
+  if (c.id === "T03") return (st.t02 === "store" || st.t02 === "share") ? (c.faces[st.t02] || null) : null;
+  if (c.id === "T04") return (st.t03 === "carve" || st.t03 === "skip") ? (c.faces[st.t03] || null) : null;
+  if (c.id === "T05") {
+    if (st.t04 === "hold") return c.faces.hold || null;
+    if (st.t04 === "yield" || st.t04 === "river") return c.faces.open || null;
+  }
+  return null;
+}
+function flyCut(dir) {
+  if (st.phase !== "card" || !st.current) return false;
+  const flag = flagForAction(st.current, { type: "choose", side: dir });
+  return !!cutsceneRow(st.current, flag);
 }
 function veilCard() {
   const c = cardEl();
@@ -1678,48 +1724,49 @@ function revealCard() {
 function abortCutscene() {
   ui.cutscene = null;
   const layer = $("cutscene");
-  if (layer) { layer.hidden = true; delete layer.dataset.flag; delete layer.dataset.alias; }
+  if (layer) { layer.hidden = true; delete layer.dataset.flag; delete layer.dataset.alias; delete layer.dataset.from; }
   delete document.body.dataset.cutscene;
 }
 function showCutsceneLayer() {
-  const row = cutsceneRow(st.t01);
+  const held = ui.cutscene;
+  const row = held && cutsceneRow(held.from, held.flag);
   if (!row) { abortCutscene(); revealCard(); return; }
-  ui.cutscene = { ep: ui.cutscene && ui.cutscene.ep, flag: st.t01, alias: row.alias || "" };
+  ui.cutscene = { ep: held.ep, from: held.from, flag: held.flag, alias: row.alias || "" };
   hideToast();
   setText($("cut-speaker"), row.speaker);
   setText($("cut-body"), row.body);
   setText($("cut-continue"), row.continue || "继续");
   const layer = $("cutscene");
-  layer.dataset.flag = st.t01;
+  layer.dataset.flag = held.flag;
   layer.dataset.alias = row.alias || "";
+  layer.dataset.from = held.from;
   layer.hidden = false;
-  document.body.dataset.cutscene = st.t01;
+  document.body.dataset.cutscene = held.flag;
   veilCard();
   requestAnimationFrame(() => { if (ui.cutscene) $("cut-continue")?.focus({ preventScroll: true }); });
 }
 function closeCutscene() {
   if (!ui.cutscene) return;
+  const note = pendingBridgeNote;
+  pendingBridgeNote = "";
   abortCutscene();
   revealCard();
   render();
+  if (note) showToastLine(note);
+  if (ui.keyQueue.length) armDrain();
 }
 function afterChoice(ep, act) {
   return () => {
     if (ui.epoch !== ep) return;
-    const gate = st.phase === "card" && st.current === "T01" && act && act.type === "choose" && (act.side === "left" || act.side === "right");
-    if (gate) { clearQueue(); ui.cutscene = { ep }; }
     dispatch(act);
-    if (!gate) return;
-    if (st.t01 === "bone" || st.t01 === "hardship") showCutsceneLayer();
-    else { abortCutscene(); revealCard(); }
   };
 }
 on($("cut-continue"), () => closeCutscene());
 function flyOut(targetX, done) {
   const dir = targetX < 0 ? "left" : "right";
-  const cut = t01FlyCut(dir);
+  const cut = flyCut(dir);
   primeFloats(dir);   // 飞出前把这一下的飘字钉在触发卡上
-  if (!cut) showChoiceToast(dir);   // T01 改走对话卡，不弹选项 toast
+  if (!cut) showChoiceToast(dir);   // 教学桥改走对话卡，不弹选项 toast
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   n1Ref = null;                   // 新一次飞出：上一次飞卡的 N1 参照点作废（键盘/拖拽启动的也没有参照点）
   cardSettling = true;
@@ -1930,6 +1977,7 @@ const drainStep = () => {
     step();
   });
   settle.then(() => whenCardEntryDone()).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (cutsceneOn()) { ui.drainArmed = false; return; }   // 对话卡只暂停队列，不丢掉；点「继续」后再放
     if (modalOpen()) { clearQueue(); ui.drainArmed = false; return; }
     if (st.phase !== "card" && st.phase !== "engrave") { clearQueue(); ui.drainArmed = false; return; }
     if (document.hidden) { ui.drainArmed = false; return; }
@@ -2337,7 +2385,7 @@ window.__zz = {
   get debugGoal() { return DEBUG_GOAL; },
   get settledAt() { return ui.settledAt; },
   get engraveHinted() { return !!ui.engraveHinted; },
-  get cutscene() { return ui.cutscene ? { flag: ui.cutscene.flag || null, alias: ui.cutscene.alias || "" } : null; },
+  get cutscene() { return ui.cutscene ? { from: ui.cutscene.from || null, flag: ui.cutscene.flag || null, alias: ui.cutscene.alias || "" } : null; },
   get ui() { return ui; },
   dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },

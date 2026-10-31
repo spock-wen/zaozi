@@ -57,6 +57,8 @@ async function runScenario(engine, variant) {
   const still = async () => {
     await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
     await page.waitForTimeout(400);
+    const cut = await page.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+    if (cut) await page.locator("#cut-continue").click();
   };
   const imp = async (c) => {
     await page.evaluate((code) => __zz.importCode(code), c);
@@ -189,6 +191,8 @@ async function runScenario(engine, variant) {
   // 断言：点卡后入队 (queued >= 1)
   const qAfter = await page.evaluate(() => __zz.queued);
   assert.ok(qAfter >= 1, `点卡后应入队 (queued >= 1)，实为 ${qAfter}`);
+  const held = await page.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+  if (held) await page.locator("#cut-continue").click();
 
   // 等待拦截提示显形
   await page.waitForFunction(() => {
@@ -238,6 +242,8 @@ async function runMidFlyoutReset(engine, mode) {
   const still = async () => {
     await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
     await page.waitForTimeout(400);
+    const cut = await page.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+    if (cut) await page.locator("#cut-continue").click();
   };
 
   await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
@@ -409,6 +415,8 @@ async function runMidReboundReset(engine) {
   const still = async () => {
     await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
     await page.waitForTimeout(400);
+    const cut = await page.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+    if (cut) await page.locator("#cut-continue").click();
   };
 
   await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });
@@ -511,6 +519,8 @@ async function runMidFlyoutRestore(engine) {
   const still = async () => {
     await page.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {});
     await page.waitForTimeout(400);
+    const cut = await page.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+    if (cut) await page.locator("#cut-continue").click();
   };
 
   await page.goto(`${server.origin}/?seed=${SEED}`, { waitUntil: "load" });

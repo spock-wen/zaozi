@@ -7,6 +7,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -277,6 +278,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           window.__zz.dispatch({ type: "choose", side: "right" });
         });
         await page.waitForFunction(() => window.__zz.st?.phase === "engrave", null, { timeout: 10000 });
+        await passCutscene(page);
 
         // Hint toast left over, exactly like the reported T03-after-engraving state.
         await page.evaluate(() => {

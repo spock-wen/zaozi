@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { ENGINES, SEED, ROOT, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { phase, current, commit } from "./helpers/flow.mjs";
+import { phase, current, commit, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -61,11 +61,13 @@ for (const engine of Object.keys(ENGINES)) {
 
       await page.locator("#bonecorner").click();  // 刻 → T04
       await page.waitForTimeout(350);
+      await passCutscene(page);
       assert.equal(await current(page), "T04");
       await assertNoUndefined(page, "T04");
 
       await page.locator("#wordbox .slot.ok").first().click();  // 落「水」→ T05
       await page.waitForTimeout(350);
+      await passCutscene(page);
       assert.equal(await current(page), "T05");
       await assertNoUndefined(page, "T05");
 

@@ -14,7 +14,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { clearTutorial, playToWinter, commit } from "./helpers/flow.mjs";
+import { clearTutorial, playToWinter, commit, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -377,6 +377,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         const r = await page.evaluate((n) => ({ phase: window.__zz.st.phase, types: window.__zz.actions.slice(n).map((a) => a.type) }), n0);
         assert.ok(!r.types.includes("engrave"), `飞出期间点「刻」不得刻字：${JSON.stringify(r)}`);
         if (r.phase === "engrave") reached = true;
+        await passCutscene(page);
       }
       assert.ok(reached, "应走到一次「飞出后进入刻字」并停在刻字界面");
       assert.deepEqual(errs, [], "页面不应有报错：" + errs.join(" | "));

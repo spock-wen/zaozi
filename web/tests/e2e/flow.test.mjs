@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { ENGINES, SEED, ROOT, buildDist, startServer, collectErrors, firePointerThenClick } from "./helpers/env.mjs";
-import { phase, current, commit, playToWinter, dragCard } from "./helpers/flow.mjs";
+import { phase, current, commit, playToWinter, dragCard, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -66,9 +66,11 @@ for (const [engine] of Object.entries(ENGINES)) {
 
         await page.locator("#bonecorner").click(); // 刻 → T04
         await page.waitForTimeout(300);
+        await passCutscene(page);
         assert.equal(await current(page), "T04");
         await page.locator("#wordbox .slot.ok").first().click(); // 落「水」→ T05
         await page.waitForTimeout(300);
+        await passCutscene(page);
         assert.equal(await current(page), "T05");
         // P1：落字达成 G_DROP1，屏幕上的横幅必须是 goals.json 的 banner（「达成　落一个字」），不是目标正文。
         await page.locator("#banner").waitFor({ state: "visible", timeout: 3000 });

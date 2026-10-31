@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { ENGINES, SEED, DIST, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { commit } from "./helpers/flow.mjs";
+import { commit, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -164,12 +164,14 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#bonecorner").click();
         await page.waitForFunction(() => window.__zz.st?.current === "T04");
         await page.waitForTimeout(200);
+        await passCutscene(page);
         await assertStepFit(page, "T04 drop");
 
         // 落水 → T05
         await page.locator("#wordbox .slot.ok").first().click();
         await page.waitForFunction(() => window.__zz.st?.current === "T05");
         await page.waitForTimeout(200);
+        await passCutscene(page);
         await assertStepFit(page, "T05");
 
         // T05 提交 → 进入普通卡
@@ -421,11 +423,13 @@ for (const [engine] of Object.entries(ENGINES)) {
         await page.locator("#bonecorner").click();
         await page.waitForFunction(() => window.__zz.st?.current === "T04");
         await page.waitForTimeout(200);
+        await passCutscene(page);
         await checkCardFit("T04 drop");
 
         await page.locator("#wordbox .slot.ok").first().click();
         await page.waitForFunction(() => window.__zz.st?.current === "T05");
         await page.waitForTimeout(200);
+        await passCutscene(page);
         await checkCardFit("T05");
 
         await commit(page, "left");

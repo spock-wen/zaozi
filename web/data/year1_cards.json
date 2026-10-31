@@ -8,8 +8,8 @@
       "left":  { "label": "接过骨刀", "delta": { "faith": 6 } },
       "right": { "label": "先问问往后的难处", "delta": { "memory": 6 } },
       "cutscene": {
-        "bone": { "speaker": "族长", "body": "骨刀在你手里了。往后记事，就靠你。", "continue": "继续", "alias": "path_blade" },
-        "hardship": { "speaker": "族长", "body": "往后粮会紧、外人会讨。记不住事，旧账就会翻回来。", "continue": "继续", "alias": "path_ask" }
+        "bone": { "speaker": "族长", "body": "刀刚到手，寨口就有脚步。妇人背回一筐野果，等你拿主意。", "continue": "继续", "alias": "path_blade" },
+        "hardship": { "speaker": "族长", "body": "难处先记着。寨口妇人背回野果——今冬紧不紧，就看这一筐。", "continue": "继续", "alias": "path_ask" }
       },
       "drops": [] },
     { "id": "T02", "season": "spring", "speaker": "采集的妇人", "tutorial": 2, "only_tutorial": true,
@@ -31,26 +31,87 @@
       },
       "left":  { "label": "先存着", "delta": { "food": 8, "faith": -4 } },
       "right": { "label": "分给他们", "delta": { "faith": 6, "food": -4 } },
+      "cutscene": {
+        "store": { "speaker": "族长", "body": "果先囤下了。夜里擦刀，你才看见骨上那道裂。", "continue": "继续" },
+        "share": { "speaker": "族长", "body": "果分完了。有人拿骨片来记，才摸到一道裂。", "continue": "继续" }
+      },
       "drops": [] },
     { "id": "T03", "season": "spring", "speaker": "巫", "tutorial": 3, "only_tutorial": true,
       "title": "骨上有一道裂",
       "text": "「这道迹，刻下来能留给后人。」",
       "lock_choice": true,
       "trace": { "target": "休", "tally_text": "晌午正热，赶路的背抵着一截老干，头顶叶子遮着太阳，一直待到天色转凉" },
+      "faces": {
+        "store": {
+          "title": "骨上有一道裂",
+          "text": "囤果时擦到刀身。「这道迹，刻下来，过冬也有底。」",
+          "left": "刻下这道迹",
+          "right": "先搁着"
+        },
+        "share": {
+          "title": "骨上有一道裂",
+          "text": "分完果，有人指着裂口。「刻下来，才像真记过。」",
+          "left": "刻下这道迹",
+          "right": "先不管它"
+        }
+      },
       "left":  { "label": "刻下这道迹", "delta": { "memory": 4 } },
       "right": { "label": "先不管它", "delta": { "faith": 4 } },
+      "cutscene": {
+        "carve": { "speaker": "族长", "body": "这道迹刻下了。没等干，两家又为河界吵起来。", "continue": "继续" },
+        "skip": { "speaker": "族长", "body": "裂先搁着。寨外传来喊声——河水漫过了界石。", "continue": "继续" }
+      },
       "drops": [] },
     { "id": "T04", "season": "summer", "speaker": "族长", "tutorial": 4, "only_tutorial": true,
       "title": "河水漫过了界石",
       "text": "两家为一条河争了三天。",
+      "faces": {
+        "carve": {
+          "title": "河水漫过了界石",
+          "text": "迹刚刻完，两家为一条河争了三天。",
+          "left": "各让一步",
+          "right": "守住这边",
+          "drop": { "水": { "label": "以河为界", "note": "借来一个「水」，落在这张卡上。" } }
+        },
+        "skip": {
+          "title": "河水漫过了界石",
+          "text": "裂还搁着，两家已为一条河争了三天。",
+          "left": "各让一步",
+          "right": "守住这边",
+          "drop": { "水": { "label": "以河为界", "note": "借来一个「水」，落在这张卡上。" } }
+        }
+      },
       "left":  { "label": "各让一步", "delta": { "outsider": 4, "food": -4 } },
       "right": { "label": "守住这边", "delta": { "outsider": -4, "food": 4 } },
+      "cutscene": {
+        "yield": { "speaker": "族长", "body": "各让一步，河界暂定。对方却得寸进尺，来要一半的粮。", "continue": "继续" },
+        "hold": { "speaker": "族长", "body": "这边守住了。对方改口，只要你们一半的粮。", "continue": "继续" },
+        "river": { "speaker": "族长", "body": "以河为界落了字。对方又派人来，要一半的粮。", "continue": "继续" }
+      },
       "drops": [ { "char": "水", "label": "以河为界", "delta": { "outsider": 4, "food": -4 }, "note": "借来一个「水」，落在这张卡上。" } ] },
     { "id": "T05", "season": "summer", "speaker": "外族来使", "tutorial": 5, "only_tutorial": true,
       "title": "他们要一半的粮",
       "text": "给了，今冬难熬；不给，怕要动刀。",
+      "faces": {
+        "open": {
+          "title": "他们要一半的粮",
+          "text": "河界松了口。给了，今冬难熬；不给，怕要动刀。",
+          "left": "不给",
+          "right": "给一半"
+        },
+        "hold": {
+          "title": "他们要一半的粮",
+          "text": "这边没让。给了，今冬难熬；不给，怕要动刀。",
+          "left": "不给",
+          "right": "给一半"
+        }
+      },
       "left":  { "label": "不给", "delta": { "food": 4, "outsider": -8 } },
       "right": { "label": "给一半", "delta": { "food": -6, "outsider": 6 } },
+      "cutscene": {
+        "refuse": { "speaker": "族长", "body": "粮留下了。这一季的事，先记到这儿。", "continue": "继续" },
+        "half": { "speaker": "族长", "body": "一半交出去了。这一季的事，先记到这儿。", "continue": "继续" }
+      },
       "drops": [] },
     { "id": "C01", "season": "spring", "speaker": "族长",
       "title": "春汛退了",

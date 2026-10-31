@@ -3,6 +3,15 @@ export const phase = (page) => page.evaluate(() => window.__zz.st.phase);
 export const current = (page) => page.evaluate(() => window.__zz.st.current);
 
 // T01 飞出后会停在对话卡。已经打开才点「继续」；没开就立刻返回，不把后面的按键拖进过场。
+// 飞出落定后对话卡才出现。先等到它打开，再点「继续」，让已经排进队列的下一手接着走。
+export async function releaseBridge(page) {
+  await page.waitForFunction(() => {
+    const el = document.getElementById("cutscene");
+    return !!el && !el.hidden;
+  }, null, { timeout: 4000 }).catch(() => {});
+  return passCutscene(page);
+}
+
 export async function passCutscene(page) {
   const open = await page.evaluate(() => {
     const el = document.getElementById("cutscene");
@@ -87,8 +96,10 @@ export async function clearTutorial(page) {
   await commit(page, "right");                // T02 → T03（engrave）
   await page.locator("#bonecorner").click();  // 刻 → T04
   await page.waitForTimeout(300);
+  await passCutscene(page);
   await page.locator("#wordbox .slot.ok").first().click();  // 落「水」→ T05
   await page.waitForTimeout(300);
+  await passCutscene(page);
   await commit(page, "left");                 // → 第一张普通卡
 }
 

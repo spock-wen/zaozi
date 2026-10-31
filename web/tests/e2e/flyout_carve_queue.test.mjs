@@ -185,6 +185,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       const queuedBefore = await page.evaluate(() => window.__zz.queued);
       assert.ok(queuedBefore >= 1, `window.__zz.queued right before input must be >= 1, got ${queuedBefore}`);
 
+      await passCutscene(page);
       // case K: page.keyboard.press("k")
       await page.keyboard.press("k");
 
@@ -268,6 +269,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       const queuedBefore = await page.evaluate(() => window.__zz.queued);
       assert.ok(queuedBefore >= 1, `window.__zz.queued right before input must be >= 1, got ${queuedBefore}`);
 
+      await passCutscene(page);
       // case tap: touch tap on the centre of #bonecorner
       await page.touchscreen.tap(bc.cx, bc.cy);
 

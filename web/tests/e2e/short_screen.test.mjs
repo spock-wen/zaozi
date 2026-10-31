@@ -4,7 +4,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { commit, toPickDesktop } from "./helpers/flow.mjs";
+import { commit, toPickDesktop, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -307,6 +307,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         await page.locator("#bonecorner").click();          // 刻 → T04
         await page.waitForTimeout(300);
+        await passCutscene(page);
         const t4 = await snap();
         assert.equal(t4.current, "T04");
         noOverlap(t4, "card", "卡本体");
@@ -318,6 +319,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         await page.keyboard.press("1");                     // 按 1 落字
         await page.waitForTimeout(300);
+        await passCutscene(page);
         assert.equal(await page.evaluate(() => window.__zz.st.current), "T05", "按 1 应落字进入 T05");
         assert.equal(await page.evaluate(() => window.__zz.st.phase), "card");
 

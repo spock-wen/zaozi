@@ -4,7 +4,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { passCutscene } from "./helpers/flow.mjs";
+import { passCutscene, releaseBridge } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -137,6 +137,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       // While entering / flying to T03, queue K and S
       // Once T03 is entered, st.phase is 'engrave', carveBusy() queues K and S
       await page.waitForFunction(() => window.__zz.st.phase === "engrave", null, { timeout: 3000 });
+      await releaseBridge(page);
       await page.keyboard.press("k");
       await page.keyboard.press("s");
 
@@ -148,7 +149,13 @@ for (const [engine] of Object.entries(ENGINES)) {
       const key1 = `T03|${n0 + 1}`;
       await page.waitForFunction((k) => window.__settles?.[k] != null, key1, { timeout: 8000 });
 
-      // Wait for second action (skip_engrave) to complete
+      // 第一张 T03 刻完会再挡一张对话卡，点继续后排队的 S 才落到第二张。
+      for (let i = 0; i < 40; i++) {
+        const done = await page.evaluate(() => window.__zz.actions.some((a) => a.type === "skip_engrave"));
+        if (done) break;
+        await passCutscene(page);
+        await page.waitForTimeout(200);
+      }
       await page.waitForFunction(
         () => window.__zz.actions.some((a) => a.type === "skip_engrave"),
         null,
@@ -203,6 +210,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       // Commit T02 to enter T03
       await press(page, ["ArrowRight", "ArrowRight"]);
       await page.waitForFunction(() => window.__zz.st.phase === "engrave", null, { timeout: 3000 });
+      await releaseBridge(page);
 
       // While T03 is entering, queue arrows only
       await page.keyboard.press("ArrowLeft");

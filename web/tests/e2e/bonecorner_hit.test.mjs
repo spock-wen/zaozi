@@ -89,6 +89,8 @@ for (const engine of Object.keys(ENGINES)) {
         await page.keyboard.press("ArrowRight");
         await page.keyboard.press("ArrowRight");    // T02 → T03（锁拖，一进来就是「刻」）
         await page.waitForFunction(() => {
+          const cut = document.getElementById("cutscene");
+          if (cut && !cut.hidden) document.getElementById("cut-continue")?.click();
           if (window.__zz.animating) return false;
           if (window.__zz.st.phase !== "engrave") return false;
           const card = document.querySelector("#card");
