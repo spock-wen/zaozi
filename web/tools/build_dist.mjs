@@ -69,6 +69,7 @@ app = app
   .replaceAll("BUILD_DIST = false;", "BUILD_DIST = true;")
   .replaceAll('GLYPH_BASE = "../";', 'GLYPH_BASE = "./";');
 writeFile(path.join(DIST, "app.js"), app);
+copyFile(path.join(ROOT, "web/ui_copy.js"), path.join(DIST, "ui_copy.js"));
 
 // ---- 7. credits.html：模板 + 由 csv 生成的表格行（__COUNT__/__ROWS__ 占位符）----
 const creditsTmpl = fs.readFileSync(path.join(ROOT, "tools/credits_template.html"), "utf8");

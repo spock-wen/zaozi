@@ -259,7 +259,7 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
 
 /* ---------- 菜单 ---------- */
 #menu-pop{
-  position:absolute;top:calc(44px + env(safe-area-inset-top) + 4px);right:16px;width:220px;z-index:60;
+  position:absolute;top:calc(44px + env(safe-area-inset-top) + 4px);right:16px;width:min(300px, calc(100vw - 24px));z-index:60;
   background:var(--paper-50);color:var(--ink);border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);
 }
 #menu-pop .grp{font-size:13px;color:var(--ink);padding:4px 12px;}
@@ -269,6 +269,27 @@ body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-wid
 }
 #menu-pop button:hover,#menu-pop a:hover{background:var(--paper-200);}
 #menu-pop .seed{font-size:13px;color:var(--ink);padding:4px 12px;word-break:break-all;}
+#menu-pop .lang-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  min-height:48px;padding:2px 4px 2px 12px;
+}
+#menu-pop .lang-lab{
+  font:700 15px/1.2 "Noto Sans CJK SC","Noto Sans SC","Source Han Sans SC",sans-serif;
+  color:var(--ink);flex:none;
+}
+#menu-pop .seg{
+  display:inline-flex;height:44px;min-height:44px;padding:3px;border-radius:12px;
+  background:var(--night-900);box-shadow:inset 0 0 0 1px var(--night-line);gap:2px;flex:none;
+}
+#menu-pop .seg button{
+  width:auto;min-width:72px;min-height:38px;height:38px;padding:0 12px;border-radius:10px;
+  background:var(--night-700);color:var(--on-night-2);
+  font:700 15px/1 "Noto Sans CJK SC","Noto Sans SC","Source Han Sans SC",sans-serif;
+  white-space:nowrap;flex:none;
+}
+#menu-pop .seg button.on{background:var(--zhu-600);color:#fff;}
+#menu-pop .seg button:hover{background:var(--night-700);}
+#menu-pop .seg button.on:hover{background:var(--zhu-600);}
 
 /* ---------- 侧栏 / 抽屉 ---------- */
 #sidebar{width:336px;flex:0 0 auto;background:var(--night-700);position:relative;overflow:auto;padding:12px;}

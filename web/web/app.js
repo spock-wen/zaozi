@@ -9,28 +9,28 @@ import {
 import CARD_ART from "../data/card_art.js";
 import INPUT from "../data/input_map.js";
 import { encodeSaveCode, decodeSaveCode, saveToStorage, loadFromStorage, SAVE_KEY } from "../src/savecode.js";
+import { LOCALE_KEY, readLocale, lookupCopy } from "./ui_copy.js";
 
 const BUILD_DIST = false;                 // 构建 dist 时置 true：注册 Service Worker
 const GLYPH_BASE = "../";                 // 字形包位置；构建 dist 时改成 "./"
 
-const DIMS = RULES.dims.keys, DIMNAME = RULES.dims.names, SEASON = RULES.year.season_names;
-// 环1 文案（COPY_TABLE · 2026-10-28）。只挂载，不改 B1 规则句、不改数值表。
-const DIM_GLOSS = {
-  food: "部落的存粮。见底会「饥年」，囤满了又可能「仓满招寇」。",
-  faith: "族人还信不信祭祀和巫。掉太低会「失祀」。",
-  memory: "部落还记不记得住事。记不住会「旧水重来」。",
-  outsider: "和外族处得和不和气。闹翻了会「兵祸」。",
-};
-const BONE_GLOSS = "空骨片用来把这件事刻成事签，也可以交给巫。";
-const SKIP_EMPTY = "这件事没刻下来。";
-const CARVE_OK = "刻成事签";
-// 环2 锁文（母计划 2026-10-29）。改字须先回母计划，这里不改口径。
-const PICK_LEAD = "带去落掉，冬夜就少一个部件。";
-const DROP_COST_BANNER = "达成　落一个字 · 这一代冬夜不能再当部件";
-const winterDroppedLine = (ch) => `${ch}：本代已落，不能当部件。`;
+const DIMS = RULES.dims.keys;
+// 系统/菜单中英：SYSTEM_MENU_COPY。缺英回落 zh；玩法数值表不动。
+let locale = readLocale();
+document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
+const t = (key, vars) => lookupCopy(locale, key, vars);
+const DIMNAME = (k) => t("ui.dims." + k);
+const SEASON = (k) => t("ui.top.season." + k);
+const DIM_GLOSS = (k) => t("ui.dims." + k + ".tip");
+const BONE_GLOSS = () => t("ui.bones.tip");
+const SKIP_EMPTY = () => t("ui.carve.skip_empty");
+const CARVE_OK = () => t("ui.carve.ok");
+const PICK_LEAD = () => t("ui.pick.lead");
+const DROP_COST_BANNER = () => t("ui.goals.drop_cost_banner");
+const winterDroppedLine = (ch) => t("ui.winter.dropped_line", { ch });
 const signedN = (n) => `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
-const METHOD = Object.fromEntries(Object.entries(RULES.winter_night.methods).map(([k, v]) => [k, v.name]));
-const POSNAME = { top: "上", middle: "中", bottom: "下" };
+const METHOD = (k) => t("ui.winter.method." + k);
+const POSNAME = (k) => t("ui.winter.pos." + k);
 const DRAG_RATIO = INPUT.card.drag.commit_threshold_ratio;   // 0.35
 const DWELL_MS = 250;   // 排队输入生效前，目标卡「落定并绘制」后还要多留的最短停留（round 5 A）
 const SIDEBAR_KEY = "zaozi.sidebar.open";
@@ -386,9 +386,9 @@ function openSheet(opener) {
   ui.sheetOpen = true; sheetOpener = opener || $("full");
   const c = curCard();
   const sub = $("sheet-sub") || $("sheet-meta");
-  if (sub && c) setText(sub, SEASON[c.season] + " · " + c.speaker);
-  setText($("sheetbody"), "卡上出现一道迹：" + st.pendingTrace.tally_text);
-  setText($("sheetmore"), keyboardMode() ? "下面还有，滚动看" : "下面还有，往上滑");
+  if (sub && c) setText(sub, SEASON(c.season) + " · " + c.speaker);
+  setText($("sheetbody"), t("ui.trace.prefix") + st.pendingTrace.tally_text);
+  setText($("sheetmore"), keyboardMode() ? t("ui.trace.more_keys") : t("ui.trace.more_touch"));
   const sh = $("sheet"), app = $("app");
   if (sh) sh.hidden = false;
   if (app) app.inert = true;
@@ -493,7 +493,7 @@ function dispatch(a) {
       ui.engraveHinted = false;  // REREVIEW P3 D5 / RULES §10.3b：换卡/换阶段复位刻字提示标志
       clearOutcomeFloats();      // 四维飘字钉在触发卡上：下一张进场前清掉，避免错归因
       if (a.type === "engrave") showOutcome(carveOutcome(prevDims, prevBones));
-      else if (a.type === "skip_engrave") showOutcome(SKIP_EMPTY);
+      else if (a.type === "skip_engrave") showOutcome(SKIP_EMPTY());
       else hideOutcome();
     }
     if (bridgeRow && stateFlag(fromId) === bridgeFlag) {
@@ -593,11 +593,11 @@ function carveOutcome(prevDims, prevBones) {
   const parts = [];
   for (const k of DIMS) {
     const d = st.dims[k] - prevDims[k];
-    if (d) parts.push(`${DIMNAME[k]}${signedN(d)}`);
+    if (d) parts.push(`${DIMNAME(k)}${signedN(d)}`);
   }
   const b = st.bones - prevBones;
   if (b) parts.push(`骨${signedN(b)}`);
-  return parts.length ? `${CARVE_OK} · ${parts}` : CARVE_OK;
+  return parts.length ? `${CARVE_OK()} · ${parts}` : CARVE_OK();
 }
 function showOutcome(msg) {
   const el = $("outcome");
@@ -672,20 +672,20 @@ function restore() {
       if (raw) localStorage.setItem(BACKUP_KEY, raw);
       localStorage.removeItem(SAVE_KEY);
     } catch { /* 隐私模式 */ }
-    toast("存档读不出来，已备份后重开");
+    toast(t("ui.toast.save_corrupt"));
     return false;
   }
   try {
     hideToast();
-    toast(`读回上次的进度：${st.log[st.log.length - 1] || "开局"}`);
+    toast(t("ui.toast.resume", { line: st.log[st.log.length - 1] || t("ui.toast.resume_start") }));
     render();
   } catch (e) {
     console.error("render failed on restore", e);
     try {
-      toast("渲染出错：" + e.message);
+      toast(t("ui.toast.render_fail", { msg: e.message }));
     } catch {
-      const t = $("toast");
-      if (t) { t.textContent = "渲染出错：" + e.message; t.classList.add("on"); }
+      const el = $("toast");
+      if (el) { el.textContent = lookupCopy(locale, "ui.toast.render_fail", { msg: e.message }); el.classList.add("on"); }
     }
   }
   return true;
@@ -714,25 +714,25 @@ function openDlg(title, msg, editable) {
 function closeDlg() { $("savedlg").hidden = true; }
 function exportCode() {
   $("dlgtext").value = encodeSaveCode(seed, actions);
-  openDlg("导出存档码", "把下面这串抄走（或点复制）。在新设备里粘贴导入，就从这里接着走。", true);
+  openDlg(t("ui.dlg.export.title"), t("ui.dlg.export.body"), true);
 }
 function importCode() {
   resetInputState();
   const code = $("dlgtext").value;
   let d;
-  try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
+  try { d = decodeSaveCode(code); } catch (e) { return openDlg(t("ui.dlg.import.title"), t("ui.dlg.import.bad", { msg: e.message }), false); }
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
     abortCutscene();
     clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
     resetOutcome();
     hideToast();   // 顺序同 newGame/restore：先清队列，再收 toast
-    toast(`导入成功：种子 ${seed}，${actions.length} 步`);
+    toast(t("ui.toast.import_ok", { seed, n: actions.length }));
     ui.winter = freshWinter(); ui.goalShown = 0; ui.bannerQueue = []; ui.elderShown = false;
     ui.lastDims = null; saveNow(); render();
     whenCardEntryDone().then(() => setCardSettled(true));
     closeDlg();
-  } catch (e) { openDlg("导入存档码", "这串码走不通：" + e.message, false); }
+  } catch (e) { openDlg(t("ui.dlg.import.title"), t("ui.dlg.import.fail", { msg: e.message }), false); }
 }
 
 // ---------- 渲染 ----------
@@ -762,7 +762,7 @@ function dimsHTML() {
   return DIMS.map((k, i) => {
     const v = st.dims[k];
     const danger = v <= 15 || v >= 85;
-    const gloss = DIM_GLOSS[k] || "";
+    const gloss = DIM_GLOSS(k) || "";
     let dots = "";
     const pip = i === pipAt ? `<i class="bone-pip" aria-hidden="true"></i>` : "";
     if (opt && opt.delta && typeof opt.delta[k] === "number") {
@@ -772,7 +772,7 @@ function dimsHTML() {
     else dots = `<div class="dots"></div>`;
     const fl = pinned ? ui.floats[k] : 0;
     const float = fl ? `<span class="float ${fl > 0 ? "up" : "down"}">${signedN(fl)}</span>` : "";
-    return `<div class="dim${danger ? " danger" : ""}" data-dim="${k}" title="${gloss}">${dots}${float}<div class="lbl"><span>${DIMNAME[k]}</span><span>${v}</span></div><div class="bar"><div class="fill" style="transform:scaleX(${(v / 100).toFixed(3)})"></div></div><span class="sr-only">${gloss}</span></div>`;
+    return `<div class="dim${danger ? " danger" : ""}" data-dim="${k}" title="${gloss}">${dots}${float}<div class="lbl"><span>${DIMNAME(k)}</span><span>${v}</span></div><div class="bar"><div class="fill" style="transform:scaleX(${(v / 100).toFixed(3)})"></div></div><span class="sr-only">${gloss}</span></div>`;
   }).join("");
 }
 function floatHTML() { return ""; }
@@ -792,7 +792,7 @@ function renderGoalSlip() {
   const show = st.phase !== "ended" && st.phase !== "pick" && gs.length > 0 && !desktopExpanded;
   slip.hidden = !show;
   if (!show) { dropHTML(slip); return; }
-  patchHTML(slip, `目标 ${gs.map((g) => `<i class="gdot${g.achieved ? " on" : ""}"></i>`).join("")}`);
+  patchHTML(slip, `${t("ui.goals.slip")} ${gs.map((g) => `<i class="gdot${g.achieved ? " on" : ""}"></i>`).join("")}`);
 }
 function renderGoalPanel() {
   const p = $("goals-panel");
@@ -843,7 +843,7 @@ function pumpBanner() {
   ui.bannerOn = true; sfx.goal();
   const b = $("banner");
   // G2：落字成功横幅用锁文整句。goals.json 的短 banner 不动（≤12 字、代末结算不改）。
-  b.textContent = (ev.id === "G_DROP1" || ev.banner === "达成　落一个字") ? DROP_COST_BANNER : (ev.banner ?? ev.text);
+  b.textContent = (ev.id === "G_DROP1" || ev.banner === "达成　落一个字") ? DROP_COST_BANNER() : (ev.banner ?? ev.text);
   b.hidden = false;
   placeBanner();
   setTimeout(() => { b.hidden = true; b.style.top = ""; ui.bannerOn = false; pumpBanner(); render(); }, 1800);
@@ -851,13 +851,18 @@ function pumpBanner() {
 function renderSprout() { /* 开春展开：每代第一张卡显示三件事，随后收起 */ }
 
 function renderTopbar() {
-  setText($("gennum"), st.generation ?? 1);
-  setText($("bonesnum"), st.bones);
+  const n = st.generation ?? 1;
+  patchHTML($("gen-line"), t("ui.top.gen", { n: `<span id="gennum">${n}</span>` }));
   const chip = $("bones-chip");
-  if (chip) { chip.hidden = false; if (chip.title !== BONE_GLOSS) chip.title = BONE_GLOSS; }
+  if (chip) {
+    chip.hidden = false;
+    const bg = BONE_GLOSS();
+    chip.title = bg;
+    patchHTML(chip, `${t("ui.top.bones")} <b id="bonesnum">${st.bones}</b><span class="sr-only">${bg}</span>`);
+  }
   syncBoneFloat();
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
-  setText($("season-chip"), card ? SEASON[card.season] : (st.phase === "pick" ? "春" : "—"));
+  setText($("season-chip"), card ? SEASON(card.season) : (st.phase === "pick" ? SEASON("spring") : "—"));
 }
 function renderCard() {
   const ol = $("opt-left"), or = $("opt-right");
@@ -880,7 +885,7 @@ function renderCard() {
   const art = artHTML(c);
   patchHTML($("card-art"), art);
   $("card-art").hidden = !art;
-  setText($("card-season"), SEASON[c.season]);
+  setText($("card-season"), SEASON(c.season));
   setText($("card-speaker"), c.speaker);
   const face = teachFace(c);
   setText($("card-title"), (face && face.title) || c.title || "");
@@ -893,14 +898,14 @@ function renderCard() {
   const drops = $("card-drops");
   if (st.phase === "engrave") {
     drops.hidden = false;
-    patchHTML(drops, `<span class="tr tr-text" id="card-trace">卡上出现一道迹：${st.pendingTrace.tally_text}</span><button class="act skip" id="full" data-do="trace-full" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false" hidden>看全文</button><button class="act skip" id="skip" data-do="skip">先不刻</button>`);
+    patchHTML(drops, `<span class="tr tr-text" id="card-trace">${t("ui.trace.prefix")}${st.pendingTrace.tally_text}</span><button class="act skip" id="full" data-do="trace-full" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false" hidden>${t("ui.trace.full")}</button><button class="act skip" id="skip" data-do="skip">${t("ui.carve.skip")}</button>`);
     fitTrace();
     requestAnimationFrame(fitTrace);
   } else if (c.drops && c.drops.length) {
     // G3：这一代已经落下的字，后面的卡不再留「可落字：X」。
     const d = c.drops.filter((x) => st.wordBox.includes(x.char) && !st.dropped.includes(x.char))[0];
     drops.hidden = !d;
-    if (d) patchHTML(drops, `可落字：<b>${d.char}</b> <span class="chiplink">点字匣里的它</span>`);
+    if (d) patchHTML(drops, `${t("ui.wordbox.drop_hint")}<b>${d.char}</b> <span class="chiplink">${t("ui.wordbox.tap_chip")}</span>`);
     else dropHTML(drops);
   } else { drops.hidden = true; dropHTML(drops); }
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
@@ -912,8 +917,8 @@ function renderCard() {
     const rightLabel = (face && face.right) || c.right.label;
     setText(ol, "← " + leftLabel);
     setText(or, rightLabel + " →");
-    ol.setAttribute("aria-label", "选左：" + leftLabel);
-    or.setAttribute("aria-label", "选右：" + rightLabel);
+    ol.setAttribute("aria-label", t("ui.opt.left_aria", { label: leftLabel }));
+    or.setAttribute("aria-label", t("ui.opt.right_aria", { label: rightLabel }));
   }
   const isCard = st.phase === "card";
   ol.disabled = or.disabled = !isCard;
@@ -931,11 +936,12 @@ function renderCard() {
   let ghText = "";
   if (!deskKeys) {
     if (st.phase === "engrave") {
-      ghText = keyboardMode() ? "K 刻字 · S 先不刻 · 卡已定住" : "卡已定住 · 点「刻」或「先不刻」";
+      // 触控刻态句未单锁：缺英回落中文（MISSING_EN）
+      ghText = keyboardMode() ? t("ui.keys.gesture_engrave") : "卡已定住 · 点「刻」或「先不刻」";
     } else {
       ghText = keyboardMode()
-        ? "←/→ 预览 · 再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量"
-        : "左右拖卡做选择 · 长按看分量";
+        ? t("ui.keys.gesture_choose")
+        : t("ui.keys.gesture_touch");
     }
   }
   const gh = $("gesture-hint");
@@ -1021,23 +1027,23 @@ function renderWordbox() {
     // 「已落」由 .used 的删除线 + 灰化表达，读屏用 aria-label 补全（A/B/手机档格子自适应宽，
     // 那边也曾因这句文字溢出格子——LEFTOVERS D3/H5「不出容器」）。
     const label = `${i + 1}·${ch}`;
-    const usedAttr = used ? ` aria-label="${label}，已落"` : "";
+    const usedAttr = used ? ` aria-label="${t("ui.wordbox.dropped_aria", { label })}"` : "";
     return `<button class="slot ${ok ? "ok" : ""} ${used ? "used" : ""}" data-slot="${i}" ${st.phase !== "card" ? "disabled" : ""}${usedAttr}>${gimg(ch)}<span>${label}</span></button>`;
   }).join(""));
 }
 function sideHTML() {
   const zl = st.zilu.map((c) => `<span class="zl ${st.newThisGen.includes(c) ? "new" : ""}">${gimg(c)}${c}${(st.clues[c] || []).map((x) => `<small>${x}</small>`).join("")}</span>`).join("");
-  const tallies = st.tallies.length ? st.tallies.map((t) => `<div class="tally">${t.id}：${t.text}</div>`).join("") : "<div>手里没有事签。</div>";
+  const tallies = st.tallies.length ? st.tallies.map((x) => `<div class="tally">${x.id}：${x.text}</div>`).join("") : `<div>${t("ui.side.empty_tallies")}</div>`;
   const goals = document.body.dataset.view === "desktop"
-    ? `<div class="side-sec"><h3>目标</h3>${goalsState().map((g) => `<div class="goal${g.achieved ? " on" : ""}">${g.achieved ? "◆" : "◇"} ${g.text}</div>`).join("")}</div>` : "";
-  return `<div class="side-sec"><h3>字录</h3><div class="zilu">${zl}</div></div>
-    <div class="side-sec"><h3>空骨片 ${st.bones}</h3>${tallies}</div>
-    <div class="side-sec"><h3>日志</h3><ol id="log">${st.log.slice(-40).reverse().map((l) => `<li>${l}</li>`).join("")}</ol></div>${goals}`;
+    ? `<div class="side-sec"><h3>${t("ui.goals.heading")}</h3>${goalsState().map((g) => `<div class="goal${g.achieved ? " on" : ""}">${g.achieved ? "◆" : "◇"} ${g.text}</div>`).join("")}</div>` : "";
+  return `<div class="side-sec"><h3>${t("ui.side.zilu")}</h3><div class="zilu">${zl}</div></div>
+    <div class="side-sec"><h3>${t("ui.top.bones")} ${st.bones}</h3>${tallies}</div>
+    <div class="side-sec"><h3>${t("ui.side.log")}</h3><ol id="log">${st.log.slice(-40).reverse().map((l) => `<li>${l}</li>`).join("")}</ol></div>${goals}`;
 }
 function renderSide() {
   const html = sideHTML();
   patchHTML($("sidebar-body"), html);
-  patchHTML($("drawer-body"), `<h3 style="color:#8a6a2a">字录 / 骨片 / 日志</h3>` + html);
+  patchHTML($("drawer-body"), `<h3 style="color:#8a6a2a">${t("ui.side.drawer_title")}</h3>` + html);
 }
 
 // 生成结果没变就别重设 innerHTML：重设会把整块节点换掉，若恰落在「按下」与「抬起」之间，
@@ -1061,24 +1067,24 @@ function renderWinter() {
   if (st.phase !== "winter") { dropHTML(el); return; }
   const w = ui.winter;
   if (w.tally && !st.tallies.some((t) => t.id === w.tally)) ui.winter = freshWinter();
-  const t = st.tallies.find((x) => x.id === ui.winter.tally);
-  let h = `<h2>冬夜</h2><p>点一张事签，按造法刻。</p>`;
-  h += st.tallies.length ? st.tallies.map((x) => `<div class="tally ${x.id === ui.winter.tally ? "sel" : ""}" data-tally="${x.id}">${x.id}：${x.text}</div>`).join("") : "<p>手里没有事签了。</p>";
-  if (t) {
-    const def = CHARS[t.target], P = winterTray();
-    h += `<h3>${METHOD[def.method]}</h3>`;
+  const wt = st.tallies.find((x) => x.id === ui.winter.tally);
+  let h = `<h2>${t("ui.winter.title")}</h2><p>${t("ui.winter.lead")}</p>`;
+  h += st.tallies.length ? st.tallies.map((x) => `<div class="tally ${x.id === ui.winter.tally ? "sel" : ""}" data-tally="${x.id}">${x.id}：${x.text}</div>`).join("") : `<p>${t("ui.winter.empty")}</p>`;
+  if (wt) {
+    const def = CHARS[wt.target], P = winterTray();
+    h += `<h3>${METHOD(def.method)}</h3>`;
     if (def.method === "huiyi") {
-      h += `<div>选两个部件（可重复）：已选 ${ui.winter.comps.join(" + ") || "—"}</div>` + P.map((c) => winterPartButton(c, "comp")).join("") + `<button class="act" data-do="clear">清空</button>`;
+      h += `<div>${t("ui.winter.pick2", { sel: ui.winter.comps.join(" + ") || "—" })}</div>` + P.map((c) => winterPartButton(c, "comp")).join("") + `<button class="act" data-do="clear">${t("ui.winter.clear")}</button>`;
     } else if (def.method === "zhishi") {
-      h += `<div>底字：</div>` + P.map((c) => winterPartButton(c, "base", ui.winter.base === c)).join("") +
-        `<div>位置：</div>` + RULES.winter_night.methods.zhishi.positions.map((p) => `<button class="comp ${ui.winter.pos === p ? "sel" : ""}" data-pos="${p}">${POSNAME[p]}</button>`).join("");
+      h += `<div>${t("ui.winter.base_label")}</div>` + P.map((c) => winterPartButton(c, "base", ui.winter.base === c)).join("") +
+        `<div>${t("ui.winter.pos_label")}</div>` + RULES.winter_night.methods.zhishi.positions.map((p) => `<button class="comp ${ui.winter.pos === p ? "sel" : ""}" data-pos="${p}">${POSNAME(p)}</button>`).join("");
     } else {
-      h += `<div>依次点三个亮点：${ui.winter.points.join(" → ") || "—"} <button class="act" data-do="clear">重描</button></div><canvas id="xcv" width="260" height="260"></canvas>`;
+      h += `<div>${t("ui.winter.points_line", { path: ui.winter.points.join(" → ") || "—" })} <button class="act" data-do="clear">${t("ui.winter.redraw")}</button></div><canvas id="xcv" width="260" height="260"></canvas>`;
     }
-    h += `<div><button class="act" data-do="carve">刻（Enter）</button><button class="act" data-do="defer">留到明年</button></div>`;
+    h += `<div><button class="act" data-do="carve">${t("ui.winter.carve")}</button><button class="act" data-do="defer">${t("ui.winter.defer")}</button></div>`;
   }
-  h += `<hr><button class="act" data-do="end" id="winter-end">天亮了</button>`;
-  if (patchHTML(el, h) && t && CHARS[t.target].method === "xiangxing") drawTrace(t.target);
+  h += `<hr><button class="act" data-do="end" id="winter-end">${t("ui.winter.end")}</button>`;
+  if (patchHTML(el, h) && wt && CHARS[wt.target].method === "xiangxing") drawTrace(wt.target);
 }
 function drawTrace(target) {
   const el = $("xcv"); if (!el) return;
@@ -1102,17 +1108,17 @@ function winterTray() { return st.zilu.filter((c) => !st.newThisGen.includes(c))
 function winterPartButton(c, attr, sel) {
   const dropped = st.dropped.includes(c);
   const aria = dropped ? ` aria-disabled="true" aria-label="${winterDroppedLine(c)}"` : "";
-  return `<button type="button" class="comp${dropped ? " used" : ""}${sel ? " sel" : ""}" data-${attr}="${c}"${aria}>${gimg(c)}${c}${dropped ? `<i class="dropped-tag">已落</i>` : ""}</button>`;
+  return `<button type="button" class="comp${dropped ? " used" : ""}${sel ? " sel" : ""}" data-${attr}="${c}"${aria}>${gimg(c)}${c}${dropped ? `<i class="dropped-tag">${t("ui.wordbox.dropped_tag")}</i>` : ""}</button>`;
 }
 function winterCarve() {
-  const t = st.tallies.find((x) => x.id === ui.winter.tally); if (!t) return toast("先点一张事签");
-  const m = CHARS[t.target].method; let answer;
-  if (m === "huiyi") { if (ui.winter.comps.length !== 2) return toast("要两个部件"); answer = { method: m, components: ui.winter.comps.slice() }; }
-  else if (m === "zhishi") { if (!ui.winter.base || !ui.winter.pos) return toast("要底字和位置"); answer = { method: m, base: ui.winter.base, position: ui.winter.pos }; }
-  else { if (ui.winter.points.length !== 3) return toast("要依次点三个亮点"); answer = { method: m, points: ui.winter.points.slice() }; }
+  const wt = st.tallies.find((x) => x.id === ui.winter.tally); if (!wt) return toast(t("ui.winter.need_tally"));
+  const m = CHARS[wt.target].method; let answer;
+  if (m === "huiyi") { if (ui.winter.comps.length !== 2) return toast(t("ui.winter.need_2")); answer = { method: m, components: ui.winter.comps.slice() }; }
+  else if (m === "zhishi") { if (!ui.winter.base || !ui.winter.pos) return toast(t("ui.winter.need_base")); answer = { method: m, base: ui.winter.base, position: ui.winter.pos }; }
+  else { if (ui.winter.points.length !== 3) return toast(t("ui.winter.need_3")); answer = { method: m, points: ui.winter.points.slice() }; }
   const before = st.zilu.length;
-  dispatch({ type: "winter_carve", tally: t.id, answer });
-  if (before === st.zilu.length) { toast("刻错了，骨片裂"); sfx.down(); } else { toast(`刻成「${t.target}」`); sfx.evolve(); }
+  dispatch({ type: "winter_carve", tally: wt.id, answer });
+  if (before === st.zilu.length) { toast(t("ui.winter.wrong")); sfx.down(); } else { toast(t("ui.winter.ok", { ch: wt.target })); sfx.evolve(); }
   ui.winter = freshWinter(); render();
 }
 
@@ -1121,7 +1127,7 @@ function winterCarve() {
 // 触屏的合成 click 又按坐标命中「补进同一格的新字」，把放回做两次（P1-1）。两处都从根上避免。
 function buildPickSkeleton(el) {
   el.innerHTML =
-    `<div class="pick-legacy"><b>传下字录：</b><span class="chars"></span></div>` +
+    `<div class="pick-legacy"><b class="pick-legacy-lab"></b><span class="chars"></span></div>` +
     `<h2></h2>` +
     `<p class="pick-lead"></p>` +
     `<p class="season-note"></p>` +
@@ -1165,21 +1171,22 @@ function renderPick() {
   const picks = st.picks || [];
   const full = picks.length >= RULES.word_box.slots;
   // 挑字页标题显示即将开始的代：此刻 st.generation 还是刚结束的那一代（begin_generation 之后才 +1），与交棒按钮（n+1）保持一致。
-  setText(el.querySelector("h2"), `出发挑字 · 第 ${(st.generation ?? 1) + 1} 代`);
+  setText(el.querySelector("h2"), t("ui.pick.title", { n: (st.generation ?? 1) + 1 }));
+  setText(el.querySelector(".pick-legacy-lab"), t("ui.pick.legacy"));
   setText(el.querySelector(".pick-legacy .chars"), handedChars());
-  setText(el.querySelector(".pick-lead"), PICK_LEAD);
+  setText(el.querySelector(".pick-lead"), PICK_LEAD());
   // gf5：手机用点选引导（点一下看说明、再点一次带上），电脑用键位提示。
   setText(el.querySelector(".season-note"), document.body.dataset.view === "desktop"
-    ? "点字，或用 ← → 移动、Space 选 · Backspace 放回最后一个 · Enter 出发"
-    : "点一个字看它能做什么；再点一次带上。");
+    ? t("ui.pick.note_desk")
+    : t("ui.pick.note_touch"));
   patchKeyed(el.querySelector(".pickslots"), [0, 1, 2], (i) => i,
     () => document.createElement("button"),
     (node, i) => {
       const ch = picks[i];
       node.className = "pickslot";
       node.dataset.slot = String(i);
-      if (ch) { node.dataset.char = ch; node.title = "放回"; patchHTML(node, `${gimg(ch)}<span>${i + 1}·${ch}</span>`); }
-      else { delete node.dataset.char; node.removeAttribute("title"); patchHTML(node, "空"); }
+      if (ch) { node.dataset.char = ch; node.title = t("ui.pick.return_title"); patchHTML(node, `${gimg(ch)}<span>${i + 1}·${ch}</span>`); }
+      else { delete node.dataset.char; node.removeAttribute("title"); patchHTML(node, t("ui.pick.empty_slot")); }
     });
   patchKeyed(el.querySelector(".pool"), PICK_CHARS, (p) => p.char,
     () => document.createElement("button"),
@@ -1189,11 +1196,11 @@ function renderPick() {
       const priorDrop = (st.dropped || []).includes(p.char);
       node.className = "cand" + (isSel ? " sel" : "") + (full && !isSel ? " dim" : "") + (p.char === ui.pickFocus ? " focus" : "");
       node.dataset.char = p.char; node.dataset.i = String(PICK_CHARS.indexOf(p));
-      patchHTML(node, `${fresh ? `<span class="badge-new">新</span>` : ""}${priorDrop ? `<span class="badge-dropped">上代已落</span>` : ""}${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}`);
+      patchHTML(node, `${fresh ? `<span class="badge-new">${t("ui.pick.badge_new")}</span>` : ""}${priorDrop ? `<span class="badge-dropped">${t("ui.pick.badge_prior")}</span>` : ""}${gimg(p.char)}<span>${p.char}</span><span class="mng">${p.meaning}</span>${isSel ? `<span class="badge">${sel + 1}</span>` : ""}`);
     });
   const go = el.querySelector(".go");
   go.disabled = !full;
-  setText(go, full ? "带这三个字出发" : "还差字");
+  setText(go, full ? t("ui.pick.go") : t("ui.pick.need"));
   go.classList.toggle("ready", full);
   updatePickInfo();
 }
@@ -1221,8 +1228,8 @@ function pickInfoHTML(ch) {
   const parts = charParts(ch);
   const drops = dropLabels(ch);
   const rows = [
-    drops.length ? `<div class="pi-row"><b>落</b><span>能落：${drops.join("、")}</span></div>` : "",
-    parts.length ? `<div class="pi-row part"><b>部件</b><span>能拼出：${parts.join("、")}</span></div>` : "",
+    drops.length ? `<div class="pi-row"><b>${t("ui.pick.row_drop")}</b><span>${t("ui.pick.row_drop_body", { list: drops.join("、") })}</span></div>` : "",
+    parts.length ? `<div class="pi-row part"><b>${t("ui.pick.row_part")}</b><span>${t("ui.pick.row_part_body", { list: parts.join("、") })}</span></div>` : "",
   ].join("");
   return `<div class="pickinfo"><div class="pi-h">${ch}${p.meaning ? ` <span>${p.meaning}</span>` : ""}</div>${rows}</div>`;
 }
@@ -1243,7 +1250,7 @@ function pickClick(ch) {
 function pickToggle(ch) {
   const picks = (st.picks || []).slice();
   if (picks.includes(ch)) { dispatch({ type: "pick_toggle", char: ch }); sfx.unpick(); }
-  else if (picks.length >= RULES.word_box.slots) { toast("先放回一个"); shakeSlots(); }
+  else if (picks.length >= RULES.word_box.slots) { toast(t("ui.pick.put_back")); shakeSlots(); }
   else { dispatch({ type: "pick_toggle", char: ch }); sfx.pick(); }
 }
 function shakeSlots() { const s = $("pick")?.querySelector(".pickslots"); if (!s) return; s.animate?.([{ transform: "translateX(0)" }, { transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "translateX(0)" }], { duration: 240 }); }
@@ -1253,9 +1260,9 @@ function renderElder() {
   el.hidden = !(st.phase === "ended" && ui.elderShown);
   if (el.hidden) { dropHTML(el); return; }
   const n = st.generation ?? 1;
-  patchHTML(el, `<div class="card-e"><h1>${TUTORIAL.elder.header.replace("{n}", String(n))}</h1>
-    <p><b>${TUTORIAL.elder.title}</b></p><p>${TUTORIAL.elder.body}</p>
-    <div class="btnrow"><button class="act primary" data-do="heir">${TUTORIAL.elder.button_next.replace("{n}", String(n + 1))}</button></div></div>`);
+  patchHTML(el, `<div class="card-e"><h1>${t("ui.elder.header", { n })}</h1>
+    <p><b>${t("ui.elder.title")}</b></p><p>${t("ui.elder.body")}</p>
+    <div class="btnrow"><button class="act primary" data-do="heir">${t("ui.elder.button", { n: n + 1 })}</button></div></div>`);
 }
 function renderEnded() {
   const el = $("endseq");
@@ -1264,10 +1271,10 @@ function renderEnded() {
   el.hidden = !show;
   if (!show) { dropHTML(el); return; }
   const e = st.ending, L = st.legacy;
-  patchHTML(el, `<div class="card-e"><h1>${e.name}</h1><p>${e.kind === "good" ? "这一代平安走完。" : "这一代没撑住。"}</p>
-    <p>${DIMS.map((k) => `${DIMNAME[k]} ${st.dims[k]}`).join(" · ")} · 骨片 ${st.bones}</p>
-    <p>传下字录：${handedChars()} · 传下事签：${L?.carriedTally ? L.carriedTally.id : "无"}</p>
-    <div class="btnrow"><button class="act primary" data-do="elder">先人</button></div></div>`);
+  patchHTML(el, `<div class="card-e"><h1>${e.name}</h1><p>${e.kind === "good" ? t("ui.end.good_line") : t("ui.end.fail_line")}</p>
+    <p>${DIMS.map((k) => `${DIMNAME(k)} ${st.dims[k]}`).join(" · ")} · ${t("ui.top.bones")} ${st.bones}</p>
+    <p>${t("ui.end.legacy", { chars: handedChars(), tally: L?.carriedTally ? L.carriedTally.id : t("ui.end.no_tally") })}</p>
+    <div class="btnrow"><button class="act primary" data-do="elder">${t("ui.end.to_elder")}</button></div></div>`);
   if (pending) deferInteract(el, 400);
 }
 
@@ -1279,26 +1286,26 @@ function renderKeys() {
   if (!keyboardMode() || tier === "B") { setText(el, ""); return; }
   const engrave = st.phase === "engrave";
   if (engrave) {
-    setText(el, "K 刻字 · S 先不刻 · 卡已定住");
+    setText(el, t("ui.keys.engrave"));
   } else if (tier === "A") {
-    setText(el, "←→选 1–3落字 Space分量");
+    setText(el, t("ui.keys.short"));
   } else {
-    setText(el, "← → 预览，再按同向或 Enter 提交 · 1–3 落字 · 按住 Space 看分量 · Esc 关浮层");
+    setText(el, t("ui.keys.full"));
   }
 }
 // 矮屏 B 顶栏「?」浮层：列出全部键位。首次进入某存档自动弹一次（3 秒后收起）。
 function keyhelpHTML() {
   const rows = st.phase === "engrave" ? [
-    ["K", "刻字（或点卡角骨片）"],
-    ["S", "先不刻"],
-    ["Esc", "关浮层"],
+    ["K", t("ui.keys.help.K")],
+    ["S", t("ui.keys.help.S")],
+    ["Esc", t("ui.keys.help.Esc")],
   ] : [
-    ["← →", "选字；再按同向或 Enter 提交"],
-    ["1–3", "落字"],
-    ["Space", "按住看分量"],
-    ["Esc", "关浮层"],
+    ["← →", t("ui.keys.help.arrows")],
+    ["1–3", t("ui.keys.help.123")],
+    ["Space", t("ui.keys.help.space")],
+    ["Esc", t("ui.keys.help.Esc")],
   ];
-  return rows.map(([k, t]) => `<div class="kh-row"><b>${k}</b><span>${t}</span></div>`).join("");
+  return rows.map(([k, lab]) => `<div class="kh-row"><b>${k}</b><span>${lab}</span></div>`).join("");
 }
 // 卡入场动画是否在跑：JS 飞出/回弹的 rAF 阶段（ui.animating），或随后 160ms 的 CSS 回位过渡。
 // 键位浮层在这期间必须隐去——它右上贴边，卡从右侧滑回时会正好从它下面经过（压住卡角「刻」）。
@@ -1495,7 +1502,7 @@ function beginDrag(x, pointerId) {
 const queuedPress = (id) => ui.keyQueue.find((it) => it.kind === "press" && it.id === id);
 function onDown(e) {
   if (ui.sheetOpen) return;
-  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角那道迹，才能刻"); return; }  // B11
+  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || t("ui.carve.lock_fallback")); return; }  // B11
   if (st.phase !== "card" || inputBusy()) return;
   // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
   // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
@@ -1735,7 +1742,7 @@ function showCutsceneLayer() {
   hideToast();
   setText($("cut-speaker"), row.speaker);
   setText($("cut-body"), row.body);
-  setText($("cut-continue"), row.continue || "继续");
+  setText($("cut-continue"), row.continue || t("ui.cut.continue"));
   const layer = $("cutscene");
   layer.dataset.flag = held.flag;
   layer.dataset.alias = row.alias || "";
@@ -1945,7 +1952,7 @@ function handleKey(e) {
     const a = INPUT.card.keys[e.code]; if (a && !e.repeat) { e.preventDefault(); dispatch(a); }
   } else if (st.phase === "engrave") {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
-      toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角那道迹，才能刻");
+      toast(tutorialStepOf(st.current)?.lock_hint || t("ui.carve.lock_fallback"));
     } else if (e.code === INPUT.engrave.key) {
       clearToast();
       ui.engraved = true;
@@ -2000,7 +2007,7 @@ const drainStep = () => {
         ui.drainArmed = false;
         if (dropped && !ui.engraveHinted) {
           ui.engraveHinted = true;
-          toast(tutorialStepOf(st.current)?.lock_hint || "先点卡角那道迹，才能刻");
+          toast(tutorialStepOf(st.current)?.lock_hint || t("ui.carve.lock_fallback"));
         }
         return;
       }
@@ -2095,26 +2102,70 @@ function commitSide(dir) {
 
 // ---------- 事件绑定 ----------
 on($("keyhelp-btn"), () => { ui.keyhelpOpen = !ui.keyhelpOpen; renderShort(); });
+function paintStaticChrome() {
+  document.title = t("ui.doc.title");
+  const pairs = [
+    ["menubtn", "ui.top.menu_aria"],
+    ["keyhelp-btn", "ui.top.keyhelp_aria"],
+    ["goals-slip", "ui.top.goals_aria"],
+    ["bonecorner", "ui.carve.aria"],
+    ["sidebar-tab", "ui.side.zilu_aria"],
+  ];
+  for (const [id, key] of pairs) {
+    const el = $(id); if (el) el.setAttribute("aria-label", t(key));
+  }
+  setText($("sidebar-tab"), t("ui.side.zilu"));
+  setText($("too-short"), t("ui.layout.too_short"));
+  setText($("rotate-hint"), t("ui.layout.rotate"));
+  setText($("dlgcopy"), t("ui.dlg.copy"));
+  setText($("dlgapply"), t("ui.dlg.apply"));
+  setText($("dlgclose"), t("ui.dlg.close"));
+  if ($("savedlg").hidden) setText($("dlgtitle"), t("ui.dlg.title_default"));
+  setText($("sheet-title"), t("ui.trace.sheet_title"));
+  setText($("fold"), t("ui.trace.close"));
+  setText($("skip2"), t("ui.carve.skip"));
+  const bc = $("bonecorner"); if (bc) { const badge = bc.querySelector(".bone-badge"); setText(bc, t("ui.carve.btn")); if (badge) bc.appendChild(badge); }
+}
+function applyLocale(next) {
+  locale = next === "en" ? "en" : "zh";
+  try { localStorage.setItem(LOCALE_KEY, locale); } catch { /* 隐私模式 */ }
+  document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
+  paintStaticChrome();
+  if (ui.menuOpen) renderMenu();
+  render();
+}
 on($("menubtn"), () => { ui.menuOpen = !ui.menuOpen; renderMenu(); });
 function renderMenu() {
   const m = $("menu-pop"); m.hidden = !ui.menuOpen; $("menubtn").setAttribute("aria-expanded", String(ui.menuOpen));
   if (!ui.menuOpen) { dropHTML(m); return; }
+  const seg = (id, label) =>
+    `<button type="button" data-locale="${id}" class="${locale === id ? "on" : ""}" aria-pressed="${locale === id}">${label}</button>`;
   patchHTML(m,
-    `<div class="grp">存档</div>` +
-    `<button data-menu="export">导出存档码</button>` +
-    `<button data-menu="import">导入存档码</button>` +
-    `<div class="grp">设置</div>` +
-    `<button data-menu="mute">${muted() ? "打开音效" : "静音"}</button>` +
-    `<div class="grp">别的</div>` +
-    `<a href="credits.html">字源与版权</a>` +
-    `<button data-menu="new">重新开局</button>` +
-    `<div class="seed">种子 ${seed}</div>`);
+    `<div class="grp">${t("ui.menu.group.save")}</div>` +
+    `<button data-menu="export">${t("ui.menu.export")}</button>` +
+    `<button data-menu="import">${t("ui.menu.import")}</button>` +
+    `<div class="grp">${t("ui.menu.group.settings")}</div>` +
+    `<div class="lang-row">` +
+      `<span class="lang-lab">${t("ui.lang.label")}</span>` +
+      `<div class="seg" role="group" aria-label="${t("ui.lang.label")}">${seg("zh", t("ui.lang.zh"))}${seg("en", t("ui.lang.en"))}</div>` +
+    `</div>` +
+    `<button data-menu="mute">${muted() ? t("ui.menu.unmute") : t("ui.menu.mute")}</button>` +
+    `<div class="grp">${t("ui.menu.group.other")}</div>` +
+    `<a href="credits.html">${t("ui.menu.credits")}</a>` +
+    `<button data-menu="new">${t("ui.menu.new")}</button>` +
+    `<div class="seed">${t("ui.menu.seed", { n: seed })}</div>`);
 }
 on($("menu-pop"), (e) => {
+  const locBtn = e.target.closest("[data-locale]");
+  if (locBtn) {
+    e.stopPropagation(); // 重绘菜单会摘掉按钮；冒泡到 document 会被当成点在外面
+    applyLocale(locBtn.dataset.locale);
+    return;
+  }
   const b = e.target.closest("[data-menu]"); if (!b) return;
   const k = b.dataset.menu;
   if (k === "export") exportCode();
-  else if (k === "import") openDlg("导入存档码", "把存档码粘贴在下面，点导入。", true);
+  else if (k === "import") openDlg(t("ui.dlg.import.title"), t("ui.dlg.import.body"), true);
   else if (k === "mute") { localStorage.setItem(MUTE_KEY, muted() ? "0" : "1"); renderMenu(); }
   else if (k === "new") newGame(seed);
   ui.menuOpen = false; renderMenu();
@@ -2346,18 +2397,18 @@ on($("elder"), (e) => {
   ui.elderShown = false; ui.winter = freshWinter();
   dispatch({ type: "heir" });
 });
-on($("dlgcopy"), async () => { const t = $("dlgtext"); try { await navigator.clipboard.writeText(t.value); toast("已复制"); } catch { t.focus(); t.select(); toast("复制不了，请手动选中复制"); } });
+on($("dlgcopy"), async () => { const box = $("dlgtext"); try { await navigator.clipboard.writeText(box.value); toast(t("ui.toast.copied")); } catch { box.focus(); box.select(); toast(t("ui.toast.copy_fail")); } });
 on($("dlgapply"), importCode);
 on($("dlgclose"), closeDlg);
 function onDimGloss(e) {
   const dim = e.target.closest?.("[data-dim]");
   if (!dim || !e.currentTarget.contains(dim)) return;
-  const g = DIM_GLOSS[dim.dataset.dim];
+  const g = DIM_GLOSS(dim.dataset.dim);
   if (g) toast(g);
 }
 $("dims").addEventListener("click", onDimGloss);
 $("dims-desktop").addEventListener("click", onDimGloss);
-$("bones-chip").addEventListener("click", () => toast(BONE_GLOSS));
+$("bones-chip").addEventListener("click", () => toast(BONE_GLOSS()));
 $("savedlg").addEventListener("click", (e) => { if (e.target === $("savedlg")) closeDlg(); });
 const closeMenuOutside = (e) => {                 // 点外面关菜单
   if (ui.menuOpen && !e.target.closest("#menu-pop") && !e.target.closest("#menubtn")) { ui.menuOpen = false; renderMenu(); }
@@ -2392,10 +2443,13 @@ window.__zz = {
   setMuted(v) { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); renderMenu(); },
   isMuted: () => muted(),
   openMenu: () => { ui.menuOpen = true; renderMenu(); },
+  get locale() { return locale; },
+  setLocale(v) { applyLocale(v); },
 };
 
 // ---------- 启动 ----------
 if (!DEBUG_GOAL) restore();          // 调试图标（debug_goal）时不读旧存档，保证这一局就是目标被塞进去的局
+paintStaticChrome();
 computeLayout();
 render();
 whenCardEntryDone().then(() => setCardSettled(true));
