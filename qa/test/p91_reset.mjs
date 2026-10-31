@@ -26,7 +26,9 @@ for (const path of ["重新开局", "导入", "读档"]) for (let k = 0; k <= re
   const cardBox = () => p.evaluate(() => { const c = document.getElementById("card"); const r = c.getBoundingClientRect(); return { l: Math.round(r.left), w: Math.round(r.width), tf: c.style.transform || "", op: c.style.opacity || "" }; });
   await p.goto(`${BASE}/?seed=20261016`, { waitUntil: "load" }); await p.evaluate(() => localStorage.clear()); await p.goto(`${BASE}/?seed=20261016`, { waitUntil: "load" }); await p.waitForFunction(() => !!window.__zz); await p.waitForTimeout(900);
   const version = await p.evaluate(async () => { try { const t = await (await fetch("sw.js", { cache: "no-store" })).text(); return (t.match(/VERSION = "([^"]+)"/) || [])[1]; } catch { return null; } });
-  const codes = {}; for (let i = 0; i < 3; i++) { await still(); const z = await p.evaluate(() => ({ cur: __zz.st.current, c: __zz.code() })); codes[z.cur] = z.c; if (z.cur === "T03") break; const L = await ctr("#opt-left"); await clk(L[0], L[1]); }
+  const codes = {}; for (let i = 0; i < 3; i++) { await p.waitForFunction(() => !__zz.animating, null, { timeout: 4000 }).catch(() => {}); const z = await p.evaluate(() => ({ cur: __zz.st.current, c: __zz.code() })); codes[z.cur] = z.c; if (z.cur === "T03") break;
+    const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }); if (cut) await p.locator("#cut-continue").click();
+    const L = await ctr("#opt-left"); await clk(L[0], L[1]); }
   let pre = null, afterReset = null; const ev = [];
   if (variant === "清队后") {
     await imp(codes.T03); const CC = await ctr("#card"); await clk(CC[0], CC[1] + 30); await p.waitForTimeout(150); ev.push(await shot("T03拦截提示"));

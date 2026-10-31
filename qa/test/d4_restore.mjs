@@ -13,7 +13,9 @@ const state = (p) => p.evaluate(() => window.__zz ? { cur: __zz.st.current, ph: 
 const shot = async (p, n) => { const f = `shots/${cfg}_${n}.png`; await p.screenshot({ path: `${OUT}/${f}`, fullPage: true }).catch(() => {}); return f; };
 let p = await ctx.newPage(); const errs1 = []; p.on("pageerror", (e) => errs1.push(e.message.slice(0, 160)));
 await p.goto(`${BASE}/?seed=20261016`, { waitUntil: "load" }); await p.evaluate(() => localStorage.clear()); await p.goto(`${BASE}/?seed=20261016`, { waitUntil: "load" }); await p.waitForFunction(() => !!window.__zz); await p.waitForTimeout(900);
-for (let i = 0; i < 2; i++) { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0)); await p.waitForTimeout(400); const c = await p.evaluate(() => { const r = document.getElementById("opt-left").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }); touch ? await p.touchscreen.tap(c[0], c[1]) : await p.mouse.click(c[0], c[1]); }
+for (let i = 0; i < 2; i++) { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0)); await p.waitForTimeout(400);
+  const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }); if (cut) await p.locator("#cut-continue").click();
+  const c = await p.evaluate(() => { const r = document.getElementById("opt-left").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }); touch ? await p.touchscreen.tap(c[0], c[1]) : await p.mouse.click(c[0], c[1]); }
 await p.waitForTimeout(1200); const before = await ls(p); const stBefore = await state(p); const f1 = await shot(p, "1_前");
 await p.addInitScript(() => { const orig = Document.prototype.getElementById; let hit = 0; window.__d4 = { thrown: 0 };
   Document.prototype.getElementById = function (id) { if (id === "dims" && !hit) { hit = 1; window.__d4.thrown = 1; throw new Error("D4 注入的渲染异常"); } return orig.call(this, id); }; });

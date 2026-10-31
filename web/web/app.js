@@ -69,6 +69,7 @@ const ui = {
   engraveHinted: false,               // 刻字阶段锁定提示是否已弹出：每进一次刻字阶段最多一次。在进入刻字阶段（换卡或换阶段）及 newGame/restore/importCode 时复位为 false（REREVIEW P3 D5 / RULES §10.3b）
   keyhelpOpen: false,                 // 矮屏 B：顶栏「?」键位浮层
   sheetOpen: false,                   // 「看全文」模态浮层
+  cutscene: null,                     // T01 飞出落定后的对话卡。非空时下一张还不可选
 };
 function freshWinter() { return { tally: null, comps: [], base: null, pos: null, points: [] }; }
 
@@ -645,6 +646,7 @@ function resetCardMotion() {
   capturedPointers.clear();
 }
 function restore() {
+  abortCutscene();
   clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
   resetOutcome();
   resetInputState();
@@ -679,6 +681,7 @@ function restore() {
   return true;
 }
 function newGame(s) {
+  abortCutscene();
   clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
   resetOutcome();
   resetInputState();
@@ -710,6 +713,7 @@ function importCode() {
   try { d = decodeSaveCode(code); } catch (e) { return openDlg("导入存档码", "导不进来：" + e.message, false); }
   try {
     st = run({ seed: d.seed }, d.actions); seed = d.seed; actions = d.actions.slice();
+    abortCutscene();
     clearQueue(); ui.epoch++; ui.settleKey = null; ui.settledAt = 0; ui.engraveHinted = false; resetCardMotion();
     resetOutcome();
     hideToast();   // 顺序同 newGame/restore：先清队列，再收 toast
@@ -868,8 +872,9 @@ function renderCard() {
   $("card-art").hidden = !art;
   setText($("card-season"), SEASON[c.season]);
   setText($("card-speaker"), c.speaker);
-  setText($("card-title"), c.title || "");
-  setText($("card-text"), c.text);
+  const face = t02Face(c);
+  setText($("card-title"), (face && face.title) || c.title || "");
+  setText($("card-text"), (face && face.text) || c.text);
   const engrave = st.phase === "engrave";
   card.classList.toggle("engrave", engrave);
   if (!engrave) ui.engraved = false;    // 离开「刻」就复位本张卡的已刻标记，别把 done 带到下一张「刻」卡
@@ -893,10 +898,12 @@ function renderCard() {
   const showOpts = true;
   ol.hidden = !showOpts; or.hidden = !showOpts;
   if (showOpts) {
-    setText(ol, "← " + c.left.label);
-    setText(or, c.right.label + " →");
-    ol.setAttribute("aria-label", "选左：" + c.left.label);
-    or.setAttribute("aria-label", "选右：" + c.right.label);
+    const leftLabel = (face && face.left) || c.left.label;
+    const rightLabel = (face && face.right) || c.right.label;
+    setText(ol, "← " + leftLabel);
+    setText(or, rightLabel + " →");
+    ol.setAttribute("aria-label", "选左：" + leftLabel);
+    or.setAttribute("aria-label", "选右：" + rightLabel);
   }
   const isCard = st.phase === "card";
   ol.disabled = or.disabled = !isCard;
@@ -1454,6 +1461,7 @@ function render() {
   if (st.phase === "engrave") fitTrace();
   if (ui.sheetOpen) relayoutSheet();
   reflowToast();
+  if (ui.cutscene) veilCard();
 }
 
 // ---------- 拖卡 / 键盘 ----------
@@ -1584,19 +1592,13 @@ function onUp(e) {
         }
         ui.animating = false;
         sfx.commit();
-        flyOut(target, () => {
-          if (ui.epoch !== ep) return;
-          dispatch(act);
-        });
+        flyOut(target, afterChoice(ep, act));
       };
       ui.resumeHeldCommit = fire;
       ui.heldCommitT = setTimeout(fire, ui.commitNotBefore - performance.now());
     } else {
       sfx.commit();
-      flyOut(target, () => {
-        if (ui.epoch !== ep) return;
-        dispatch(act);
-      });
+      flyOut(target, afterChoice(ep, act));
     }
   } else {
     if (wasHold) sfx.rebound();
@@ -1646,10 +1648,78 @@ function showToastLine(msg) {
 function showChoiceToast(dir) {
   showToastLine(choiceToast(dir));
 }
+// T01 选后：飞出落定立刻记旗并上对话卡。只点「继续」才收。T03–T05 本环不挂。
+function cutsceneOn() { return !!ui.cutscene; }
+function cutsceneRow(flag) {
+  const card = CARDS.find((c) => c.id === "T01");
+  return (card && card.cutscene && card.cutscene[flag]) || null;
+}
+function t02Face(c) {
+  if (!c || c.id !== "T02" || !c.faces || (st.t01 !== "bone" && st.t01 !== "hardship")) return null;
+  return c.faces[st.t01] || null;
+}
+function t01FlyCut(dir) {
+  if (st.phase !== "card" || st.current !== "T01") return false;
+  return !!cutsceneRow(dir === "left" ? "bone" : "hardship");
+}
+function veilCard() {
+  const c = cardEl();
+  if (c) c.style.opacity = "0";
+}
+function revealCard() {
+  const c = cardEl();
+  if (!c) return;
+  c.style.transition = "none";
+  c.style.transform = "";
+  c.style.opacity = "";
+  void c.offsetWidth;
+  c.style.transition = "";
+}
+function abortCutscene() {
+  ui.cutscene = null;
+  const layer = $("cutscene");
+  if (layer) { layer.hidden = true; delete layer.dataset.flag; delete layer.dataset.alias; }
+  delete document.body.dataset.cutscene;
+}
+function showCutsceneLayer() {
+  const row = cutsceneRow(st.t01);
+  if (!row) { abortCutscene(); revealCard(); return; }
+  ui.cutscene = { ep: ui.cutscene && ui.cutscene.ep, flag: st.t01, alias: row.alias || "" };
+  hideToast();
+  setText($("cut-speaker"), row.speaker);
+  setText($("cut-body"), row.body);
+  setText($("cut-continue"), row.continue || "继续");
+  const layer = $("cutscene");
+  layer.dataset.flag = st.t01;
+  layer.dataset.alias = row.alias || "";
+  layer.hidden = false;
+  document.body.dataset.cutscene = st.t01;
+  veilCard();
+  requestAnimationFrame(() => { if (ui.cutscene) $("cut-continue")?.focus({ preventScroll: true }); });
+}
+function closeCutscene() {
+  if (!ui.cutscene) return;
+  abortCutscene();
+  revealCard();
+  render();
+}
+function afterChoice(ep, act) {
+  return () => {
+    if (ui.epoch !== ep) return;
+    const gate = st.phase === "card" && st.current === "T01" && act && act.type === "choose" && (act.side === "left" || act.side === "right");
+    if (gate) { clearQueue(); ui.cutscene = { ep }; }
+    dispatch(act);
+    if (!gate) return;
+    if (st.t01 === "bone" || st.t01 === "hardship") showCutsceneLayer();
+    else { abortCutscene(); revealCard(); }
+  };
+}
+on($("cut-continue"), () => closeCutscene());
 function flyOut(targetX, done) {
   const dir = targetX < 0 ? "left" : "right";
+  const cut = t01FlyCut(dir);
   primeFloats(dir);   // 飞出前把这一下的飘字钉在触发卡上
-  showChoiceToast(dir);
+  if (!cut) showChoiceToast(dir);   // T01 改走对话卡，不弹选项 toast
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
   n1Ref = null;                   // 新一次飞出：上一次飞卡的 N1 参照点作废（键盘/拖拽启动的也没有参照点）
   cardSettling = true;
@@ -1661,7 +1731,8 @@ function flyOut(targetX, done) {
     cardEl().style.opacity = "0";
     cardSettling = true;
     setTimeout(() => {
-      cardEl().style.opacity = "";
+      if (cut) cardEl().style.opacity = "0";
+      else cardEl().style.opacity = "";
       ui.animating = false;
       if (ui.epoch === ep) done();
       cardSettling = false;
@@ -1681,7 +1752,9 @@ function flyOut(targetX, done) {
     else {
       ui.animating = false;
       ui.dx = 0;
-      cardEl().style.transform = ""; cardEl().style.opacity = "";
+      cardEl().style.transform = "";
+      if (cut) cardEl().style.opacity = "0";
+      else cardEl().style.opacity = "";
       cardSettling = true;
       if (ui.epoch === ep) done();
       requestAnimationFrame(() => {
@@ -1699,6 +1772,7 @@ function flyOut(targetX, done) {
 // 按下目标统一判定 #cardwrap：卡片区内（含卡边距但非按钮）无论空闲现场起拖或忙时排队按下均一致接受，
 // 避免命中边缘在空闲与飞出重放时表现不一致。
 addEventListener("pointerdown", (e) => {
+  if (cutsceneOn()) return;
   if (e.target.closest("button")) return;
   const isPrimary = e.isPrimary || !e.isTrusted;
   if (inputBusy()) {
@@ -1715,7 +1789,7 @@ addEventListener("pointerup", onUp);
 addEventListener("pointercancel", onUp);
 
 // 模态浮层：存档框 / ☰ 菜单 / 目标面板 / 移动抽屉 / 「看全文」（键位浮层不是模态）。
-function modalOpen() { return !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden || ui.sheetOpen; }
+function modalOpen() { return cutsceneOn() || !$("savedlg").hidden || ui.menuOpen || ui.panelOpen || !$("drawer").hidden || ui.sheetOpen; }
 // 关掉「最上面」的浮层：存档框最后开、最先关；否则关菜单/目标面板/抽屉/「看全文」。只关浮层，不动输入队列。
 function closeOverlay() {
   if (ui.sheetOpen) { closeSheet(); return; }
@@ -1724,6 +1798,13 @@ function closeOverlay() {
   renderMenu(); render();                              // render() 内含 renderGoalPanel()，目标面板随之收起
 }
 addEventListener("keydown", (e) => {
+  // 对话卡只认「继续」。Esc 和其他键都不关、也不选下一张。
+  if (cutsceneOn()) {
+    if (e.key === "Tab") return;
+    if (e.target?.closest?.("#cut-continue") && (e.key === "Enter" || e.key === " ")) return;
+    e.preventDefault();
+    return;
+  }
   // 浮层打开时键盘属于它：Esc 只关浮层；出卡阶段其它键（方向/落字/Enter…）既不排队也不处理，
   if (modalOpen()) {
     if (ui.sheetOpen) {
@@ -1832,6 +1913,7 @@ function handleKey(e) {
 // 每项都要等当前卡落定（whenCardEntryDone）后再过两帧 rAF，保证卡先画出来、输入才生效；
 // 换到冬夜/挑字或弹出存档框/菜单时整队作废（U2/R08：进入刻字阶段不作废队列，按序逐个执行，不可执行的项才丢弃）。
 function enqueueInput(item) {
+  if (cutsceneOn()) return;
   ui.keyQueue.push(item);
   armDrain();
 }
@@ -1957,11 +2039,10 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 function commitSide(dir) {
+  if (cutsceneOn()) return;
   const ep = ui.epoch;
-  flyOut((dir === "left" ? -1 : 1) * 620, () => {
-    if (ui.epoch !== ep) return;
-    dispatch(dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action);
-  });
+  const act = dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action;
+  flyOut((dir === "left" ? -1 : 1) * 620, afterChoice(ep, act));
 }
 
 // ---------- 事件绑定 ----------
@@ -2014,10 +2095,12 @@ on($("wb-handle"), () => { $("drawer").hidden = false; renderSide(); });
 on($("drawer-mask"), () => { $("drawer").hidden = true; });
 // 落字：点字匣格子与重放排队项共用这一条路（重放时按当前卡重新取格子，沿用 disabled 判定）。
 function dropSlot(slot) {
+  if (cutsceneOn()) return;
   const b = document.querySelector(`#wordbox [data-slot="${slot}"]`);
   if (b && !b.disabled) dispatch({ type: "choose", side: "drop", slot });
 }
 on($("wordbox"), (e) => {
+  if (cutsceneOn()) return;
   const b = e.target.closest("[data-slot]"); if (!b || b.disabled) return;
   if (inputBusy()) enqueueInput({ kind: "drop", slot: Number(b.dataset.slot) });
   else dropSlot(Number(b.dataset.slot));
@@ -2063,10 +2146,12 @@ function bindOpt(id, side) {
   const el = $(id);
   if (!el) return;
   el.addEventListener("pointerdown", (e) => {
+    if (cutsceneOn()) return;
     if (e.button !== 0 && e.pointerType === "mouse") return;
     optPress = { side, id: e.pointerId, x: e.clientX, y: e.clientY };
   });
   el.addEventListener("pointerup", (e) => {
+    if (cutsceneOn()) { optPress = null; return; }
     if (!optPress || optPress.side !== side || optPress.id !== e.pointerId) return;
     const press = optPress;
     optPress = null;
@@ -2095,6 +2180,7 @@ function bindOpt(id, side) {
     if (optPress && optPress.id === e.pointerId) optPress = null;
   });
   on(el, (e) => {
+    if (cutsceneOn()) return;
     const now = performance.now();
     if (lastOptPointerCommit.side === side && (now - lastOptPointerCommit.at) < 700) {
       lastOptPointerCommit = { side: null, at: 0 };
@@ -2251,6 +2337,7 @@ window.__zz = {
   get debugGoal() { return DEBUG_GOAL; },
   get settledAt() { return ui.settledAt; },
   get engraveHinted() { return !!ui.engraveHinted; },
+  get cutscene() { return ui.cutscene ? { flag: ui.cutscene.flag || null, alias: ui.cutscene.alias || "" } : null; },
   get ui() { return ui; },
   dispatch, newGame, restore, render, clearToast, toast, code: () => encodeSaveCode(seed, actions),
   importCode(c) { $("dlgtext").value = c; return importCode(); },

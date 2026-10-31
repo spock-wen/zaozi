@@ -2,6 +2,21 @@
 export const phase = (page) => page.evaluate(() => window.__zz.st.phase);
 export const current = (page) => page.evaluate(() => window.__zz.st.current);
 
+// T01 飞出后会停在对话卡。已经打开才点「继续」；没开就立刻返回，不把后面的按键拖进过场。
+export async function passCutscene(page) {
+  const open = await page.evaluate(() => {
+    const el = document.getElementById("cutscene");
+    return !!el && !el.hidden;
+  }).catch(() => false);
+  if (!open) return false;
+  await page.locator("#cut-continue").click();
+  await page.waitForFunction(() => {
+    const el = document.getElementById("cutscene");
+    return !el || el.hidden;
+  }, null, { timeout: 3000 });
+  return true;
+}
+
 export async function commit(page, dir) {
   const k = dir === "left" ? "ArrowLeft" : "ArrowRight";
   // 先等上一张的飞出动画结束再按（动画中按键会被提交后的状态重置吞掉），再留原有的结算/重绘时间。
@@ -9,6 +24,7 @@ export async function commit(page, dir) {
   await page.keyboard.press(k);
   await page.keyboard.press(k);
   await page.waitForTimeout(520);
+  await passCutscene(page);
 }
 
 export async function playToWinter(page) {

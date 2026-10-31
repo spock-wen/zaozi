@@ -18,7 +18,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { commit, clearTutorial, playToWinter } from "./helpers/flow.mjs";
+import { commit, clearTutorial, playToWinter, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -49,6 +49,7 @@ async function settle(page) {
 // 按下 →（触发一次 render）→ 抬起：render 恰好落在 down 与 up 之间（Escape 会调用 render()）。
 async function pressWithRenderBetween(page, sel) {
   await settle(page);
+  await passCutscene(page);
   const box = await page.locator(sel).first().boundingBox();
   if (!box) throw new Error(`找不到 ${sel}`);
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
@@ -61,6 +62,7 @@ async function pressWithRenderBetween(page, sel) {
 // 任务给出的确定性复现：按下 → 直接强制 window.__zz.render() → 抬起。
 async function pressBetween(page, sel) {
   await settle(page);
+  await passCutscene(page);
   const box = await page.locator(sel).first().boundingBox();
   if (!box) throw new Error(`找不到 ${sel}`);
   const x = box.x + box.width / 2, y = box.y + box.height / 2;

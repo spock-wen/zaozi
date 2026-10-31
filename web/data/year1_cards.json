@@ -5,14 +5,32 @@
     { "id": "T01", "season": "spring", "speaker": "族长", "tutorial": 1, "only_tutorial": true,
       "title": "开春了",
       "text": "族长把骨刀交到你手里：「往后记事，就靠你了。」",
-      "left":  { "label": "接过骨刀", "delta": { "faith": 6 }, "toast": "骨刀在你手里了。族人信你记事。" },
-      "right": { "label": "先问问往后的难处", "delta": { "memory": 6 }, "toast": "往后粮会紧、外人会讨。记不住事，旧账就会翻回来。" },
+      "left":  { "label": "接过骨刀", "delta": { "faith": 6 } },
+      "right": { "label": "先问问往后的难处", "delta": { "memory": 6 } },
+      "cutscene": {
+        "bone": { "speaker": "族长", "body": "骨刀在你手里了。往后记事，就靠你。", "continue": "继续", "alias": "path_blade" },
+        "hardship": { "speaker": "族长", "body": "往后粮会紧、外人会讨。记不住事，旧账就会翻回来。", "continue": "继续", "alias": "path_ask" }
+      },
       "drops": [] },
     { "id": "T02", "season": "spring", "speaker": "采集的妇人", "tutorial": 2, "only_tutorial": true,
       "title": "她背回一筐野果",
-      "text": "「分给大家，还是先存起来？」",
-      "left":  { "label": "先存起来", "delta": { "food": 8, "faith": -4 } },
-      "right": { "label": "分给大家", "delta": { "faith": 6, "food": -4 } },
+      "text": "族人看着你手里的刀。「分给他们，还是先存着？」",
+      "faces": {
+        "bone": {
+          "title": "她背回一筐野果",
+          "text": "族人看着你手里的刀。「分给他们，还是先存着？」",
+          "left": "先存着",
+          "right": "分给他们"
+        },
+        "hardship": {
+          "title": "她背回一筐野果",
+          "text": "「粮会紧。这筐果先囤过冬，还是分掉？」",
+          "left": "先囤过冬",
+          "right": "分给大家"
+        }
+      },
+      "left":  { "label": "先存着", "delta": { "food": 8, "faith": -4 } },
+      "right": { "label": "分给他们", "delta": { "faith": 6, "food": -4 } },
       "drops": [] },
     { "id": "T03", "season": "spring", "speaker": "巫", "tutorial": 3, "only_tutorial": true,
       "title": "骨上有一道裂",

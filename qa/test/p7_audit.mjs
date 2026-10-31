@@ -21,7 +21,9 @@ let seq = 0; const shot = async (n) => { const f = `shots/${cfg}/${String(++seq)
 const center = (s) => p.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return r.width > 0 ? [r.left + r.width / 2, r.top + r.height / 2] : null; }, s);
 const tapXY = async (x, y) => { if (touch) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
 const tap = async (s) => { const c = await center(s); if (!c) throw new Error(s + " 无盒"); await tapXY(c[0], c[1]); };
-const still = async (ms = 400) => { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0) && !document.getElementById("card").getAnimations().some((a) => a.playState === "running"), null, { timeout: 9000, polling: 30 }).catch(() => {}); await p.waitForTimeout(ms); };
+const still = async (ms = 400) => { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0) && !document.getElementById("card").getAnimations().some((a) => a.playState === "running"), null, { timeout: 9000, polling: 30 }).catch(() => {}); await p.waitForTimeout(ms);
+  const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+  if (cut) { await p.locator("#cut-continue").click(); await p.waitForFunction(() => document.getElementById("cutscene").hidden, null, { timeout: 2000 }).catch(() => {}); } };
 const imp = async (c) => { await p.evaluate((c) => __zz.importCode(c), c); await p.waitForTimeout(300); await still(500); await mon(); };
 const Z = () => p.evaluate(() => ({ cur: __zz.st.current, ph: __zz.st.phase, n: __zz.actions.length, q: __zz.queued, anim: __zz.animating, toast: document.getElementById("toast").classList.contains("on") ? document.getElementById("toast").textContent.trim() : "", live: document.getElementById("toast-live")?.textContent ?? null }));
 // 页内监视：rAF 帧（是否在动画）、actions.push 时刻、toast 显示事件

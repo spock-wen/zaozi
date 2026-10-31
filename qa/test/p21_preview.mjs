@@ -24,7 +24,9 @@ for (const path of ["重新开局", "导入", "读档"]) for (let k = 0; k < rep
     const clk = async (x, y) => { if (touch) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
     const ctr = (s) => p.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, s);
     const clkSel = async (s) => { const c = await ctr(s); if (c) await clk(c[0], c[1]); return !!c; };
-    const still = async () => { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {}); await p.waitForTimeout(400); };
+    const still = async () => { await p.waitForFunction(() => !__zz.animating && !(__zz.queued > 0), null, { timeout: 9000, polling: 30 }).catch(() => {}); await p.waitForTimeout(400);
+      const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; }).catch(() => false);
+      if (cut) { await p.locator("#cut-continue").click(); await p.waitForFunction(() => document.getElementById("cutscene").hidden, null, { timeout: 2000 }).catch(() => {}); } };
     const snap = () => p.evaluate(() => ({ cur: __zz.st.current, ph: __zz.st.phase, n: __zz.actions.length, anim: __zz.animating, L: document.getElementById("opt-left").classList.contains("on"), R: document.getElementById("opt-right").classList.contains("on") }));
     await p.goto(`${BASE}/?seed=20261016`, { waitUntil: "load" }); await p.evaluate(() => localStorage.clear()); await p.goto(`${BASE}/?seed=20261016`, { waitUntil: "load" }); await p.waitForFunction(() => !!window.__zz); await p.waitForTimeout(900);
     const version = await p.evaluate(async () => { try { const t = await (await fetch("sw.js", { cache: "no-store" })).text(); return (t.match(/VERSION = "([^"]+)"/) || [])[1]; } catch { return null; } });

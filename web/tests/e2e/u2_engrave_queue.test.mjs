@@ -4,6 +4,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -112,6 +113,7 @@ async function settle(page) {
 async function gotoT02(page) {
   await press(page, ["ArrowLeft", "ArrowLeft"]);
   await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 5000 });
+  await passCutscene(page);
   await settle(page);
 }
 
