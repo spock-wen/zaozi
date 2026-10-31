@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { commit } from "./helpers/flow.mjs";
+import { commit, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -105,6 +105,7 @@ for (const engine of Object.keys(ENGINES)) {
         checkStep(t3, "T03");
         await page.locator("#bonecorner").click();
         await page.waitForTimeout(300);
+        await passCutscene(page);
 
         // T04：落字（真实按 1）
         const t4 = await snap(page);
@@ -112,6 +113,7 @@ for (const engine of Object.keys(ENGINES)) {
         checkStep(t4, "T04");
         await page.keyboard.press("1");
         await page.waitForTimeout(300);
+        await passCutscene(page);
 
         // T05：代价取舍
         const t5 = await snap(page);

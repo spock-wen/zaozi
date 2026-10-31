@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { phase, current, commit } from "./helpers/flow.mjs";
+import { phase, current, commit, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -74,6 +74,7 @@ for (const engine of Object.keys(ENGINES)) {
         await page.waitForFunction(() => !window.__zz.animating, null, { timeout: 5000 });
         await page.waitForTimeout(350);           // 卡落定，但远早于 toast 的 1800ms 自动收
 
+        await passCutscene(page);
         const elapsed = Date.now() - t0;
         assert.ok(elapsed < 1500, `刻字后检查得太晚（${elapsed}ms），测试失去意义`);
 

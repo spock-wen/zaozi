@@ -8,7 +8,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { phase, clearTutorial, playToWinter, dragCard, visibleText, toPick } from "./helpers/flow.mjs";
+import { phase, clearTutorial, playToWinter, dragCard, visibleText, toPick, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -148,9 +148,11 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.keyboard.press("ArrowLeft");
       await page.keyboard.press("ArrowLeft");
       await page.waitForTimeout(520);
+      await passCutscene(page);
       await page.keyboard.press("ArrowRight");
       await page.keyboard.press("ArrowRight");
       await page.waitForTimeout(520);
+      await passCutscene(page);
       assert.equal(await phase(page), "engrave", "第 3 张应停在刻阶段");
 
       // D4：拖动锁定的卡出专属提示

@@ -44,9 +44,11 @@ const idle = () => p.waitForFunction(() => !window.__zz.animating, null, { timeo
 const vis = (s) => p.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden && e.getClientRects().length > 0; }, s);
 const tapSel = async (s) => { const L = p.locator(s).first(); if (touch) await L.tap(); else await L.click(); };
 const tapXY = async (x, y) => { if (touch) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
-const commit = async (d) => { await idle(); const k = d === "l" ? "ArrowLeft" : "ArrowRight"; await p.keyboard.press(k); await p.keyboard.press(k); await p.waitForTimeout(650);
+const passCut = async () => {
   const cut = await p.evaluate(() => { const e = document.getElementById("cutscene"); return !!e && !e.hidden; });
-  if (cut) { await p.locator("#cut-continue").click(); await p.waitForTimeout(200); } };
+  if (cut) { await p.locator("#cut-continue").click(); await p.waitForTimeout(200); }
+};
+const commit = async (d) => { await idle(); const k = d === "l" ? "ArrowLeft" : "ArrowRight"; await p.keyboard.press(k); await p.keyboard.press(k); await p.waitForTimeout(650); await passCut(); };
 const cell = (s) => String(s).replace(/[\n\r]/g, " ").replace(/,/g, "，");
 let n = 0; const cardSizes = [];
 async function scene(name, settle = 300) {
@@ -105,6 +107,7 @@ try {
   for (let i = 0; i < 300; i++) {
     const ph = await st("phase"), g = await st("generation"); if (g > 2) break;
     if (ph === "card" || ph === "engrave") {
+      await passCut();
       await idle(); const cur = await st("current"); const key = `g${g}_${cur}_${ph}`;
       if (g === 2) { await scene(`g2_${cur}_开局`); if (want("E")) await menuProbe(); break; }
       if (!done.has(key)) { done.add(key); await scene(`g1_${cur}_${ph === "engrave" ? "刻" : "卡"}`); if (ph === "card" && !dragDone && /^C/.test(cur) && want("E")) { dragDone = true; await dragProbe(cur); } }
@@ -112,9 +115,9 @@ try {
         if (!lockDone) { // 刻阶段先碰一下卡（锁拖 → 提示「先点卡角骨片…」），再点骨片刻下：提示还在而骨片已收起？
           lockDone = true; const c = await p.evaluate(() => { const b = document.querySelector("#card").getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; });
           await tapXY(c[0], c[1]); await scene(`g1_${cur}_刻_锁拖提示`, 200);
-          await tapSel("#bonecorner"); await scene(`g1_${cur}_刻下后_提示残留`, 300); continue; }
+          await tapSel("#bonecorner"); await passCut(); await scene(`g1_${cur}_刻下后_提示残留`, 300); continue; }
         await p.keyboard.press("s"); await p.waitForTimeout(400); continue; }
-      if (cur === "T04") { await p.keyboard.press("1"); await p.waitForTimeout(600); if ((await st("current")) === "T04" && (await st("phase")) === "card") await commit("l"); continue; }
+      if (cur === "T04") { await passCut(); await p.keyboard.press("1"); await p.waitForTimeout(600); await passCut(); if ((await st("current")) === "T04" && (await st("phase")) === "card") await commit("l"); continue; }
       await commit(done.size % 2 ? "l" : "r"); continue; }
     if (ph === "winter") { if (!winterDone) { winterDone = true; await scene("g1_冬夜", 700); } await tapSel("#winter-end"); await p.waitForTimeout(900); continue; }
     if (ph === "ended") { for (let t = 0; t < 60 && !(await vis("#endseq")); t++) await p.waitForTimeout(200); await scene("g1_结局页", 600);

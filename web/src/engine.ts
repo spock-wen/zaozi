@@ -117,6 +117,10 @@ export function createGame(cfg: GameConfig): GameState {
     engravedThisGen: 0,
     tutorialDone: generation > 1,
     t01: null,
+    t02: null,
+    t03: null,
+    t04: null,
+    t05: null,
     log: [`开局：种子 ${cfg.seed}，第 ${generation} 代，第一张 ${deck[0]}`],
   };
   enterCard(st);
@@ -274,6 +278,7 @@ export function step(prev: GameState, action: Action): GameState {
         applyDelta(st, d.delta);
         achieveInstant(st, "drop");
         st.log.push(`${card.id} 落字 ${ch}`);
+        if (card.id === "T04") st.t04 = "river";
         advance(st);
         return st;
       }
@@ -282,9 +287,13 @@ export function step(prev: GameState, action: Action): GameState {
       if (opt.bones) applyBones(st, opt.bones);
       if (opt.hidden_marker) st.hiddenMarkers[opt.hidden_marker] = (st.hiddenMarkers[opt.hidden_marker] ?? 0) + 1;
       st.log.push(`${card.id} ${action.side === "left" ? "左" : "右"}`);
-      // 路径旗只记 T01：左 bone（别名 path_blade）/ 右 hardship（别名 path_ask）。
-      // T03–T05 同模式（选后对话卡 → 下一张按旗改语气）本环不记旗、不出帧。
-      if (card.id === "T01") st.t01 = action.side === "left" ? "bone" : "hardship";
+      // 教学路径旗叠着记。键名用锁表：skip / hold / river，不用设计稿别名 ignore / guard / water。
+      // t04=yield 与 t04=river 都灌 T05.open；t04=hold 灌 T05.hold。delta 不在这里改。
+      if (card.id === "T01" && (action.side === "left" || action.side === "right")) st.t01 = action.side === "left" ? "bone" : "hardship";
+      if (card.id === "T02" && (action.side === "left" || action.side === "right")) st.t02 = action.side === "left" ? "store" : "share";
+      if (card.id === "T04" && action.side === "left") st.t04 = "yield";
+      if (card.id === "T04" && action.side === "right") st.t04 = "hold";
+      if (card.id === "T05" && (action.side === "left" || action.side === "right")) st.t05 = action.side === "left" ? "refuse" : "half";
       if (opt.trace) {
         st.pendingTrace = opt.trace;
         st.phase = "engrave";
@@ -295,6 +304,7 @@ export function step(prev: GameState, action: Action): GameState {
     }
     case "engrave": {
       if (st.phase !== "engrave" || !st.pendingTrace) throw new Error("现在没有迹可刻");
+      if (st.current === "T03") st.t03 = "carve";
       if (action.trace !== st.pendingTrace.target) throw new Error(`这张卡上的迹是 ${st.pendingTrace.target}`);
       if (st.bones < rules.engrave_tally.bone_cost) throw new Error("没有空骨片");
       st.bones -= rules.engrave_tally.bone_cost;
@@ -310,6 +320,7 @@ export function step(prev: GameState, action: Action): GameState {
     }
     case "skip_engrave": {
       if (st.phase !== "engrave") throw new Error("现在没有迹可刻");
+      if (st.current === "T03") st.t03 = "skip";
       st.pendingTrace = null;
       st.log.push("不刻");
       advance(st);

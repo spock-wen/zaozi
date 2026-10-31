@@ -569,6 +569,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           await page.locator("#opt-right").click();
         }
         await page.waitForFunction(() => window.__zz.st?.current === "T03" && document.body.dataset.cardReady === "1", null, { timeout: 5000 });
+        await passCutscene(page);
 
         // T03 -> T04 (刻)
         if (vp.isTouch) {
@@ -577,6 +578,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           await page.locator("#bonecorner").click();
         }
         await page.waitForFunction(() => window.__zz.st?.current === "T04" && document.body.dataset.cardReady === "1", null, { timeout: 5000 });
+        await passCutscene(page);
 
         // T04 drop 水 via wordbox tap
         const slot = page.locator("#wordbox .slot.ok").first();

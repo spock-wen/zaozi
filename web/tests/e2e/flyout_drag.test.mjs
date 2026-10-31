@@ -13,7 +13,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { clearTutorial, gen2Codes, passCutscene } from "./helpers/flow.mjs";
+import { clearTutorial, gen2Codes, passCutscene, releaseBridge } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -373,6 +373,7 @@ for (const [engine] of Object.entries(ENGINES)) {
 
       await press(page, ["ArrowLeft", "ArrowLeft"]);
       await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+      await passCutscene(page);
       await settle(page);
 
       const box = await cardBox(page);
@@ -385,6 +386,7 @@ for (const [engine] of Object.entries(ENGINES)) {
       await page.mouse.down();
       await page.mouse.move(box.cx + 60, box.cy);   // 未到阈值，整项作为「松过手的 press」留在队列里
       await page.mouse.up();
+      await releaseBridge(page);
 
       await page.waitForFunction(() => window.__zz.st.current === "T03", null, { timeout: 3000 });
       await page.waitForFunction(() => {
@@ -416,12 +418,14 @@ for (const [engine] of Object.entries(ENGINES)) {
 
       await press(page, ["ArrowLeft", "ArrowLeft"]);
       await page.waitForFunction(() => window.__zz.st.current === "T02" && !window.__zz.animating, null, { timeout: 3000 });
+      await passCutscene(page);
       await settle(page);
 
       const n0 = await actionsLen(page);
       await startSettleRecorder(page);              // 独立落定记录：要量的是「卡真落定 → 提示」这段
       await watchToast(page);
       await press(page, ["ArrowRight", "ArrowRight", "ArrowRight"]);   // 第 3 次按在飞出期间 → 入队
+      await releaseBridge(page);
       const queued = await page.evaluate(() => window.__zz.queued);
       t.diagnostic(`飞出期间排队项：${queued}`);
 

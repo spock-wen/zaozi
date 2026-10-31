@@ -2,6 +2,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -67,6 +68,7 @@ for (const [engine] of Object.entries(ENGINES)) {
           window.__zz.dispatch({ type: "choose", side: "right" });
         });
         await page.waitForFunction(() => window.__zz.st?.phase === "engrave");
+        await passCutscene(page);
 
         // Helper to check 5x3 elementFromPoint
         const checkEntryHit = async (selector, label) => {
@@ -377,6 +379,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         window.__zz.dispatch({ type: "choose", side: "right" });
       });
       await page.waitForFunction(() => window.__zz.st?.phase === "engrave");
+      await passCutscene(page);
 
       // Show lock toast
       await page.evaluate(() => {
@@ -430,6 +433,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         window.__zz.dispatch({ type: "choose", side: "right" });
       });
       await page.waitForFunction(() => window.__zz.st?.phase === "engrave");
+      await passCutscene(page);
 
       // Show lock toast
       await page.evaluate(() => {
@@ -486,6 +490,7 @@ for (const [engine] of Object.entries(ENGINES)) {
         window.__zz.dispatch({ type: "choose", side: "right" });
       });
       await page.waitForFunction(() => window.__zz.st?.phase === "engrave");
+      await passCutscene(page);
 
       // Show lock toast
       await page.evaluate(() => {

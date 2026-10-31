@@ -20,6 +20,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
+import { passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -90,6 +91,7 @@ async function settle(page, cur) {
     { timeout: 10000 },
   );
   await page.waitForTimeout(400);
+  await passCutscene(page);
 }
 
 const readState = (page) => page.evaluate(() => ({

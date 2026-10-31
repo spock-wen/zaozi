@@ -14,7 +14,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { ENGINES, SEED, buildDist, startServer, collectErrors } from "./helpers/env.mjs";
-import { commit } from "./helpers/flow.mjs";
+import { commit, passCutscene } from "./helpers/flow.mjs";
 
 buildDist();
 
@@ -136,6 +136,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         await page.locator("#bonecorner").click();           // T03 → T04（落字）
         await page.waitForTimeout(300);
+        await passCutscene(page);
         await settle(page);
         const g4 = await geom(page);
         assert.equal(g4.current, "T04", `应进 T04，实际 ${g4.current}/${g4.phase}`);
@@ -143,6 +144,7 @@ for (const engine of Object.keys(ENGINES)) {
 
         await page.keyboard.press("1");                      // T04 → T05（取舍）
         await page.waitForTimeout(300);
+        await passCutscene(page);
         await settle(page);
         const g5 = await geom(page);
         assert.equal(g5.current, "T05", `应进 T05，实际 ${g5.current}/${g5.phase}`);
