@@ -40,7 +40,6 @@
   </div>
 
   <main id="stage">
-    <button id="opt-left" class="optbtn" hidden></button>
     <div id="cardcol">
       <div id="dims-desktop" class="dims"></div>
       <div id="cardwrap">
@@ -50,16 +49,19 @@
           <div class="card-head"><span id="card-season"></span><span class="dot-sep">·</span><span id="card-speaker"></span></div>
           <h2 id="card-title"></h2>
           <p id="card-text"></p>
-          <div id="card-drag-hint" class="card-drag-hint" hidden>
-            <div id="card-drag-label" class="card-drag-label"></div>
-            <div id="card-drag-bar" class="card-drag-bar"><div id="card-drag-fill" class="card-drag-fill"></div></div>
-          </div>
           <div id="card-drops" class="card-drops" hidden></div>
         </article>
       </div>
+      <div id="choice" class="choice">
+        <div class="choice-row">
+          <button id="opt-left" type="button" class="optbtn" hidden></button>
+          <button id="opt-right" type="button" class="optbtn" hidden></button>
+        </div>
+        <p id="lock-note" class="lock-note" hidden></p>
+      </div>
+      <p id="choice-tip" class="choice-tip" hidden></p>
       <div id="gesture-hint"></div>
     </div>
-    <button id="opt-right" class="optbtn" hidden></button>
     <div id="coachcol"><div id="coach" hidden></div></div>
   </main>
 

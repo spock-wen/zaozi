@@ -31,6 +31,56 @@ const winterDroppedLine = (ch) => t("ui.winter.dropped_line", { ch });
 const signedN = (n) => `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
 const METHOD = (k) => t("ui.winter.method." + k);
 const POSNAME = (k) => t("ui.winter.pos." + k);
+// 卡面 / 左右 / 落字 label：locale=en 缺英留空，不回落中文。系统菜单仍走 lookupCopy 的缺英回落。
+function locStr(zh, en) {
+  if (locale !== "en") return zh == null ? "" : String(zh);
+  if (typeof en === "string" && en.trim()) return en;
+  return "";
+}
+function faceKeyOf(c) {
+  if (!c || !c.faces) return null;
+  if (c.id === "T02" && (st.t01 === "bone" || st.t01 === "hardship")) return st.t01;
+  if (c.id === "T03" && (st.t02 === "store" || st.t02 === "share")) return st.t02;
+  if (c.id === "T04" && (st.t03 === "carve" || st.t03 === "skip")) return st.t03;
+  if (c.id === "T05") {
+    if (st.t04 === "hold") return "hold";
+    if (st.t04 === "yield" || st.t04 === "river") return "open";
+  }
+  return null;
+}
+function shownCard(c) {
+  const key = faceKeyOf(c);
+  const zhFace = key && c.faces ? c.faces[key] : null;
+  const enAll = (c && c.en) || {};
+  const enFace = key && enAll.faces ? enAll.faces[key] : null;
+  return {
+    title: locStr((zhFace && zhFace.title) || c.title || "", (enFace && enFace.title) || enAll.title),
+    speaker: locStr(c.speaker || "", enAll.speaker),
+    text: locStr((zhFace && zhFace.text) || c.text || "", (enFace && enFace.text) || enAll.text),
+    left: locStr((zhFace && zhFace.left) || (c.left && c.left.label) || "", (enFace && enFace.left) || enAll.left),
+    right: locStr((zhFace && zhFace.right) || (c.right && c.right.label) || "", (enFace && enFace.right) || enAll.right),
+  };
+}
+function locTraceText(trace) {
+  if (!trace) return "";
+  return locStr(trace.tally_text, trace.tally_text_en);
+}
+function choiceLocked() {
+  const c = curCard();
+  return !!(c && c.lock_choice && st.phase === "engrave");
+}
+const CHOICE_GESTURE_TEACH = new Set(["drag", "preview", "tradeoff"]);
+function coachText(step) {
+  if (!step) return "";
+  const desktop = document.body.dataset.view === "desktop";
+  if (desktop && (step.coach_desktop || step.coach_desktop_en)) return locStr(step.coach_desktop, step.coach_desktop_en);
+  return locStr(step.coach, step.coach_en);
+}
+function lockHintText() {
+  const step = st.current && tutorialStepOf(st.current);
+  const s = step ? locStr(step.lock_hint, step.lock_hint_en) : "";
+  return s || t("ui.carve.lock_fallback");
+}
 const DRAG_RATIO = INPUT.card.drag.commit_threshold_ratio;   // 0.35
 const DWELL_MS = 250;   // 排队输入生效前，目标卡「落定并绘制」后还要多留的最短停留（round 5 A）
 const SIDEBAR_KEY = "zaozi.sidebar.open";
@@ -53,7 +103,8 @@ let lastHover = { x: NaN, y: NaN };   // 上一次鼠标位置：区分「真的
 let st = createGame({ seed, debugGoal: DEBUG_GOAL });
 const ui = {
   dx: 0, dragging: false, dragged: false, startX: 0, hold: false, holdT: 0,
-  preview: false, kbDir: null, animating: false, floats: {}, floatPin: null, boneFloat: 0, boneFloatT: 0,
+  preview: false, kbDir: null, weightSide: null, weightT: 0, hoverT: 0, pressSide: null,
+  animating: false, floats: {}, floatPin: null, boneFloat: 0, boneFloatT: 0,
   keyQueue: [], drainArmed: false,
   settleKey: null, settledAt: 0, dwellT: 0, commitNotBefore: 0, heldCommitT: 0,   // round 5：最短停留 / 提交不早于
   resumeHeldCommit: null, epoch: 0,
@@ -386,8 +437,8 @@ function openSheet(opener) {
   ui.sheetOpen = true; sheetOpener = opener || $("full");
   const c = curCard();
   const sub = $("sheet-sub") || $("sheet-meta");
-  if (sub && c) setText(sub, SEASON(c.season) + " · " + c.speaker);
-  setText($("sheetbody"), t("ui.trace.prefix") + st.pendingTrace.tally_text);
+  if (sub && c) setText(sub, SEASON(c.season) + " · " + shownCard(c).speaker);
+  setText($("sheetbody"), t("ui.trace.prefix") + locTraceText(st.pendingTrace));
   setText($("sheetmore"), keyboardMode() ? t("ui.trace.more_keys") : t("ui.trace.more_touch"));
   const sh = $("sheet"), app = $("app");
   if (sh) sh.hidden = false;
@@ -453,7 +504,9 @@ function resetInputState() {
   clearTimeout(ui.holdT);
   n1Swallowed = 0; n1Reason = null;
   n1Ref = null;
-  ui.dragging = false; ui.dragged = false; ui.hold = false; ui.kbDir = null; ui.animating = false; ui.dx = 0;
+  ui.dragging = false; ui.dragged = false; ui.hold = false; ui.kbDir = null; ui.weightSide = null; ui.pressSide = null;
+  clearTimeout(ui.weightT); ui.weightT = 0; clearTimeout(ui.hoverT); ui.hoverT = 0;
+  ui.animating = false; ui.dx = 0;
   const c = cardEl();
   if (c) {
     c.classList.remove("dragging");
@@ -502,7 +555,8 @@ function dispatch(a) {
       pendingDropNote = "";
     }
   } catch (e) { pendingDropNote = ""; pendingBridgeNote = ""; abortCutscene(); clearOutcomeFloats(); toast(e.message); }
-  ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false;
+  ui.dx = 0; ui.kbDir = null; ui.preview = false; ui.hold = false; ui.weightSide = null; ui.pressSide = null;
+  clearTimeout(ui.weightT); ui.weightT = 0; clearTimeout(ui.hoverT); ui.hoverT = 0;
   render();
   if (ui.cutscene && ui.cutscene.from === fromId && ui.cutscene.flag === bridgeFlag) showCutsceneLayer();
   showToastLine(pendingDropNote);
@@ -641,8 +695,9 @@ function resetCardMotion() {
   ui.dx = 0;
   ui.animating = false;
   ui.dragging = false; ui.dragged = false; ui.hold = false;
-  ui.kbDir = null; ui.preview = false;
+  ui.kbDir = null; ui.preview = false; ui.weightSide = null; ui.pressSide = null;
   clearTimeout(ui.holdT); ui.holdT = 0;
+  clearTimeout(ui.weightT); ui.weightT = 0; clearTimeout(ui.hoverT); ui.hoverT = 0;
   const c = $("card");
   if (c) {
     for (const id of capturedPointers) { try { c.releasePointerCapture?.(id); } catch {} }
@@ -740,15 +795,27 @@ const curCard = () => CARDS.find((c) => c.id === st.current);
 const usable = (ch) => st.zilu.includes(ch) && !st.newThisGen.includes(ch);
 
 function previewSide() {
+  if (ui.weightSide) return ui.weightSide;
   if (ui.kbDir) return ui.kbDir;
-  if (ui.dragging || ui.hold) return ui.dx < 0 ? "left" : (ui.dx > 0 ? "right" : "left");
   return null;
 }
 function dimsHTML() {
+  const pinned = ui.floatPin && ui.floatPin === st.current;
+  return DIMS.map((k) => {
+    const v = st.dims[k];
+    const danger = v <= 15 || v >= 85;
+    const gloss = DIM_GLOSS(k) || "";
+    const dots = `<div class="dots"></div>`;
+    const fl = pinned ? ui.floats[k] : 0;
+    const float = fl ? `<span class="float ${fl > 0 ? "up" : "down"}">${signedN(fl)}</span>` : "";
+    return `<div class="dim${danger ? " danger" : ""}" data-dim="${k}" title="${gloss}">${dots}${float}<div class="lbl"><span>${DIMNAME(k)}</span><span>${v}</span></div><div class="bar"><div class="fill" style="transform:scaleX(${(v / 100).toFixed(3)})"></div></div><span class="sr-only">${gloss}</span></div>`;
+  }).join("");
+}
+// 分量圆点挂在已有 .dots 上，淡入 120ms / 淡出 160ms，不靠整段 innerHTML 替换（替换会跳过过渡）。
+function paintWeightDots() {
   const side = previewSide();
-  const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
-  const opt = side && card && st.phase === "card" ? (side === "left" ? card.left : card.right) : null;
-  // 按住预览：该侧副作用 boneΔ≠0 时，在圆点排末尾追加骨 pip（与留迹同形，70%）。涨跌不写在点上。
+  const card = st.phase === "card" ? curCard() : null;
+  const opt = side && card ? (side === "left" ? card.left : card.right) : null;
   const rawBone = opt && typeof opt.bones === "number" ? opt.bones : 0;
   let pipAt = -1;
   if (rawBone) {
@@ -758,22 +825,49 @@ function dimsHTML() {
     }
     if (pipAt < 0) pipAt = DIMS.length - 1;
   }
-  const pinned = ui.floatPin && ui.floatPin === st.current;
-  return DIMS.map((k, i) => {
-    const v = st.dims[k];
-    const danger = v <= 15 || v >= 85;
-    const gloss = DIM_GLOSS(k) || "";
-    let dots = "";
+  const htmlFor = (k, i) => {
+    if (!opt) return "";
     const pip = i === pipAt ? `<i class="bone-pip" aria-hidden="true"></i>` : "";
-    if (opt && opt.delta && typeof opt.delta[k] === "number") {
+    if (opt.delta && typeof opt.delta[k] === "number") {
       const a = Math.abs(opt.delta[k]);
-      dots = `<div class="dots on">${a > 8 ? '<i class="dot s3"></i>' : a > 4 ? '<i class="dot s2"></i>' : '<i class="dot"></i>'}${pip}</div>`;
-    } else if (pip) dots = `<div class="dots on">${pip}</div>`;
-    else dots = `<div class="dots"></div>`;
-    const fl = pinned ? ui.floats[k] : 0;
-    const float = fl ? `<span class="float ${fl > 0 ? "up" : "down"}">${signedN(fl)}</span>` : "";
-    return `<div class="dim${danger ? " danger" : ""}" data-dim="${k}" title="${gloss}">${dots}${float}<div class="lbl"><span>${DIMNAME(k)}</span><span>${v}</span></div><div class="bar"><div class="fill" style="transform:scaleX(${(v / 100).toFixed(3)})"></div></div><span class="sr-only">${gloss}</span></div>`;
-  }).join("");
+      const dot = a > 8 ? "dot s3" : a > 4 ? "dot s2" : "dot";
+      return `<i class="${dot}"></i>${pip}`;
+    }
+    return pip;
+  };
+  for (const id of ["dims", "dims-desktop"]) {
+    const root = $(id);
+    if (!root) continue;
+    root.querySelectorAll(".dim").forEach((dim) => {
+      const k = dim.dataset.dim;
+      const i = DIMS.indexOf(k);
+      const dots = dim.querySelector(".dots");
+      if (!dots) return;
+      const html = i < 0 ? "" : htmlFor(k, i);
+      if (html) {
+        if (dots.dataset.w !== html) {
+          dots.dataset.w = html;
+          dots.innerHTML = html;
+          dots.classList.remove("on");
+          requestAnimationFrame(() => {
+            if (dots.isConnected && dots.dataset.w === html) dots.classList.add("on");
+          });
+        } else if (!dots.classList.contains("on")) {
+          requestAnimationFrame(() => {
+            if (dots.isConnected && dots.dataset.w === html) dots.classList.add("on");
+          });
+        }
+      } else if (dots.classList.contains("on") || dots.dataset.w || dots.innerHTML) {
+        dots.classList.remove("on");
+        const stamp = {};
+        dots._fade = stamp;
+        dots.dataset.w = "";
+        setTimeout(() => {
+          if (dots._fade === stamp && !dots.classList.contains("on") && !dots.dataset.w) dots.innerHTML = "";
+        }, 160);
+      }
+    });
+  }
 }
 function floatHTML() { return ""; }
 
@@ -880,16 +974,23 @@ function renderCard() {
   const card = $("card");
   const canCard = st.phase === "card" || st.phase === "engrave";
   $("stage").hidden = false;
-  if (!canCard) { return; }
+  if (!canCard) {
+    const choice = $("choice"); if (choice) choice.hidden = true;
+    const tip = $("choice-tip"); if (tip) tip.hidden = true;
+    const note = $("lock-note"); if (note) note.hidden = true;
+    delete document.body.dataset.choiceLock;
+    return;
+  }
+  const choice = $("choice"); if (choice) choice.hidden = false;
   const c = curCard();
   const art = artHTML(c);
   patchHTML($("card-art"), art);
   $("card-art").hidden = !art;
+  const shown = shownCard(c);
   setText($("card-season"), SEASON(c.season));
-  setText($("card-speaker"), c.speaker);
-  const face = teachFace(c);
-  setText($("card-title"), (face && face.title) || c.title || "");
-  setText($("card-text"), (face && face.text) || c.text);
+  setText($("card-speaker"), shown.speaker);
+  setText($("card-title"), shown.title);
+  setText($("card-text"), shown.text);
   const engrave = st.phase === "engrave";
   card.classList.toggle("engrave", engrave);
   if (!engrave) ui.engraved = false;    // 离开「刻」就复位本张卡的已刻标记，别把 done 带到下一张「刻」卡
@@ -898,7 +999,7 @@ function renderCard() {
   const drops = $("card-drops");
   if (st.phase === "engrave") {
     drops.hidden = false;
-    patchHTML(drops, `<span class="tr tr-text" id="card-trace">${t("ui.trace.prefix")}${st.pendingTrace.tally_text}</span><button class="act skip" id="full" data-do="trace-full" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false" hidden>${t("ui.trace.full")}</button><button class="act skip" id="skip" data-do="skip">${t("ui.carve.skip")}</button>`);
+    patchHTML(drops, `<span class="tr tr-text" id="card-trace">${t("ui.trace.prefix")}${locTraceText(st.pendingTrace)}</span><button class="act skip" id="full" data-do="trace-full" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false" hidden>${t("ui.trace.full")}</button><button class="act skip" id="skip" data-do="skip">${t("ui.carve.skip")}</button>`);
     fitTrace();
     requestAnimationFrame(fitTrace);
   } else if (c.drops && c.drops.length) {
@@ -909,19 +1010,26 @@ function renderCard() {
     else dropHTML(drops);
   } else { drops.hidden = true; dropHTML(drops); }
   const dh = $("card-drag-hint"); if (dh) dh.hidden = true;
-  // 左右选项：各视口在卡/刻阶段均显示（手机与平板竖屏经 CSS 排到卡下方并排）
-  const showOpts = true;
-  ol.hidden = !showOpts; or.hidden = !showOpts;
-  if (showOpts) {
-    const leftLabel = (face && face.left) || c.left.label;
-    const rightLabel = (face && face.right) || c.right.label;
-    setText(ol, "← " + leftLabel);
-    setText(or, rightLabel + " →");
-    ol.setAttribute("aria-label", t("ui.opt.left_aria", { label: leftLabel }));
-    or.setAttribute("aria-label", t("ui.opt.right_aria", { label: rightLabel }));
-  }
-  const isCard = st.phase === "card";
+  const locked = choiceLocked();
+  const showChoice = st.phase === "card" || locked;
+  ol.hidden = or.hidden = !showChoice;
+  setText(ol, shown.left);
+  setText(or, shown.right);
+  ol.setAttribute("aria-label", t("ui.opt.left_aria", { label: shown.left }));
+  or.setAttribute("aria-label", t("ui.opt.right_aria", { label: shown.right }));
+  const isCard = st.phase === "card" && !locked;
   ol.disabled = or.disabled = !isCard;
+  ol.classList.toggle("is-locked", locked);
+  or.classList.toggle("is-locked", locked);
+  if (locked) {
+    ol.setAttribute("aria-disabled", "true");
+    or.setAttribute("aria-disabled", "true");
+    document.body.dataset.choiceLock = "1";
+  } else {
+    ol.removeAttribute("aria-disabled");
+    or.removeAttribute("aria-disabled");
+    delete document.body.dataset.choiceLock;
+  }
   if (!isCard) {
     ol.tabIndex = -1;
     or.tabIndex = -1;
@@ -929,20 +1037,22 @@ function renderCard() {
     ol.removeAttribute("tabindex");
     or.removeAttribute("tabindex");
   }
+  const note = $("lock-note");
+  if (note) {
+    note.hidden = !locked;
+    if (locked) setText(note, t("ui.choice.locked"));
+  }
+  const tip = $("choice-tip");
+  if (tip) {
+    tip.hidden = false;
+    setText(tip, t("ui.choice.tip"));
+  }
   paintOpts();
-  // 手势/键位提示：接了键鼠（pointer:fine）才用键盘文案。
-  // R18 (L15)：电脑端按键提示只出现一处，由底部 #keys 承载，卡下 #gesture-hint 置空隐藏。
+  // 选择区不再挂拖卡 / 长按卡教学。键位仍由底部 #keys 承担。刻态短句只在非 lock_choice 时留一行。
   const deskKeys = document.body.dataset.view === "desktop" && keyboardMode();
   let ghText = "";
-  if (!deskKeys) {
-    if (st.phase === "engrave") {
-      // 触控刻态句未单锁：缺英回落中文（MISSING_EN）
-      ghText = keyboardMode() ? t("ui.keys.gesture_engrave") : "卡已定住 · 点「刻」或「先不刻」";
-    } else {
-      ghText = keyboardMode()
-        ? t("ui.keys.gesture_choose")
-        : t("ui.keys.gesture_touch");
-    }
+  if (!deskKeys && st.phase === "engrave" && !locked) {
+    ghText = keyboardMode() ? t("ui.keys.gesture_engrave") : "卡已定住 · 点「刻」或「先不刻」";
   }
   const gh = $("gesture-hint");
   const kind = st.phase === "engrave" ? "carve" : "gesture";
@@ -965,10 +1075,12 @@ function renderCoach() {
   col.style.cssText = "";               // 先清掉上次的定位，交回 placeCoach 重算
   const card = (st.phase === "card" || st.phase === "engrave") ? curCard() : null;
   const step = card && isTutorialCard(card.id) ? tutorialStepOf(card.id) : null;
-  if (!step) { el.hidden = true; dropHTML(el); return; }
+  // 拖卡 / 按住卡看分量 / 选择代价：选择手势已改点钮，这些 coach 不再画在选择区。刻角、落字仍留。
+  if (!step || CHOICE_GESTURE_TEACH.has(step.teach)) { el.hidden = true; dropHTML(el); return; }
+  const text = coachText(step);
+  if (!text) { el.hidden = true; dropHTML(el); return; }
   el.hidden = false;
   const desktop = document.body.dataset.view === "desktop";
-  const text = desktop && step.coach_desktop ? step.coach_desktop : step.coach;
   patchHTML(el, text);
   if (desktop) placeCoach(step);        // 桌面所有档位（N/A/B）同一条摆放规则
 }
@@ -1218,7 +1330,10 @@ function dropLabels(ch) {
   const labels = [];
   for (const c of CARDS) {
     for (const d of c.drops || []) {
-      if (d.char === ch && d.label && !labels.includes(d.label)) labels.push(d.label);
+      if (d.char !== ch || !d.label) continue;
+      const en = c.en && c.en.drops && c.en.drops[d.char] && c.en.drops[d.char].label;
+      const label = locStr(d.label, en);
+      if (label && !labels.includes(label)) labels.push(label);
     }
   }
   return labels;
@@ -1228,7 +1343,7 @@ function pickInfoHTML(ch) {
   const parts = charParts(ch);
   const drops = dropLabels(ch);
   const rows = [
-    drops.length ? `<div class="pi-row"><b>${t("ui.pick.row_drop")}</b><span>${t("ui.pick.row_drop_body", { list: drops.join("、") })}</span></div>` : "",
+    drops.length ? `<div class="pi-row"><b>${t("ui.pick.row_drop")}</b><span>${t("ui.pick.row_drop_body", { list: drops.join(locale === "en" ? ", " : "、") })}</span></div>` : "",
     parts.length ? `<div class="pi-row part"><b>${t("ui.pick.row_part")}</b><span>${t("ui.pick.row_part_body", { list: parts.join("、") })}</span></div>` : "",
   ].join("");
   return `<div class="pickinfo"><div class="pi-h">${ch}${p.meaning ? ` <span>${p.meaning}</span>` : ""}</div>${rows}</div>`;
@@ -1479,6 +1594,7 @@ function render() {
   if (ui.sheetOpen) relayoutSheet();
   reflowToast();
   if (ui.cutscene) veilCard();
+  paintWeightDots();
 }
 
 // ---------- 拖卡 / 键盘 ----------
@@ -1493,22 +1609,12 @@ const captureCard = (id) => {
   } catch { /* 合成指针会抛 */ }
 };
 // 起拖：onDown 与「排队 press 的重放」共用同一段（round 4 A5）。置拖拽态、加 .dragging、挂长按计时。
-function beginDrag(x, pointerId) {
-  ui.dragging = true; ui.dragged = false; ui.startX = x;
-  cardEl().classList.add("dragging");
-  captureCard(pointerId);
-  ui.holdT = setTimeout(() => { if (ui.dragging && Math.abs(ui.dx) < 8) { ui.hold = true; render(); } }, 300);
+function beginDrag() {
+  // 环4：卡面拖不再作为选择路径，也不再长按卡面看分量。
 }
 const queuedPress = (id) => ui.keyQueue.find((it) => it.kind === "press" && it.id === id);
-function onDown(e) {
-  if (ui.sheetOpen) return;
-  if (st.phase === "engrave") { toast(tutorialStepOf(st.current)?.lock_hint || t("ui.carve.lock_fallback")); return; }  // B11
-  if (st.phase !== "card" || inputBusy()) return;
-  // 鼠标在可拖的卡上一按下就清掉页面上已有的文字选区：从卡外开始的选区（提示行/顶栏划进卡、Ctrl+A）会把卡包进去，
-  // 浏览器把这次按下移动当成拖选中内容（webkit 粘卡并误提交，chromium/firefox pointercancel）。别处的选择不动。
-  if (e.pointerType === "mouse") getSelection()?.removeAllRanges();
-  beginDrag(e.clientX, e.pointerId);
-  ui.commitNotBefore = 0;                                 // 现场起拖：松手即可提交，不受最短停留约束
+function onDown() {
+  // 卡面起拖已废止。刻态点卡身的提示在舞台 pointerdown 里。
 }
 function onMove(e) {
   if (!ui.dragging) {
@@ -1560,22 +1666,20 @@ function renderDragHintOnly() {
 function paintOpts() {
   const ol = $("opt-left"), or = $("opt-right");
   if (!ol || !or) return;
-  const thr = threshold();
-  const dragging = ui.dragging && Math.abs(ui.dx) > 8 && st.phase === "card";
-  const pastThr = dragging && Math.abs(ui.dx) >= thr;
-  const side = dragging ? (ui.dx < 0 ? "left" : "right") : (ui.kbDir ? ui.kbDir : null);
+  const side = previewSide();
   ol.classList.toggle("on", side === "left");
   or.classList.toggle("on", side === "right");
-  if (pastThr && side === "left") ol.setAttribute("data-ready", "1");
-  else ol.removeAttribute("data-ready");
-  if (pastThr && side === "right") or.setAttribute("data-ready", "1");
-  else or.removeAttribute("data-ready");
+  ol.classList.toggle("press", ui.pressSide === "left");
+  or.classList.toggle("press", ui.pressSide === "right");
+  ol.removeAttribute("data-ready");
+  or.removeAttribute("data-ready");
 }
 function renderDimsOnly() {
   const d = dimsHTML();
   patchHTML($("dims"), d); patchHTML($("dims-desktop"), d);
   paintOpts();
   renderDragHintOnly();
+  paintWeightDots();
 }
 function onUp(e) {
   if (e?.pointerId != null) capturedPointers.delete(e.pointerId);
@@ -1653,11 +1757,15 @@ function choiceToast(dir) {
   return msg;
 }
 function dropNote(card, ch) {
+  const key = faceKeyOf(card);
   const face = teachFace(card);
   const faced = face && face.drop && face.drop[ch];
-  if (faced && typeof faced.note === "string" && faced.note.trim()) return faced.note.trim();
+  const enFace = key && card.en && card.en.faces && card.en.faces[key] && card.en.faces[key].drop && card.en.faces[key].drop[ch];
+  const enDrop = card.en && card.en.drops && card.en.drops[ch];
   const row = card && (card.drops || []).find((d) => d.char === ch);
-  return row && typeof row.note === "string" ? row.note.trim() : "";
+  const zh = (faced && typeof faced.note === "string" && faced.note.trim()) || (row && typeof row.note === "string" ? row.note.trim() : "");
+  const en = (enFace && enFace.note) || (enDrop && enDrop.note) || "";
+  return locStr(zh, en).trim();
 }
 function showToastLine(msg) {
   if (!msg) return;
@@ -1740,9 +1848,11 @@ function showCutsceneLayer() {
   if (!row) { abortCutscene(); revealCard(); return; }
   ui.cutscene = { ep: held.ep, from: held.from, flag: held.flag, alias: row.alias || "" };
   hideToast();
-  setText($("cut-speaker"), row.speaker);
-  setText($("cut-body"), row.body);
-  setText($("cut-continue"), row.continue || t("ui.cut.continue"));
+  const card = CARDS.find((c) => c.id === held.from);
+  const enRow = card && card.en && card.en.cutscene && card.en.cutscene[held.flag];
+  setText($("cut-speaker"), locStr(row.speaker, enRow && enRow.speaker));
+  setText($("cut-body"), locStr(row.body, enRow && enRow.body));
+  setText($("cut-continue"), locStr(row.continue, enRow && enRow.continue) || t("ui.cut.continue"));
   const layer = $("cutscene");
   layer.dataset.flag = held.flag;
   layer.dataset.alias = row.alias || "";
@@ -1828,13 +1938,9 @@ function flyOut(targetX, done) {
 addEventListener("pointerdown", (e) => {
   if (cutsceneOn()) return;
   if (e.target.closest("button")) return;
-  const isPrimary = e.isPrimary || !e.isTrusted;
-  if (inputBusy()) {
-    if (isPrimary && e.target.closest("#cardwrap")) {
-      captureCard(e.pointerId);
-      enqueueInput({ kind: "press", id: e.pointerId, pointerType: e.pointerType, startX: e.clientX, x: e.clientX, down: true });
-    }
-  } else if (isPrimary && e.target.closest("#cardwrap")) onDown(e);
+  if (!e.target.closest("#cardwrap")) return;
+  // 卡面拖、卡面长按不再作为选择或分量预览。刻态点卡身仍提示先点角。
+  if (st.phase === "engrave") toast(lockHintText());
 });
 // 卡上不许原生拖拽（图片 / 选中内容）：dragstart 一律拦掉，否则 webkit 丢 pointerup 粘卡、其他引擎 pointercancel。
 cardEl().addEventListener("dragstart", (e) => e.preventDefault());
@@ -1940,7 +2046,13 @@ function handleKey(e) {
   }
   if (st.phase === "card") {
     if (e.repeat && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter")) { e.preventDefault(); return; }  // 自动重复只预览一次
-    if (e.code === "Space") { e.preventDefault(); ui.hold = true; render(); return; }
+    if (e.code === "Space") {
+      e.preventDefault();
+      ui.hold = true;
+      ui.weightSide = ui.kbDir || ui.weightSide || "left";
+      render();
+      return;
+    }
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
       const dir = e.key === "ArrowLeft" ? "left" : "right";
@@ -1952,7 +2064,7 @@ function handleKey(e) {
     const a = INPUT.card.keys[e.code]; if (a && !e.repeat) { e.preventDefault(); dispatch(a); }
   } else if (st.phase === "engrave") {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter") {
-      toast(tutorialStepOf(st.current)?.lock_hint || t("ui.carve.lock_fallback"));
+      toast(lockHintText());
     } else if (e.code === INPUT.engrave.key) {
       clearToast();
       ui.engraved = true;
@@ -2007,7 +2119,7 @@ const drainStep = () => {
         ui.drainArmed = false;
         if (dropped && !ui.engraveHinted) {
           ui.engraveHinted = true;
-          toast(tutorialStepOf(st.current)?.lock_hint || t("ui.carve.lock_fallback"));
+          toast(lockHintText());
         }
         return;
       }
@@ -2031,18 +2143,8 @@ const drainStep = () => {
       else ui.drainArmed = false;
       return;
     }
-    if (item.kind === "press") {                                      // 排队的按下：仍按住就起成实拖（round 4 A3）
+    if (item.kind === "press") {                                      // 卡面拖已废止：丢掉排队的按下，不提交
       ui.drainArmed = false;
-      if (item.down) {
-        beginDrag(item.startX, item.id);
-        ui.dx = item.x - item.startX;
-        if (Math.abs(ui.dx) > 8) { ui.dragged = true; clearTimeout(ui.holdT); ui.hold = false; }
-        if (Math.abs(ui.dx) >= threshold() && !ui._thr) { ui._thr = true; sfx.threshold(); }
-        if (Math.abs(ui.dx) < threshold()) ui._thr = false;
-        applyTilt();
-        renderDimsOnly();
-        ui.commitNotBefore = ui.settledAt + DWELL_MS;
-      }
       if (ui.keyQueue.length) armDrain();
       return;
     }
@@ -2073,7 +2175,13 @@ function applyQueued(item) {
   else if (item.kind === "drop") dropSlot(item.slot);
   else if (item.kind === "side") commitSide(item.dir);
 }
-addEventListener("keyup", (e) => { if (e.code === "Space" && ui.hold && !ui.dragging) { ui.hold = false; render(); } });
+addEventListener("keyup", (e) => {
+  if (e.code === "Space" && ui.hold && !ui.dragging) {
+    ui.hold = false;
+    if (!ui.kbDir) ui.weightSide = null;
+    render();
+  }
+});
 // 后台标签页（P2-3）：document.hidden 期间停止 dwell / heldCommit 计时并禁止排队执行；恢复可见两帧后重新等满 DWELL_MS。
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
@@ -2094,10 +2202,24 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 function commitSide(dir) {
-  if (cutsceneOn()) return;
+  if (cutsceneOn() || choiceLocked()) return;
+  if (st.phase !== "card") return;
+  const btn = $(dir === "left" ? "opt-left" : "opt-right");
+  if (btn && (btn.disabled || btn.getAttribute("aria-disabled") === "true")) return;
+  clearTimeout(ui.weightT); ui.weightT = 0;
+  clearTimeout(ui.hoverT); ui.hoverT = 0;
+  ui.weightSide = null; ui.pressSide = null;
   const ep = ui.epoch;
   const act = dir === "left" ? INPUT.card.drag.left_action : INPUT.card.drag.right_action;
-  flyOut((dir === "left" ? -1 : 1) * 620, afterChoice(ep, act));
+  const go = () => {
+    if (ui.epoch !== ep || st.phase !== "card" || choiceLocked()) { ui.animating = false; return; }
+    btn?.classList.remove("commit");
+    flyOut((dir === "left" ? -1 : 1) * 620, afterChoice(ep, act));
+  };
+  if (btn) btn.classList.add("commit");
+  if (reducedPref()) { go(); return; }
+  ui.animating = true;
+  setTimeout(go, 120);
 }
 
 // ---------- 事件绑定 ----------
@@ -2244,29 +2366,52 @@ function n1RepeatTap(side, x, y) {
 function bindOpt(id, side) {
   const el = $(id);
   if (!el) return;
+  const clearSidePreview = () => {
+    clearTimeout(ui.weightT); ui.weightT = 0;
+    if (ui.pressSide === side) ui.pressSide = null;
+    el.classList.remove("press");
+    if (ui.weightSide === side) ui.weightSide = null;
+    paintOpts();
+    paintWeightDots();
+  };
   el.addEventListener("pointerdown", (e) => {
     if (cutsceneOn()) return;
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (el.disabled || choiceLocked()) return;
     optPress = { side, id: e.pointerId, x: e.clientX, y: e.clientY };
+    ui.pressSide = side;
+    el.classList.add("press");
+    clearTimeout(ui.weightT);
+    ui.weightT = setTimeout(() => {
+      if (!optPress || optPress.side !== side || el.disabled || choiceLocked()) return;
+      ui.weightSide = side;
+      paintOpts();
+      paintWeightDots();
+    }, 300);
+    paintOpts();
   });
   el.addEventListener("pointerup", (e) => {
-    if (cutsceneOn()) { optPress = null; return; }
+    if (cutsceneOn()) { optPress = null; clearSidePreview(); return; }
     if (!optPress || optPress.side !== side || optPress.id !== e.pointerId) return;
     const press = optPress;
     optPress = null;
-    if (ui.dragging) return;
+    clearTimeout(ui.weightT); ui.weightT = 0;
+    if (ui.pressSide === side) ui.pressSide = null;
+    el.classList.remove("press");
+    if (ui.dragging || el.disabled || choiceLocked()) { clearSidePreview(); return; }
     const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
-    if (dist > 20) return;
+    if (dist > 20) { clearSidePreview(); return; }
     // N1 重复点按过滤器：放在 hit / inputBusy 之前，只认「按下点在同一个选项按钮上」，
     // 不依赖抬起时卡片是否已经飞出移位（选项按钮不在 #card 里，不随飞出位移）。
     if (n1RepeatTap(side, press.x, press.y)) {
       // 这次点按没有提交，但它后面照样会合成一个 click：借 S-1 那条既有的 700ms 去重把它挡掉，
       // 否则这条 click 会绕过 N1 走到 commitSide（白入队一次）。
       lastOptPointerCommit = { side, at: performance.now() };
+      clearSidePreview();
       return;
     }
     const hit = el.contains(e.target) || document.elementFromPoint(e.clientX, e.clientY)?.closest("#" + id);
-    if (!hit) return;
+    if (!hit) { clearSidePreview(); return; }
     lastOptPointerCommit = { side, at: performance.now() };
     if (inputBusy()) {
       enqueueInput({ kind: "side", dir: side });
@@ -2277,9 +2422,26 @@ function bindOpt(id, side) {
   });
   el.addEventListener("pointercancel", (e) => {
     if (optPress && optPress.id === e.pointerId) optPress = null;
+    clearSidePreview();
+  });
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+  el.addEventListener("mouseenter", () => {
+    if (!hasFinePointer() || el.disabled || choiceLocked() || st.phase !== "card") return;
+    clearTimeout(ui.hoverT);
+    ui.hoverT = setTimeout(() => {
+      if (el.disabled || choiceLocked() || st.phase !== "card") return;
+      ui.weightSide = side;
+      paintOpts();
+      paintWeightDots();
+    }, 300);
+  });
+  el.addEventListener("mouseleave", () => {
+    clearTimeout(ui.hoverT); ui.hoverT = 0;
+    if (optPress && optPress.side === side) return;
+    if (ui.weightSide === side) clearSidePreview();
   });
   on(el, (e) => {
-    if (cutsceneOn()) return;
+    if (cutsceneOn() || el.disabled || choiceLocked()) return;
     const now = performance.now();
     if (lastOptPointerCommit.side === side && (now - lastOptPointerCommit.at) < 700) {
       lastOptPointerCommit = { side: null, at: 0 };

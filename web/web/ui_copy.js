@@ -159,6 +159,8 @@ export const UI_COPY = {
     "ui.pick.row_part": "部件",
     "ui.pick.row_part_body": "能拼出：{list}",
     "ui.goals.drop_cost_banner": "达成　落一个字 · 这一代冬夜不能再当部件",
+    "ui.choice.tip": "有的选择两边都要付出。想好再松手。",
+    "ui.choice.locked": "本步不选",
   },
   en: {
     "ui.lang.label": "Language",
@@ -317,6 +319,8 @@ export const UI_COPY = {
     "ui.pick.row_part": "Parts",
     "ui.pick.row_part_body": "Builds: {list}",
     "ui.goals.drop_cost_banner": "Done · Dropped a glyph · can't be a winter part this gen",
+    "ui.choice.tip": "Some choices cost both sides. Think, then let go.",
+    "ui.choice.locked": "Locked step — no choice",
   },
 };
 
