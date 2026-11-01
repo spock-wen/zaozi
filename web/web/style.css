@@ -56,8 +56,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 .dim .bar{height:8px;border-radius:4px;background:var(--night-line);overflow:hidden;margin-top:2px;}
 .dim .fill{height:100%;width:100%;background:var(--gold-400);transform-origin:left center;transform:scaleX(.5);transition:transform 400ms cubic-bezier(.2,.8,.2,1);}
 .dim.danger .lbl,.dim.danger .fill{background:var(--down);color:var(--down);}
-.dim .dots{position:absolute;left:0;right:0;top:-14px;display:flex;gap:3px;height:12px;align-items:flex-end;opacity:0;transition:opacity 120ms ease-out;pointer-events:none;}
-.dim .dots.on{opacity:1;}
+.dim .dots{position:absolute;left:0;right:0;top:-14px;display:flex;gap:3px;height:12px;align-items:flex-end;opacity:0;transition:opacity 160ms ease;pointer-events:none;}
+.dim .dots.on{opacity:1;transition:opacity 120ms ease;}
 .dot{width:5px;height:5px;border-radius:50%;background:var(--gold-400);}
 .dot.s2{width:8px;height:8px;} .dot.s3{width:12px;height:12px;}
 /* 预览骨 pip：常态骨片 16×20 的 70%（≈11×14）。矮屏圆点排只有 8px，收到排内，避免顶栏溢出。 */
@@ -144,35 +144,55 @@ body[data-reduced="1"] .card{transition:opacity 120ms ease-out;transform:none !i
 .bone-hint{position:absolute;top:14px;right:58px;font-size:13px;color:var(--zhu-600);background:var(--paper-100);padding:2px 6px;border-radius:6px;display:none;}
 .card.engrave .bone-hint{display:block;}
 
-/* 左右选项 */
+/* 左右选项：卡下等宽双钮。轻点提交；按住 / 悬停 300ms 才出分量圆点。 */
+.choice{width:100%;max-width:520px;display:flex;flex-direction:column;gap:8px;flex:0 0 auto;}
+.choice-row{display:flex;gap:10px;width:100%;align-items:stretch;}
 .optbtn{
   position:relative;z-index:10;
-  width:192px;min-height:44px;padding:10px 12px;border-radius:10px;background:var(--night-700);
-  color:var(--paper-50);font-size:15px;font-weight:700;text-align:center;border:1px solid var(--bone-100);
-  transition:transform 160ms ease-out;
+  flex:1 1 0;min-width:0;width:auto;min-height:52px;padding:8px 12px;border-radius:12px;background:var(--night-700);
+  color:var(--on-night);font-size:15px;font-weight:700;line-height:1.25;text-align:center;
+  border:1.5px solid var(--bone-100);
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-box-pack:center;-webkit-line-clamp:2;
+  line-clamp:2;overflow:hidden;text-overflow:ellipsis;word-break:break-word;
+  transition:transform 80ms ease,box-shadow 120ms ease,background 120ms ease,color 120ms ease;
 }
-.optbtn.on{background:var(--bone-100);color:var(--ink);border-color:var(--zhu-600);box-shadow:inset 0 0 0 1px var(--zhu-600);}
-.optbtn[data-ready]{background:var(--zhu-600);color:var(--paper-50);box-shadow:0 0 0 2px var(--paper-50);}
-.optbtn:disabled{background:transparent;color:var(--paper-200);border:1px dashed var(--bone-crack);cursor:not-allowed;}
+html[lang="en"] .optbtn{font-size:14px;}
+.optbtn.press{transform:scale(.98);}
+.optbtn.on{background:var(--night-700);color:var(--on-night);border-color:var(--gold-400);box-shadow:inset 0 0 0 2px var(--zhu-600);}
+.optbtn.commit{background:rgba(181,67,46,.22);color:#fff;border-color:var(--gold-400);box-shadow:inset 0 0 0 2px var(--zhu-600);}
+.optbtn:disabled{cursor:not-allowed;}
+.optbtn.is-locked,
+.optbtn:disabled.is-locked{
+  opacity:.42;pointer-events:none;cursor:not-allowed;
+  background:var(--night-700);color:var(--on-night-2);border-color:var(--bone-100);box-shadow:inset 0 0 0 1.5px var(--bone-100);
+}
+.lock-note{margin:0;font-size:12px;font-weight:500;line-height:1.4;color:var(--on-night-2);text-align:center;}
+.choice-tip{
+  width:100%;max-width:520px;margin:0;box-sizing:border-box;flex:0 0 auto;
+  border-radius:10px;background:rgba(43,48,66,.72);box-shadow:inset 0 0 0 1px var(--night-line);
+  padding:8px 12px;font-size:13px;font-weight:500;line-height:1.35;color:var(--on-night-2);text-align:center;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;
+}
 /* 选卡用的左右选项只在选卡阶段出现（PM 10/19 10:20）：刻字等阶段藏起、禁用（JS）、visibility:hidden 同时移出 Tab 顺序和点击。
    只点名 #opt-left / #opt-right，不再对所有 .optbtn 一刀切；刻字入口（卡角「刻」、卡内「先不刻」）不受影响。 */
 body:not([data-phase="card"]) #opt-left,body:not([data-phase="card"]) #opt-right{visibility:hidden;}
+body[data-choice-lock="1"] #opt-left,body[data-choice-lock="1"] #opt-right{visibility:visible;}
 
 #gesture-hint{font-size:13px;color:var(--paper-200);text-align:center;min-height:16px;}
+#gesture-hint:empty{display:none;min-height:0;}
 
 /* 教学气泡 */
 #coachcol{display:none;}
-/* 移动端与平板竖屏：卡片居中，左右选项置于卡片正下方并排（各占半宽、间距 8px）；教学气泡位于选项下方 */
+/* 移动端与平板竖屏：卡下选择行在 #cardcol 内；教学气泡在卡列之下 */
 body[data-view="mobile"] #stage,
 body[data-view="tablet-portrait"] #stage{
   display:grid;
   grid-template-areas:
-    "card card"
-    "l r"
-    "coach coach";
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  column-gap:8px;row-gap:8px;
-  grid-template-rows:minmax(0,1fr) auto auto;align-content:stretch;justify-items:center;
+    "card"
+    "coach";
+  grid-template-columns:minmax(0,1fr);
+  row-gap:8px;
+  grid-template-rows:minmax(0,1fr) auto;align-content:stretch;justify-items:center;
   width:min(calc(100% - 32px),480px);
   align-self:center;padding:8px 0;
 }
@@ -209,14 +229,14 @@ body[data-view="mobile"] .slot img{width:24px;height:24px;}
 body[data-view="mobile"] .slot span{font-size:13px;line-height:18px;text-align:center;}
 body[data-view="mobile"] .slot.used span{font-size:13px;line-height:18px;white-space:nowrap;}
 body[data-view="mobile"] .optbtn,body[data-view="tablet-portrait"] .optbtn{
-  width:100%;height:46px;min-height:44px;padding:0 8px;
-  font-size:15px;line-height:20px;
-  overflow:hidden;overflow-wrap:anywhere;text-wrap:balance;
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-box-pack:center;-webkit-line-clamp:2;
+  width:auto;height:auto;min-height:52px;padding:8px 10px;
+  font-size:15px;line-height:1.25;
+  overflow:hidden;overflow-wrap:anywhere;
 }
+html[lang="en"] body[data-view="mobile"] .optbtn,
+html[lang="en"] body[data-view="tablet-portrait"] .optbtn{font-size:14px;}
 body:not([data-phase="card"]) #opt-left,body:not([data-phase="card"]) #opt-right{visibility:hidden;}
-body[data-view="mobile"] #opt-left,body[data-view="tablet-portrait"] #opt-left{grid-area:l;}
-body[data-view="mobile"] #opt-right,body[data-view="tablet-portrait"] #opt-right{grid-area:r;}
+body[data-choice-lock="1"] #opt-left,body[data-choice-lock="1"] #opt-right{visibility:visible;}
 /* 行高随气泡：T01 教练两行时不能锁 40px，否则气泡伸出 #stage、压住字匣把手。 */
 body[data-view="mobile"] #coachcol,body[data-view="tablet-portrait"] #coachcol{display:block;grid-area:coach;width:100%;max-width:none;height:auto;min-height:40px;}
 body[data-view="mobile"] #coach,body[data-view="tablet-portrait"] #coach{max-width:none;}
@@ -492,7 +512,7 @@ body[data-view="tablet-landscape"] #drawer{display:none;}
    否则 WebKit 对 `height:100%` 的卡在「卡槽宽 auto」收缩时不认 aspect-ratio，
    拿卡内文字 max-content 当槽宽（实测 377 vs 卡 328），卡被左贴、槽心 ≠ 卡心，
    字匣（居中在网格列）就不在卡下了（也把 #cardwrap 卡槽右缘算错，气泡偏右）。 */
-body[data-view="tablet-landscape"] #cardwrap{height:min(560px,calc(100dvh - 240px));width:auto;aspect-ratio:328/468;}
+body[data-view="tablet-landscape"] #cardwrap{height:min(520px,calc(100dvh - 360px));width:auto;aspect-ratio:328/468;}
 body[data-view="tablet-landscape"] .card{height:100%;width:auto;aspect-ratio:328/468;}
 body[data-view="tablet-landscape"] #wordbox-bar{border-radius:16px;margin:8px 16px;min-height:0;}
 body[data-view="tablet-landscape"] #stage{flex-wrap:nowrap;}
@@ -512,7 +532,8 @@ body[data-view="desktop"] #dims-desktop .dim{flex:0 0 auto;width:110px;}
 body[data-view="desktop"] #gesture-hint:empty{display:none;}
 /* 卡槽宽 = 卡高 × 328/468（同 tablet-landscape 注释）：让 #cardwrap 盒 = 卡盒，
    卡在槽内居中、字匣（居中在网格列）正好在卡下，矮屏 A/B 也沿用此比例。 */
-body[data-view="desktop"] #cardwrap{height:clamp(468px,calc(100dvh - 280px),640px);width:auto;aspect-ratio:328/468;}
+body[data-view="desktop"] #cardcol{width:min(520px,100%);}
+body[data-view="desktop"] #cardwrap{height:clamp(280px,calc(100dvh - 400px),560px);width:auto;aspect-ratio:328/468;}
 body[data-view="desktop"] .card{
   height:100%;width:auto;aspect-ratio:328/468;
   display:flex;flex-direction:column;
@@ -545,7 +566,7 @@ body[data-view="desktop"] #log li{overflow-wrap:anywhere;}
 body[data-view="desktop"] #coachcol{display:block;position:absolute;right:16px;bottom:8px;width:320px;z-index:30;pointer-events:none;}
 body[data-view="desktop"] #wordbox{min-height:0;}
 body[data-view="desktop"] #cardcol{flex:0 1 auto;min-width:0;}
-body[data-view="desktop"] .optbtn{width:192px;flex:0 1 auto;min-width:120px;}
+body[data-view="desktop"] .optbtn{width:auto;flex:1 1 0;min-width:0;min-height:52px;}
 
 /* 手机横屏：提示转竖屏（由 JS 显示 #rotate-hint） */
 body[data-view="mobile"] #drawer-body{max-height:68dvh;}
@@ -603,8 +624,8 @@ body[data-short="A"] #topbar .float,
 body[data-short="B"] #topbar .float{top:50%;}
 
 /* 卡高（宽由 aspect-ratio 得）；#stage 内边距与左右选项宽度按档收窄 */
-body[data-short="A"] #cardwrap{height:clamp(380px,calc(100dvh - 188px),468px);}
-body[data-short="B"] #cardwrap{height:clamp(320px,calc(100dvh - 172px),428px);}
+body[data-short="A"] #cardwrap{height:clamp(240px,calc(100dvh - 308px),468px);}
+body[data-short="B"] #cardwrap{height:clamp(200px,calc(100dvh - 292px),428px);}
 body[data-short="A"] #stage{padding:12px;gap:8px;}   /* 卡上/下距 12 */
 body[data-short="B"] #stage{padding:16px 12px;gap:8px;} /* 卡上/下距 16 */
 body[data-short="A"] #stage .optbtn{width:160px;}

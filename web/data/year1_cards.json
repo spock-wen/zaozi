@@ -2,17 +2,67 @@
   "schema_version": "1",
   "_说明": "一年里程碑卡池：10 张卡（春 3、夏 3、秋 2、冬 2）+ 1 次冬夜，外加 5 张教学卡 T01–T05（只进第 1 代、按序；only_tutorial 为 true，不进普通牌堆）。卡上数值是内容样例，按 GAMEPLAY §3 的幅度写；落字「水」的数值照 §2.4 的例子。新增字段：title=卡头标题（版式），tutorial=教学顺序号，only_tutorial=只用于教学，lock_choice=开局即进「刻」阶段且锁左右拖（教学第 3 张），trace=卡级迹（配合 lock_choice）。trace 表示选这一边后卡上出现的迹，target 是这条迹能刻成的字，tally_text 是事签文案。",
   "cards": [
-    { "id": "T01", "season": "spring", "speaker": "管事的老人", "tutorial": 1, "only_tutorial": true,
+    {
+      "id": "T01",
+      "season": "spring",
+      "speaker": "管事的老人",
+      "tutorial": 1,
+      "only_tutorial": true,
       "title": "火边这一夜",
       "text": "管事的老人把刻骨用的骨刀推到你面前。火边的人都看着你。",
-      "left":  { "label": "今晚这事我来记", "delta": { "faith": 6 } },
-      "right": { "label": "先问清往后的难处", "delta": { "memory": 6 } },
-      "cutscene": {
-        "bone": { "speaker": "管事的老人", "body": "寨口有脚步。妇人背回一筐野果，等你拿主意。", "continue": "继续", "alias": "path_blade" },
-        "hardship": { "speaker": "管事的老人", "body": "难处先记着。寨口妇人背回野果——今冬紧不紧，就看这一筐。", "continue": "继续", "alias": "path_ask" }
+      "left": {
+        "label": "今晚这事我来记",
+        "delta": {
+          "faith": 6
+        }
       },
-      "drops": [] },
-    { "id": "T02", "season": "spring", "speaker": "采集的妇人", "tutorial": 2, "only_tutorial": true,
+      "right": {
+        "label": "先问清往后的难处",
+        "delta": {
+          "memory": 6
+        }
+      },
+      "cutscene": {
+        "bone": {
+          "speaker": "管事的老人",
+          "body": "寨口有脚步。妇人背回一筐野果，等你拿主意。",
+          "continue": "继续",
+          "alias": "path_blade"
+        },
+        "hardship": {
+          "speaker": "管事的老人",
+          "body": "难处先记着。寨口妇人背回野果——今冬紧不紧，就看这一筐。",
+          "continue": "继续",
+          "alias": "path_ask"
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Night by the Fire",
+        "speaker": "Elder in charge",
+        "text": "The elder who runs things slides the bone carving knife before you. Everyone by the fire is watching.",
+        "left": "I'll keep tonight's word",
+        "right": "First ask what gets hard later",
+        "cutscene": {
+          "bone": {
+            "speaker": "Elder in charge",
+            "body": "Footsteps at the gate. A woman brings back a basket of wild fruit, waiting on your call.",
+            "continue": "Continue"
+          },
+          "hardship": {
+            "speaker": "Elder in charge",
+            "body": "Keep the hard parts in mind. A woman at the gate brings wild fruit—whether winter bites hangs on this basket.",
+            "continue": "Continue"
+          }
+        }
+      }
+    },
+    {
+      "id": "T02",
+      "season": "spring",
+      "speaker": "采集的妇人",
+      "tutorial": 2,
+      "only_tutorial": true,
       "title": "她背回一筐野果",
       "text": "族人等你拿主意。「分给他们，还是先存着？」",
       "faces": {
@@ -29,18 +79,81 @@
           "right": "分给大家"
         }
       },
-      "left":  { "label": "先存着", "delta": { "food": 8, "faith": -4 } },
-      "right": { "label": "分给他们", "delta": { "faith": 6, "food": -4 } },
-      "cutscene": {
-        "store": { "speaker": "管事的老人", "body": "果先囤下了。夜里摸骨片，你才看见那道裂。", "continue": "继续" },
-        "share": { "speaker": "管事的老人", "body": "果分完了。有人拿骨片来记，才摸到一道裂。", "continue": "继续" }
+      "left": {
+        "label": "先存着",
+        "delta": {
+          "food": 8,
+          "faith": -4
+        }
       },
-      "drops": [] },
-    { "id": "T03", "season": "spring", "speaker": "巫", "tutorial": 3, "only_tutorial": true,
+      "right": {
+        "label": "分给他们",
+        "delta": {
+          "faith": 6,
+          "food": -4
+        }
+      },
+      "cutscene": {
+        "store": {
+          "speaker": "管事的老人",
+          "body": "果先囤下了。夜里摸骨片，你才看见那道裂。",
+          "continue": "继续"
+        },
+        "share": {
+          "speaker": "管事的老人",
+          "body": "果分完了。有人拿骨片来记，才摸到一道裂。",
+          "continue": "继续"
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "She Brings Back Wild Fruit",
+        "speaker": "Foraging woman",
+        "text": "The clan waits on your call. \"Share it out, or store it first?\"",
+        "left": "Store it first",
+        "right": "Share it out",
+        "faces": {
+          "bone": {
+            "title": "She Brings Back Wild Fruit",
+            "text": "The clan waits on your call. \"Share it out, or store it first?\"",
+            "left": "Store it first",
+            "right": "Share it out"
+          },
+          "hardship": {
+            "title": "She Brings Back Wild Fruit",
+            "text": "\"Grain will run short. Store this fruit for winter, or share it now?\"",
+            "left": "Store for winter",
+            "right": "Share with everyone"
+          }
+        },
+        "cutscene": {
+          "store": {
+            "speaker": "Elder in charge",
+            "body": "The fruit is stored. At night you touch the bone slip and feel the crack.",
+            "continue": "Continue"
+          },
+          "share": {
+            "speaker": "Elder in charge",
+            "body": "The fruit is shared out. Someone brings a bone slip to mark it—and finds a crack.",
+            "continue": "Continue"
+          }
+        }
+      }
+    },
+    {
+      "id": "T03",
+      "season": "spring",
+      "speaker": "巫",
+      "tutorial": 3,
+      "only_tutorial": true,
       "title": "骨上有一道裂",
       "text": "「这道迹，刻下来能留给后人。」",
       "lock_choice": true,
-      "trace": { "target": "休", "tally_text": "晌午正热，赶路的背抵着一截老干，头顶叶子遮着太阳，一直待到天色转凉" },
+      "trace": {
+        "target": "休",
+        "tally_text": "晌午正热，赶路的背抵着一截老干，头顶叶子遮着太阳，一直待到天色转凉",
+        "tally_text_en": "Noon heat. The traveler leans his back on an old trunk; leaves shade him till the day cools."
+      },
       "faces": {
         "store": {
           "title": "骨上有一道裂",
@@ -55,14 +168,71 @@
           "right": "先不管它"
         }
       },
-      "left":  { "label": "刻下这道迹", "delta": { "memory": 4 } },
-      "right": { "label": "先不管它", "delta": { "faith": 4 } },
-      "cutscene": {
-        "carve": { "speaker": "管事的老人", "body": "这道迹刻下了。没等干，两家又为河滩吵起来。", "continue": "继续" },
-        "skip": { "speaker": "管事的老人", "body": "裂先搁着。寨外传来喊声——河水漫过了界石。", "continue": "继续" }
+      "left": {
+        "label": "刻下这道迹",
+        "delta": {
+          "memory": 4
+        }
       },
-      "drops": [] },
-    { "id": "T04", "season": "summer", "speaker": "管事的老人", "tutorial": 4, "only_tutorial": true,
+      "right": {
+        "label": "先不管它",
+        "delta": {
+          "faith": 4
+        }
+      },
+      "cutscene": {
+        "carve": {
+          "speaker": "管事的老人",
+          "body": "这道迹刻下了。没等干，两家又为河滩吵起来。",
+          "continue": "继续"
+        },
+        "skip": {
+          "speaker": "管事的老人",
+          "body": "裂先搁着。寨外传来喊声——河水漫过了界石。",
+          "continue": "继续"
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "A Crack on the Bone",
+        "speaker": "The ritual keeper",
+        "text": "\"This mark, carved, can be left for those after us.\"",
+        "left": "Carve this mark",
+        "right": "Leave it for now",
+        "faces": {
+          "store": {
+            "title": "A Crack on the Bone",
+            "text": "Storing fruit, you feel the crack on the bone. \"Carve this mark—winter has a hold.\"",
+            "left": "Carve this mark",
+            "right": "Set it aside"
+          },
+          "share": {
+            "title": "A Crack on the Bone",
+            "text": "Fruit shared, someone points at the crack. \"Carve it, or it hardly counts as kept.\"",
+            "left": "Carve this mark",
+            "right": "Leave it for now"
+          }
+        },
+        "cutscene": {
+          "carve": {
+            "speaker": "Elder in charge",
+            "body": "The mark is carved. Before it dries, two houses quarrel over the river flat.",
+            "continue": "Continue"
+          },
+          "skip": {
+            "speaker": "Elder in charge",
+            "body": "The crack waits. Shouts outside the gate—river water has climbed past the boundary stone.",
+            "continue": "Continue"
+          }
+        }
+      }
+    },
+    {
+      "id": "T04",
+      "season": "summer",
+      "speaker": "管事的老人",
+      "tutorial": 4,
+      "only_tutorial": true,
       "title": "河水漫过了界石",
       "text": "两家为一条河争了三天。",
       "faces": {
@@ -71,25 +241,131 @@
           "text": "迹刚刻完，两家为一条河争了三天。",
           "left": "各让一步",
           "right": "守住这边",
-          "drop": { "水": { "label": "河滩分开", "note": "拿来一个像水的形，落到这张卡上。" } }
+          "drop": {
+            "水": {
+              "label": "河滩分开",
+              "note": "拿来一个像水的形，落到这张卡上。"
+            }
+          }
         },
         "skip": {
           "title": "河水漫过了界石",
           "text": "裂还搁着，两家已为一条河争了三天。",
           "left": "各让一步",
           "right": "守住这边",
-          "drop": { "水": { "label": "河滩分开", "note": "拿来一个像水的形，落到这张卡上。" } }
+          "drop": {
+            "水": {
+              "label": "河滩分开",
+              "note": "拿来一个像水的形，落到这张卡上。"
+            }
+          }
         }
       },
-      "left":  { "label": "各让一步", "delta": { "outsider": 4, "food": -4 } },
-      "right": { "label": "守住这边", "delta": { "outsider": -4, "food": 4 } },
-      "cutscene": {
-        "yield": { "speaker": "管事的老人", "body": "各让一步，两边暂定。对方又来，要一半的粮。", "continue": "继续" },
-        "hold": { "speaker": "管事的老人", "body": "这边守住了。对方改口，只要你们一半的粮。", "continue": "继续" },
-        "river": { "speaker": "管事的老人", "body": "河滩分开的形落下了。对方又派人来，要一半的粮。", "continue": "继续" }
+      "left": {
+        "label": "各让一步",
+        "delta": {
+          "outsider": 4,
+          "food": -4
+        }
       },
-      "drops": [ { "char": "水", "label": "河滩分开", "delta": { "outsider": 4, "food": -4 }, "note": "拿来一个像水的形，落到这张卡上。" } ] },
-    { "id": "T05", "season": "summer", "speaker": "外族来使", "tutorial": 5, "only_tutorial": true,
+      "right": {
+        "label": "守住这边",
+        "delta": {
+          "outsider": -4,
+          "food": 4
+        }
+      },
+      "cutscene": {
+        "yield": {
+          "speaker": "管事的老人",
+          "body": "各让一步，两边暂定。对方又来，要一半的粮。",
+          "continue": "继续"
+        },
+        "hold": {
+          "speaker": "管事的老人",
+          "body": "这边守住了。对方改口，只要你们一半的粮。",
+          "continue": "继续"
+        },
+        "river": {
+          "speaker": "管事的老人",
+          "body": "河滩分开的形落下了。对方又派人来，要一半的粮。",
+          "continue": "继续"
+        }
+      },
+      "drops": [
+        {
+          "char": "水",
+          "label": "河滩分开",
+          "delta": {
+            "outsider": 4,
+            "food": -4
+          },
+          "note": "拿来一个像水的形，落到这张卡上。"
+        }
+      ],
+      "en": {
+        "title": "River Over the Boundary Stone",
+        "speaker": "Elder in charge",
+        "text": "Two houses have fought over one river for three days.",
+        "left": "Each gives a step",
+        "right": "Hold this side",
+        "drops": {
+          "水": {
+            "label": "Split the river flat",
+            "note": "Take a water-shaped form and drop it on this card."
+          }
+        },
+        "faces": {
+          "carve": {
+            "title": "River Over the Boundary Stone",
+            "text": "Mark just carved, two houses have fought over one river for three days.",
+            "left": "Each gives a step",
+            "right": "Hold this side",
+            "drop": {
+              "水": {
+                "label": "Split the river flat",
+                "note": "Take a water-shaped form and drop it on this card."
+              }
+            }
+          },
+          "skip": {
+            "title": "River Over the Boundary Stone",
+            "text": "Crack still waiting, two houses have already fought over one river for three days.",
+            "left": "Each gives a step",
+            "right": "Hold this side",
+            "drop": {
+              "水": {
+                "label": "Split the river flat",
+                "note": "Take a water-shaped form and drop it on this card."
+              }
+            }
+          }
+        },
+        "cutscene": {
+          "yield": {
+            "speaker": "Elder in charge",
+            "body": "Each gave a step; both sides hold for now. They come again, asking for half the grain.",
+            "continue": "Continue"
+          },
+          "hold": {
+            "speaker": "Elder in charge",
+            "body": "This side held. They change their ask—only half your grain.",
+            "continue": "Continue"
+          },
+          "river": {
+            "speaker": "Elder in charge",
+            "body": "The split-flat form is down. They send people again, asking for half the grain.",
+            "continue": "Continue"
+          }
+        }
+      }
+    },
+    {
+      "id": "T05",
+      "season": "summer",
+      "speaker": "外族来使",
+      "tutorial": 5,
+      "only_tutorial": true,
       "title": "他们要一半的粮",
       "text": "给了，今冬难熬；不给，怕要抡棍棒。",
       "faces": {
@@ -106,77 +382,412 @@
           "right": "给一半"
         }
       },
-      "left":  { "label": "不给", "delta": { "food": 4, "outsider": -8 } },
-      "right": { "label": "给一半", "delta": { "food": -6, "outsider": 6 } },
-      "cutscene": {
-        "refuse": { "speaker": "管事的老人", "body": "粮留下了。这一季的事，先记到这儿。", "continue": "继续" },
-        "half": { "speaker": "管事的老人", "body": "一半交出去了。这一季的事，先记到这儿。", "continue": "继续" }
+      "left": {
+        "label": "不给",
+        "delta": {
+          "food": 4,
+          "outsider": -8
+        }
       },
-      "drops": [] },
-    { "id": "C01", "season": "spring", "speaker": "族长",
+      "right": {
+        "label": "给一半",
+        "delta": {
+          "food": -6,
+          "outsider": 6
+        }
+      },
+      "cutscene": {
+        "refuse": {
+          "speaker": "管事的老人",
+          "body": "粮留下了。这一季的事，先记到这儿。",
+          "continue": "继续"
+        },
+        "half": {
+          "speaker": "管事的老人",
+          "body": "一半交出去了。这一季的事，先记到这儿。",
+          "continue": "继续"
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "They Want Half the Grain",
+        "speaker": "Envoy from outside",
+        "text": "Give it, and winter bites hard; refuse, and they may raise clubs.",
+        "left": "Refuse",
+        "right": "Give half",
+        "faces": {
+          "open": {
+            "title": "They Want Half the Grain",
+            "text": "The river flat went soft. Give it, and winter bites hard; refuse, and they may raise clubs.",
+            "left": "Refuse",
+            "right": "Give half"
+          },
+          "hold": {
+            "title": "They Want Half the Grain",
+            "text": "This side did not yield. Give it, and winter bites hard; refuse, and they may raise clubs.",
+            "left": "Refuse",
+            "right": "Give half"
+          }
+        },
+        "cutscene": {
+          "refuse": {
+            "speaker": "Elder in charge",
+            "body": "The grain stays. This season's matters stop here for now.",
+            "continue": "Continue"
+          },
+          "half": {
+            "speaker": "Elder in charge",
+            "body": "Half went out. This season's matters stop here for now.",
+            "continue": "Continue"
+          }
+        }
+      }
+    },
+    {
+      "id": "C01",
+      "season": "spring",
+      "speaker": "管事的老人",
       "title": "春汛退了",
-      "text": "春汛退了，河滩露出一大片软泥。族长想趁早全族下滩抢种。",
-      "left":  { "label": "全族下滩抢种", "delta": { "food": 8, "outsider": -4 } },
-      "right": { "label": "先把堤补上", "delta": { "food": -4, "memory": 6 } },
-      "drops": [] },
-    { "id": "C02", "season": "spring", "speaker": "采集的妇人",
+      "text": "春汛退了，河滩露出一大片软泥。管事的老人想趁早全族下滩抢种。",
+      "left": {
+        "label": "全族下滩抢种",
+        "delta": {
+          "food": 8,
+          "outsider": -4
+        }
+      },
+      "right": {
+        "label": "先把堤补上",
+        "delta": {
+          "food": -4,
+          "memory": 6
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Spring Flood Goes Down",
+        "speaker": "Elder in charge",
+        "text": "The spring flood has gone down. Soft mud stretches across the river flat. The elder who runs things wants the whole clan down there early to plant.",
+        "left": "Whole clan plants the flat",
+        "right": "Fix the dikes first"
+      }
+    },
+    {
+      "id": "C02",
+      "season": "spring",
+      "speaker": "采集的妇人",
       "title": "北坡塌下去一块",
       "text": "一夜大雨，北坡塌下去一块。她说坡下露出了怪东西，没人敢过去看。",
-      "left":  { "label": "绕开北坡，别招惹", "delta": { "faith": 4, "memory": -4 } },
-      "right": { "label": "下去看个究竟", "delta": { "food": -4, "memory": 6 },
-                 "trace": { "target": "本", "tally_text": "坡上的土被雨冲开，那截老干脚下露出一团盘结的须，顺着往深处挖，越挖越粗，最粗的一股一直扎进石缝里" } },
-      "drops": [] },
-    { "id": "C03", "season": "spring", "speaker": "巫",
+      "left": {
+        "label": "绕开北坡，别招惹",
+        "delta": {
+          "faith": 4,
+          "memory": -4
+        }
+      },
+      "right": {
+        "label": "下去看个究竟",
+        "delta": {
+          "food": -4,
+          "memory": 6
+        },
+        "trace": {
+          "target": "本",
+          "tally_text": "坡上的土被雨冲开，那截老干脚下露出一团盘结的须，顺着往深处挖，越挖越粗，最粗的一股一直扎进石缝里",
+          "tally_text_en": "Rain washed the dirt off. Under that old trunk, a knot of roots shows—dig deeper and they thicken; the thickest drives into the rock crack."
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "North Slope Slides",
+        "speaker": "Foraging woman",
+        "text": "One night of hard rain, a chunk of the north slope slid. She says something strange shows under the slope. Nobody dares go look.",
+        "left": "Steer clear of the slope",
+        "right": "Go down and see"
+      }
+    },
+    {
+      "id": "C03",
+      "season": "spring",
+      "speaker": "巫",
       "title": "播种前要祭河",
       "text": "播种前，巫要拿一头小牲口祭河。",
-      "left":  { "label": "照巫说的祭", "delta": { "faith": 8, "food": -6 } },
-      "right": { "label": "牲口留着开春用", "delta": { "faith": -6, "food": 4 } },
-      "drops": [] },
-    { "id": "C04", "season": "summer", "speaker": "东岸的使者",
+      "left": {
+        "label": "照巫说的祭",
+        "delta": {
+          "faith": 8,
+          "food": -6
+        }
+      },
+      "right": {
+        "label": "牲口留着开春用",
+        "delta": {
+          "faith": -6,
+          "food": 4
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Offer to the River Before Sowing",
+        "speaker": "The ritual keeper",
+        "text": "Before sowing, the ritual keeper wants a small animal offered to the river.",
+        "left": "Offer as asked",
+        "right": "Keep the animal for spring"
+      }
+    },
+    {
+      "id": "C04",
+      "season": "summer",
+      "speaker": "东岸的使者",
       "title": "猎场上的套",
       "text": "东岸的猎手趁水浅过了河，在我们的猎场上下了套。",
-      "left":  { "label": "把他们赶回去", "delta": { "outsider": -8, "food": 4 } },
-      "right": { "label": "猎场让出一半", "delta": { "outsider": 6, "food": -6 } },
-      "drops": [ { "char": "水", "label": "以河为界", "delta": { "outsider": 4, "food": -4 }, "note": "GAMEPLAY §2.4 的落字例子" } ] },
-    { "id": "C05", "season": "summer", "speaker": "北山来的赶路者",
+      "left": {
+        "label": "把他们赶回去",
+        "delta": {
+          "outsider": -8,
+          "food": 4
+        }
+      },
+      "right": {
+        "label": "猎场让出一半",
+        "delta": {
+          "outsider": 6,
+          "food": -6
+        }
+      },
+      "drops": [
+        {
+          "char": "水",
+          "label": "以河为界",
+          "delta": {
+            "outsider": 4,
+            "food": -4
+          },
+          "note": "GAMEPLAY §2.4 的落字例子"
+        }
+      ],
+      "en": {
+        "title": "Snares on Our Hunting Ground",
+        "speaker": "Envoy from the east bank",
+        "text": "East-bank hunters crossed while the water was low and set snares on our hunting ground.",
+        "left": "Drive them back",
+        "right": "Give up half the ground",
+        "drops": {
+          "水": {
+            "label": "Bound by the river"
+          }
+        }
+      }
+    },
+    {
+      "id": "C05",
+      "season": "summer",
+      "speaker": "北山来的赶路者",
       "title": "热得走不动了",
       "text": "一个北山来的赶路者走到村口，热得走不动了。",
-      "left":  { "label": "留他到天凉再走", "delta": { "outsider": 6, "food": -4 },
-                 "trace": { "target": "休", "tally_text": "晌午正热，赶路的背抵着一截老干，头顶叶子遮着太阳，一直待到天色转凉" } },
-      "right": { "label": "催他赶紧上路", "delta": { "outsider": -4, "faith": 4 } },
-      "drops": [] },
-    { "id": "C06", "season": "summer", "speaker": "守堤的老汉",
+      "left": {
+        "label": "留他到天凉再走",
+        "delta": {
+          "outsider": 6,
+          "food": -4
+        },
+        "trace": {
+          "target": "休",
+          "tally_text": "晌午正热，赶路的背抵着一截老干，头顶叶子遮着太阳，一直待到天色转凉",
+          "tally_text_en": "Noon heat. The traveler leans his back on an old trunk; leaves shade him till the day cools."
+        }
+      },
+      "right": {
+        "label": "催他赶紧上路",
+        "delta": {
+          "outsider": -4,
+          "faith": 4
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Too Hot to Keep Walking",
+        "speaker": "Traveler from North Mountain",
+        "text": "A traveler from North Mountain reaches the village gate, too hot to walk on.",
+        "left": "Let him stay till it cools",
+        "right": "Send him on his way"
+      }
+    },
+    {
+      "id": "C06",
+      "season": "summer",
+      "speaker": "守堤的老汉",
       "title": "河水涨过了土坎",
       "text": "夜里河水涨过了第二道土坎，再涨就要漫进粟地。",
-      "left":  { "label": "全族搬上高坡", "delta": { "food": -8, "memory": 4 } },
-      "right": { "label": "守着土坎不走", "delta": { "food": 4, "faith": -6 } },
-      "drops": [] },
-    { "id": "C07", "season": "autumn", "speaker": "族里最壮的汉子",
+      "left": {
+        "label": "全族搬上高坡",
+        "delta": {
+          "food": -8,
+          "memory": 4
+        }
+      },
+      "right": {
+        "label": "守着土坎不走",
+        "delta": {
+          "food": 4,
+          "faith": -6
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "River Past the Dirt Bank",
+        "speaker": "Old man on the dike",
+        "text": "At night the river climbed past the second dirt bank. Higher, and it floods the millet fields.",
+        "left": "Whole clan to the high slope",
+        "right": "Hold the bank and stay"
+      }
+    },
+    {
+      "id": "C07",
+      "season": "autumn",
+      "speaker": "族里最壮的汉子",
       "title": "粟车陷进泥里",
       "text": "满满一车粟陷进了泥里，几个后生推不动。",
-      "left":  { "label": "让他一个人来撬", "delta": { "food": 6, "faith": -4 },
-                 "trace": { "target": "力", "tally_text": "他把耒插进车轮底下的泥里，弯腰往上撬，胳膊上的筋一条条鼓起来，车轮一点点出了泥" } },
-      "right": { "label": "卸下一半再推", "delta": { "food": -4, "memory": 4 } },
-      "drops": [] },
-    { "id": "C08", "season": "autumn", "speaker": "北山的人",
+      "left": {
+        "label": "让他一个人来撬",
+        "delta": {
+          "food": 6,
+          "faith": -4
+        },
+        "trace": {
+          "target": "力",
+          "tally_text": "他把耒插进车轮底下的泥里，弯腰往上撬，胳膊上的筋一条条鼓起来，车轮一点点出了泥",
+          "tally_text_en": "He drives the plow-stick under the wheel into the mud, pries up; cords stand out on his arms; the wheel creeps free."
+        }
+      },
+      "right": {
+        "label": "卸下一半再推",
+        "delta": {
+          "food": -4,
+          "memory": 4
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Millet Cart Stuck in Mud",
+        "speaker": "Strongest man in the clan",
+        "text": "A full cart of millet is stuck in the mud. A few young men can't push it free.",
+        "left": "Let him pry it alone",
+        "right": "Unload half, then push"
+      }
+    },
+    {
+      "id": "C08",
+      "season": "autumn",
+      "speaker": "北山的人",
       "title": "拿牛骨换粟种",
       "text": "北山的人赶着两头牛来，想拿牛骨换我们的粟种。",
-      "left":  { "label": "换", "delta": { "food": -6, "outsider": 4 }, "bones": 1 },
-      "right": { "label": "粟种不给外人", "delta": { "outsider": -4, "food": 4 } },
-      "drops": [] },
-    { "id": "C09", "season": "winter", "speaker": "巫",
+      "left": {
+        "label": "换",
+        "delta": {
+          "food": -6,
+          "outsider": 4
+        },
+        "bones": 1
+      },
+      "right": {
+        "label": "粟种不给外人",
+        "delta": {
+          "outsider": -4,
+          "food": 4
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Trade Cow Bone for Millet Seed",
+        "speaker": "People from North Mountain",
+        "text": "People from North Mountain drive two cattle over. They want to trade cow bone for our millet seed.",
+        "left": "Trade",
+        "right": "Seed stays with us"
+      }
+    },
+    {
+      "id": "C09",
+      "season": "winter",
+      "speaker": "巫",
       "title": "冬祭要一片骨片",
       "text": "冬祭到了。巫要一片骨片去占来年的收成。",
-      "left":  { "label": "给他一片", "delta": { "faith": 8 }, "bones": -1 },
-      "right": { "label": "骨片要留着记事", "delta": { "faith": -6, "memory": 4 }, "hidden_marker": "witch_hostility",
-                 "trace": { "target": "月", "tally_text": "冬祭那夜你守在河边，天上只剩弯弯一牙，又细又亮，照在冰面上像一把镰" } },
-      "drops": [] },
-    { "id": "C10", "season": "winter", "speaker": "族长",
+      "left": {
+        "label": "给他一片",
+        "delta": {
+          "faith": 8
+        },
+        "bones": -1
+      },
+      "right": {
+        "label": "骨片要留着记事",
+        "delta": {
+          "faith": -6,
+          "memory": 4
+        },
+        "hidden_marker": "witch_hostility",
+        "trace": {
+          "target": "月",
+          "tally_text": "冬祭那夜你守在河边，天上只剩弯弯一牙，又细又亮，照在冰面上像一把镰",
+          "tally_text_en": "Winter-rite night by the river. Only a thin bright crescent left in the sky, shining on the ice like a sickle."
+        }
+      },
+      "drops": [],
+      "en": {
+        "title": "Winter Rite Needs a Bone Slip",
+        "speaker": "The ritual keeper",
+        "text": "Winter rite is here. The ritual keeper wants a bone slip to read next year's harvest.",
+        "left": "Give one slip",
+        "right": "Keep the slip for tallies"
+      }
+    },
+    {
+      "id": "C10",
+      "season": "winter",
+      "speaker": "管事的老人",
       "title": "清点过冬的粮",
-      "text": "雪下了三天，族长要清点过冬的粮，看够不够撑到开春。",
-      "left":  { "label": "按户分下去", "delta": { "food": -4, "faith": 4 } },
-      "right": { "label": "先紧着猎手", "delta": { "food": -4, "outsider": 4 } },
-      "drops": [ { "char": "火", "label": "围着一堆柴同吃同睡", "delta": { "faith": 4, "food": -6 }, "note": "落字样例，数值待玩法稿确认" } ] }
+      "text": "雪下了三天，管事的老人要清点过冬的粮，看够不够撑到开春。",
+      "left": {
+        "label": "按户分下去",
+        "delta": {
+          "food": -4,
+          "faith": 4
+        }
+      },
+      "right": {
+        "label": "先紧着猎手",
+        "delta": {
+          "food": -4,
+          "outsider": 4
+        }
+      },
+      "drops": [
+        {
+          "char": "火",
+          "label": "围着一堆柴同吃同睡",
+          "delta": {
+            "faith": 4,
+            "food": -6
+          },
+          "note": "落字样例，数值待玩法稿确认"
+        }
+      ],
+      "en": {
+        "title": "Count the Winter Grain",
+        "speaker": "Elder in charge",
+        "text": "Snow has fallen three days. The elder who runs things wants a count of winter grain—will it last till spring?",
+        "left": "Split by household",
+        "right": "Feed the hunters first",
+        "drops": {
+          "火": {
+            "label": "Share fire, food, and sleep"
+          }
+        }
+      }
+    }
   ],
-  "winter_night": { "after": "last_winter_card", "note": "冬季最后一张卡之后进入冬夜；冬季两张卡的先后按种子洗牌，所以不绑定某一张卡" }
+  "winter_night": {
+    "after": "last_winter_card",
+    "note": "冬季最后一张卡之后进入冬夜；冬季两张卡的先后按种子洗牌，所以不绑定某一张卡"
+  }
 }
